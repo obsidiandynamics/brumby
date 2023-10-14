@@ -10,6 +10,13 @@ bench:
     bash -c 'type cargo-criterion >/dev/null 2>&1 || cargo install cargo-criterion'
     cargo criterion
 
+# run the tests
+test:
+    cargo test
+    cargo test --examples
+    cargo doc --no-deps
+    cargo bench --no-run --profile dev
+
 # install Rust
 install-rust:
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

@@ -5,6 +5,7 @@ use tinyrand::StdRand;
 use bentobox::capture::{CaptureMut, Capture};
 
 fn main() {
+    // probs taken from a popular website
     let mut probs = vec![
         1.0 / 11.0,
         1.0 / 41.0,
@@ -22,10 +23,13 @@ fn main() {
         1.0 / 21.0,
     ];
 
+    // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let overround = probs.normalize();
+
     println!("fair probs: {probs:?}");
     println!("overround: {overround:.3}");
 
+    // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(10_000)
         .with_probabilities(Capture::Borrowed(&probs))
