@@ -1,11 +1,11 @@
 [package]
 name = "bentobox"
-version = "0.2.0"
+version = "0.1.1"
 edition = "2021"
 readme = "README.md"
 authors = ["Emil Koutanov"]
 license = "MIT"
-description = "A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events."
+description = "A fast, allocation-free Monte Carlo model of a top-N podium finish in racing events."
 repository = "https://github.com/obsidiandynamics/bentobox"
 keywords = ["montecarlo", "simulation", "quant"]
 exclude = ["/images", "/bin", "/.idea", "/.github", "/coverage", "/doc", "/examples"]
