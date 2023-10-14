@@ -16,3 +16,13 @@ impl VecExt for Vec<f64> {
         sum
     }
 }
+
+pub struct Fraction {
+    pub numerator: u64,
+    pub denominator: u64,
+}
+impl Fraction {
+    pub fn dec(&self) -> f64 {
+        self.numerator as f64 / self.denominator as f64
+    }
+}
