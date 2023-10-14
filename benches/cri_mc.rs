@@ -31,6 +31,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     for ranked_runner in podium {
         assert_ne!(usize::MAX, ranked_runner);
     }
+    assert_eq!(4, bitmap.iter().filter(|&&item| !item).count());
 
     c.bench_function("cri_mc_wyrand", |b| {
         let mut rand = Wyrand::default();
