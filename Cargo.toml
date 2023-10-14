@@ -24,5 +24,9 @@ name = "cri_mc"
 harness = false
 
 [[bench]]
+name = "cri_mc_engine"
+harness = false
+
+[[bench]]
 name = "cri_selection"
 harness = false

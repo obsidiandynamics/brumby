@@ -79,7 +79,7 @@ pub fn run_many(
     bitmap: &mut [bool],
     rand: &mut impl Rand,
 ) -> Fraction {
-    assert!(validate_params(probabilities, podium, bitmap));
+    assert!(validate_args(probabilities, podium, bitmap));
 
     let mut matching_iters = 0;
     for _ in 0..iterations {
@@ -103,7 +103,7 @@ pub fn run_many(
 
 #[inline(always)]
 pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool], rand: &mut impl Rand) {
-    debug_assert!(validate_params(probabilities, podium, bitmap));
+    debug_assert!(validate_args(probabilities, podium, bitmap));
 
     let runners = probabilities.len();
     let mut prob_sum = 1.0;
@@ -134,7 +134,7 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
     // println!("podium: {podium:?}");
 }
 
-fn validate_params(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]) -> bool {
+fn validate_args(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]) -> bool {
     assert!(!probabilities.is_empty(), "the probabilities slice cannot be empty");
     assert_eq!(probabilities.len(), bitmap.len(), "a bitmap entry must exist for each runner");
     assert!(!podium.is_empty(), "the podium slice cannot be empty");
