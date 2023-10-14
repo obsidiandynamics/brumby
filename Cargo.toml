@@ -2,6 +2,13 @@
 name = "bentobox"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
+authors = ["Emil Koutanov"]
+license = "MIT"
+description = "A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events."
+repository = "https://github.com/obsidiandynamics/bentobox"
+keywords = ["montecarlo", "simulation", "quant"]
+exclude = ["/images", "/bin", "/.idea", "/.github", "/coverage", "/doc", "/examples"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
