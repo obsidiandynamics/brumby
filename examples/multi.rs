@@ -1,5 +1,5 @@
 use bentobox::mc;
-use bentobox::probs::VecExt;
+use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
 use tinyrand::StdRand;
 use bentobox::capture::{CaptureMut, Capture};
@@ -37,6 +37,7 @@ fn main() {
         .with_rand(CaptureMut::Owned(StdRand::default()));
 
     // simulate top-N rankings for all runners
+    // NOTE: rankings and runner numbers are zero-based
     for runner in 0..probs.len() {
         println!("runner: {runner}");
         for rank in 0..4 {

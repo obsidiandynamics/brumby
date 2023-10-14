@@ -2,12 +2,15 @@
 ===
 A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events. Derives probabilities for placing in arbitrary positions given only win probabilities. Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
+# Performance
+Circa 20M simulations/sec on a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. Roughly 80% of time is spent in the RNG routine.
+
 # Example
 Sourced from `examples/multi.rs`.
 
 ```rust
 use bentobox::mc;
-use bentobox::probs::VecExt;
+use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
 use tinyrand::StdRand;
 use bentobox::capture::{CaptureMut, Capture};
@@ -44,6 +47,7 @@ let mut engine = mc::MonteCarloEngine::default()
     .with_rand(CaptureMut::Owned(StdRand::default()));
 
 // simulate top-N rankings for all runners
+// NOTE: rankings and runner numbers are zero-based
 for runner in 0..probs.len() {
     println!("runner: {runner}");
     for rank in 0..4 {

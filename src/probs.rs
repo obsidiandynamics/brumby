@@ -1,9 +1,9 @@
-pub trait VecExt {
+pub trait SliceExt {
     fn sum(&self) -> f64;
 
     fn normalize(&mut self) -> f64;
 }
-impl VecExt for Vec<f64> {
+impl SliceExt for [f64] {
     fn sum(&self) -> f64 {
         self.iter().sum()
     }
