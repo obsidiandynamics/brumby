@@ -135,13 +135,13 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
 }
 
 fn validate_params(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]) -> bool {
-    assert!(!probabilities.is_empty());
-    assert_eq!(probabilities.len(), bitmap.len());
-    assert!(!podium.is_empty());
-    assert!(podium.len() <= probabilities.len());
+    assert!(!probabilities.is_empty(), "the probabilities slice cannot be empty");
+    assert_eq!(probabilities.len(), bitmap.len(), "a bitmap entry must exist for each runner");
+    assert!(!podium.is_empty(), "the podium slice cannot be empty");
+    assert!(podium.len() <= probabilities.len(), "number of podium entries cannot exceed number of runners");
     for &p in probabilities {
-        assert!(p >= 0.0, "invalid probabilities {probabilities:?}");
-        assert!(p <= 1.0, "invalid probabilities {probabilities:?}");
+        assert!(p >= 0.0, "probabilities out of range: {probabilities:?}");
+        assert!(p <= 1.0, "probabilities out of range: {probabilities:?}");
     }
     true
 }
