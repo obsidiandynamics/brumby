@@ -26,8 +26,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];
 
-    // check for panics
+    // sanity check
     mc::run_once(&probs, &mut podium, &mut bitmap, &mut StdRand::default());
+    for ranked_runner in podium {
+        assert_ne!(usize::MAX, ranked_runner);
+    }
 
     c.bench_function("cri_mc_wyrand", |b| {
         let mut rand = Wyrand::default();
