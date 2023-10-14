@@ -3,7 +3,7 @@
 A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events. Derives probabilities for placing in arbitrary positions given only win probabilities. Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
 # Performance
-Circa 20M simulations/sec on a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. Roughly 80% of time is spent in the RNG routine.
+Circa 20M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. Roughly 80% of time is spent in the RNG routine.
 
 # Example
 Sourced from `examples/multi.rs`.

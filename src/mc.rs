@@ -99,7 +99,7 @@ pub fn run_many(
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool], rand: &mut impl Rand) {
     debug_assert!(validate_params(probabilities, podium, bitmap));
 
@@ -144,14 +144,14 @@ fn validate_params(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bo
     true
 }
 
-#[inline]
+#[inline(always)]
 fn reset_bitmap(bitmap: &mut [bool]) {
     for b in bitmap {
         *b = true;
     }
 }
 
-#[inline]
+#[inline(always)]
 fn random_f64(rand: &mut impl Rand) -> f64 {
     rand.next_u64() as f64 / u64::MAX as f64
 }
