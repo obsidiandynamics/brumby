@@ -22,3 +22,7 @@ tinyrand-alloc = "0.5.0"
 [[bench]]
 name = "cri_mc"
 harness = false
+
+[[bench]]
+name = "cri_selection"
+harness = false

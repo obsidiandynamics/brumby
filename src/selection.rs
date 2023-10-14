@@ -7,6 +7,7 @@ pub enum Selection {
     Exact { runner: usize, rank: usize },
 }
 impl Selection {
+    #[inline(always)]
     pub fn matches(&self, podium: &[usize]) -> bool {
         match self {
             Selection::Top { runner, rank } => {
@@ -15,12 +16,12 @@ impl Selection {
                         return true;
                     }
                 }
+                false
             }
             Selection::Exact { runner, rank} => {
-                return podium[*rank] == *runner;
+                podium[*rank] == *runner
             }
         }
-        false
     }
 }
 
