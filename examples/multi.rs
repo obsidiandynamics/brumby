@@ -2,6 +2,7 @@ use bentobox::mc;
 use bentobox::probs::VecExt;
 use bentobox::selection::Selection;
 use tinyrand::StdRand;
+use bentobox::owned::{MaybeOwnedMutSized, MaybeOwned};
 
 fn main() {
     let mut probs = vec![
@@ -24,53 +25,38 @@ fn main() {
     let overround = probs.normalize();
     println!("fair probs: {probs:?}");
     println!("overround: {overround:.3}");
-    let mut podium = vec![usize::MAX; 4];
-    let mut bitmap = vec![false; probs.len()];
-    let mut rand = StdRand::default();
 
-    const ITERS: u64 = 1_000_000;
+    let mut engine = mc::MonteCarloEngine::default()
+        .with_iterations(10_000)
+        .with_probabilities(MaybeOwned::Borrowed(&probs))
+        .with_podium_places(4)
+        .with_rand(MaybeOwnedMutSized::Owned(StdRand::default()));
 
     // simulate top-N rankings for all runners
     for runner in 0..probs.len() {
         println!("runner: {runner}");
         for rank in 0..4 {
-            let frac = mc::run_many(
-                ITERS,
-                &vec![Selection::Top { runner, rank }],
-                &probs,
-                &mut podium,
-                &mut bitmap,
-                &mut rand,
-            );
+            let frac = engine.simulate(&vec![Selection::Top { runner, rank }]);
             println!(
                 "    rank: 0~{rank}, prob: {}, fair price: {:.3}, market odds: {:.3}",
-                frac.dec(),
-                1.0 / frac.dec(),
-                1.0 / frac.dec() / overround
+                frac.quotient(),
+                1.0 / frac.quotient(),
+                1.0 / frac.quotient() / overround
             );
         }
     }
 
-    // simulate a 3-leg same-race multi
+    // simulate a same-race multi for a chosen selection vector
     let selections = vec![
         Selection::Top { runner: 0, rank: 0 },
         Selection::Top { runner: 1, rank: 1 },
         Selection::Top { runner: 2, rank: 2 },
     ];
-    let frac = mc::run_many(
-        ITERS,
-        &selections,
-        &probs,
-        &mut podium,
-        &mut bitmap,
-        &mut rand,
-    );
+    let frac = engine.simulate(&selections);
     println!(
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
-        frac.dec(),
-        1.0 / frac.dec(),
-        1.0 / frac.dec() / overround
+        frac.quotient(),
+        1.0 / frac.quotient(),
+        1.0 / frac.quotient() / overround
     );
-
-    mc::run_once(&probs, &mut podium, &mut bitmap, &mut rand);
 }

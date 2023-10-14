@@ -22,7 +22,7 @@ pub struct Fraction {
     pub denominator: u64,
 }
 impl Fraction {
-    pub fn dec(&self) -> f64 {
+    pub fn quotient(&self) -> f64 {
         self.numerator as f64 / self.denominator as f64
     }
 }
