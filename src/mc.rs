@@ -1,3 +1,5 @@
+//! The core of the Monte Carlo simulator.
+
 use std::ops::DerefMut;
 use crate::probs::Fraction;
 use crate::selection::Selection;
@@ -107,7 +109,7 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
     let mut prob_sum = 1.0;
     reset_bitmap(bitmap);
     // println!("podium.len: {}", podium.len());
-    for rank in 0..podium.len() {
+    for ranked_runner in podium.iter_mut() {
         let mut cumulative = 0.0;
         let random = random_f64(rand) * prob_sum;
         // println!("random={random:.3}, prob_sum={prob_sum}");
@@ -118,7 +120,7 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
                 // println!("probabilities[{runner}]={prob:.3}, cumulative={cumulative:.3}");
                 if cumulative >= random {
                     // println!("chosen runner {runner} for rank {rank}");
-                    podium[rank] = runner;
+                    *ranked_runner = runner;
                     bitmap[runner] = false;
                     prob_sum -= prob;
                     break;
@@ -135,7 +137,7 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
 fn validate_params(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]) -> bool {
     assert!(!probabilities.is_empty());
     assert_eq!(probabilities.len(), bitmap.len());
-    assert!(podium.len() > 0);
+    assert!(!podium.is_empty());
     assert!(podium.len() <= probabilities.len());
     for &p in probabilities {
         assert!(p >= 0.0, "invalid probabilities {probabilities:?}");

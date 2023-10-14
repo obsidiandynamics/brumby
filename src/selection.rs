@@ -1,3 +1,6 @@
+//! A [Selection] is a predicate applied to a podium slice. It is used to determine whether a given
+//! runner has finished in a specific position or among the top-_N_ placings.
+
 #[derive(Debug)]
 pub enum Selection {
     Top { runner: usize, rank: usize },
@@ -7,8 +10,8 @@ impl Selection {
     pub fn matches(&self, podium: &[usize]) -> bool {
         match self {
             Selection::Top { runner, rank } => {
-                for r in 0..=*rank {
-                    if podium[r] == *runner {
+                for ranked_runner in podium[..=*rank].iter() {
+                    if ranked_runner == runner {
                         return true;
                     }
                 }

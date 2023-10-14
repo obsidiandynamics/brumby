@@ -1,3 +1,5 @@
+//! Various utilities for working with probabilities.
+
 pub trait SliceExt {
     fn sum(&self) -> f64;
 

@@ -31,7 +31,7 @@ fn main() {
 
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(10_000)
+        .with_iterations(100_000)
         .with_probabilities(Capture::Borrowed(&probs))
         .with_podium_places(4)
         .with_rand(CaptureMut::Owned(StdRand::default()));
