@@ -2,7 +2,7 @@ use bentobox::mc;
 use bentobox::probs::VecExt;
 use bentobox::selection::Selection;
 use tinyrand::StdRand;
-use bentobox::owned::{MaybeOwnedMutSized, MaybeOwned};
+use bentobox::capture::{CaptureMut, Capture};
 
 fn main() {
     let mut probs = vec![
@@ -28,9 +28,9 @@ fn main() {
 
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(10_000)
-        .with_probabilities(MaybeOwned::Borrowed(&probs))
+        .with_probabilities(Capture::Borrowed(&probs))
         .with_podium_places(4)
-        .with_rand(MaybeOwnedMutSized::Owned(StdRand::default()));
+        .with_rand(CaptureMut::Owned(StdRand::default()));
 
     // simulate top-N rankings for all runners
     for runner in 0..probs.len() {

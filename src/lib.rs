@@ -1,4 +1,4 @@
 pub mod mc;
-pub mod owned;
+pub mod capture;
 pub mod probs;
 pub mod selection;

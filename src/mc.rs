@@ -2,14 +2,14 @@ use std::ops::DerefMut;
 use crate::probs::Fraction;
 use crate::selection::Selection;
 use tinyrand::{Rand, StdRand};
-use crate::owned::{MaybeOwnedMutSized, MaybeOwned, MaybeOwnedMut};
+use crate::capture::{CaptureMut, Capture};
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
-    probabilities: MaybeOwned<'a, [f64]>,
-    podium: MaybeOwnedMut<'a, [usize]>,
-    bitmap: MaybeOwnedMut<'a, [bool]>,
-    rand: MaybeOwnedMutSized<'a, R>,
+    probabilities: Capture<'a, Vec<f64>, [f64]>,
+    podium: CaptureMut<'a, Vec<usize>, [usize]>,
+    bitmap: CaptureMut<'a, Vec<bool>, [bool]>,
+    rand: CaptureMut<'a, R, R>,
 }
 impl<'a, R: Rand> MonteCarloEngine<'a, R> {
     pub fn with_iterations(mut self, iterations: u64) -> Self {
@@ -17,33 +17,33 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self
     }
 
-    pub fn with_probabilities(mut self, probabilities: MaybeOwned<'a, [f64]>) -> Self {
+    pub fn with_probabilities(mut self, probabilities: Capture<'a, Vec<f64>, [f64]>) -> Self {
         self.probabilities = probabilities;
         self
     }
 
     pub fn with_podium_places(self, places: usize) -> Self {
-        self.with_podium(MaybeOwnedMut::Owned(vec![usize::MAX; places]))
+        self.with_podium(CaptureMut::Owned(vec![usize::MAX; places]))
     }
 
-    pub fn with_podium(mut self, podium: MaybeOwnedMut<'a, [usize]>) -> Self {
+    pub fn with_podium(mut self, podium: CaptureMut<'a, Vec<usize>, [usize]>) -> Self {
         self.podium = podium;
         self
     }
 
-    pub fn with_bitmap(mut self, bitmap: MaybeOwnedMut<'a, [bool]>) -> Self {
+    pub fn with_bitmap(mut self, bitmap: CaptureMut<'a, Vec<bool>, [bool]>) -> Self {
         self.bitmap = bitmap;
         self
     }
 
-    pub fn with_rand(mut self, rand: MaybeOwnedMutSized<'a, R>) -> Self {
+    pub fn with_rand(mut self, rand: CaptureMut<'a, R, R>) -> Self {
         self.rand = rand;
         self
     }
 
     pub fn simulate(&mut self, selections: &[Selection]) -> Fraction {
         if self.bitmap.is_empty() {
-            self.bitmap = MaybeOwnedMut::Owned(vec![true; self.probabilities.len()]);
+            self.bitmap = CaptureMut::Owned(vec![true; self.probabilities.len()]);
         }
 
         run_many(
@@ -61,10 +61,10 @@ impl Default for MonteCarloEngine<'_, StdRand> {
     fn default() -> Self {
         Self {
             iterations: 10_000,
-            probabilities: MaybeOwned::Owned(vec![]),
-            podium: MaybeOwnedMut::Owned(vec![]),
-            bitmap: MaybeOwnedMut::Owned(vec![]),
-            rand: MaybeOwnedMutSized::Owned(StdRand::default()),
+            probabilities: Capture::Owned(vec![]),
+            podium: CaptureMut::Owned(vec![]),
+            bitmap: CaptureMut::Owned(vec![]),
+            rand: CaptureMut::Owned(StdRand::default()),
         }
     }
 }
