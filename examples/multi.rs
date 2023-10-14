@@ -62,6 +62,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        1.0 / frac.quotient() / overround
+        1.0 / frac.quotient() / overround.powi(selections.len() as i32)
     );
 }
