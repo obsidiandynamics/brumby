@@ -2,8 +2,12 @@
 ===
 A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events. Derives probabilities for placing in arbitrary positions given only win probabilities. Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
+[![Crates.io](https://img.shields.io/crates/v/bentobox?style=flat-square&logo=rust)](https://crates.io/crates/bentobox)
+[![docs.rs](https://img.shields.io/badge/docs.rs-bentobox-blue?style=flat-square&logo=docs.rs)](https://docs.rs/bentobox)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/obsidiandynamics/bentobox/master.yml?branch=master&style=flat-square&logo=github)](https://github.com/obsidiandynamics/bentobox/actions/workflows/master.yml)
+
 # Performance
-Circa 20M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. Roughly 80% of time is spent in the RNG routine.
+Circa 20M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. (Per thread, benchmarked on Apple M2 Pro.) Roughly 80% of time is spent in the RNG routine.
 
 # Example
 Sourced from `examples/multi.rs`.
