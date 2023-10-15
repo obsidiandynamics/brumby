@@ -2,8 +2,9 @@
 //! Derives probabilities for placing in arbitrary positions given only win probabilities.
 //! Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
-pub mod mc;
 pub mod capture;
+pub mod linear;
+pub mod mc;
 pub mod probs;
 pub mod selection;
 
