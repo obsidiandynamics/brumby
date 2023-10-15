@@ -1,5 +1,6 @@
 //! Utilities for working with probabilities.
 
+use crate::linear::Matrix;
 use std::fmt::{Display, Formatter};
 
 pub trait SliceExt {
@@ -7,6 +8,7 @@ pub trait SliceExt {
     fn normalize(&mut self) -> f64;
     fn dilate_additive(&mut self, factor: f64);
     fn scale(&mut self, factor: f64);
+    fn dilate_rows_additive(&self, matrix: &mut Matrix);
 }
 impl SliceExt for [f64] {
     fn sum(&self) -> f64 {
@@ -30,6 +32,20 @@ impl SliceExt for [f64] {
     fn scale(&mut self, factor: f64) {
         for element in self {
             *element *= factor;
+        }
+    }
+
+    fn dilate_rows_additive(&self, matrix: &mut Matrix) {
+        debug_assert_eq!(
+            self.len(),
+            matrix.rows(),
+            "number of dilation factors {} must match the number of matrix rows {}",
+            self.len(),
+            matrix.rows()
+        );
+        for (row, factor) in self.iter().enumerate() {
+            let row_slice = matrix.row_slice_mut(row);
+            row_slice.dilate_additive(*factor);
         }
     }
 }
@@ -73,7 +89,7 @@ impl Display for Fraction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_float_eq::{afe_is_f64_near, afe_near_error_msg, assert_f64_near};
+    use assert_float_eq::*;
 
     #[test]
     fn sum() {
@@ -89,6 +105,27 @@ mod tests {
         assert_slice_f64_near(&[0.1, 0.2, 0.3, 0.4], &data, 1);
     }
 
+    #[test]
+    fn dilate_additive_zero() {
+        let mut data = [0.1, 0.2, 0.3, 0.4];
+        data.dilate_additive(0.0);
+        assert_slice_f64_near(&[0.1, 0.2, 0.3, 0.4], &data, 1);
+    }
+
+    #[test]
+    fn dilate_additive_pve() {
+        let mut data = [0.1, 0.2, 0.3, 0.4];
+        data.dilate_additive(0.2);
+        assert_slice_f64_relative(&[0.125, 0.2083, 0.2917, 0.375], &data, 0.01);
+    }
+
+    #[test]
+    fn dilate_additive_nve() {
+        let mut data = [0.1, 0.2, 0.3, 0.4];
+        data.dilate_additive(-0.2);
+        assert_slice_f64_relative(&[0.0625, 0.1875, 0.3125, 0.4375], &data, 0.01);
+    }
+
     fn assert_slice_f64_near(expected: &[f64], actual: &[f64], distance: u32) {
         assert_eq!(
             expected.len(),
@@ -99,6 +136,19 @@ mod tests {
         );
         for (index, &value) in expected.iter().enumerate() {
             assert_f64_near!(value, actual[index], distance);
+        }
+    }
+
+    fn assert_slice_f64_relative(expected: &[f64], actual: &[f64], epsilon: f64) {
+        assert_eq!(
+            expected.len(),
+            actual.len(),
+            "lengths do not match: {} ≠ {}",
+            expected.len(),
+            actual.len()
+        );
+        for (index, &value) in expected.iter().enumerate() {
+            assert_float_relative_eq!(value, actual[index], epsilon);
         }
     }
 }

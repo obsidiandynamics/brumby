@@ -1,4 +1,6 @@
+use bentobox::capture::Capture;
 use bentobox::mc;
+use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
 use criterion::{criterion_group, criterion_main, Criterion};
 use tinyrand::{StdRand, Wyrand};
@@ -21,8 +23,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         1.0 / 5.0,
         1.0 / 21.0,
     ];
-
     probs.normalize();
+    let probs = DilatedProbs::default()
+        .with_win_probs(Capture::Borrowed(&probs))
+        .undilated(4)
+        .into();
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];
 

@@ -39,16 +39,17 @@ fn main() {
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let overround = probs.normalize();
+    // let dilatives = [0.0, 0.1, 0.10, 0.15];
+    let dilatives = [0.0, 0.0, 0.0, 0.0];
 
     println!("fair probs: {probs:?}");
     println!("overround: {overround:.3}");
 
     // create an MC engine for reuse
-    let podium_places = 4;
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
         .with_win_probs(Capture::Borrowed(&probs))
-        .with_podium_places(podium_places);
+        .with_dilatives(Capture::Borrowed(&dilatives));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
@@ -65,6 +66,7 @@ fn main() {
         data.push(rank_data);
     }
 
+    let podium_places = dilatives.len();
     let mut table = Table::default()
         .with_cols({
             let mut cols = vec![];

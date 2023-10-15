@@ -28,6 +28,10 @@ impl Matrix {
     pub fn cols(&self) -> usize {
         self.cols
     }
+    
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
     pub fn row_slice(&self, row: usize) -> &[f64] {
         debug_assert!(self.validate_row_index(row));
@@ -55,12 +59,24 @@ impl Matrix {
         }
     }
 
+    pub fn clone_row(&mut self, source_row: &[f64]) {
+        debug_assert_eq!(self.cols, source_row.len(), "length of source row {} does not match number of columns {}", source_row.len(), self.cols);
+        for row in 0..self.rows {
+            let row_slice = self.row_slice_mut(row);
+            row_slice.copy_from_slice(source_row);
+        }
+    }
+
     pub fn verbose(&self) -> VerboseFormat {
         VerboseFormat { referent: self }
     }
 
     pub fn unpack(self) -> (Vec<f64>, usize, usize) {
         (self.data, self.rows, self.cols)
+    }
+    
+    pub fn flatten(&self) -> &[f64] {
+        &self.data
     }
 
     fn validate_row_index(&self, row: usize) -> bool {
@@ -229,7 +245,13 @@ mod tests {
         let mut matrix = Matrix::allocate(3, 2);
         populate_with_test_data(&mut matrix);
         matrix.scale_rows(&[2.0, 4.0, 6.0]);
-        let (data, _, _) = matrix.unpack();
-        assert_eq!(&[0.0, 20.0, 80.0, 120.0, 240.0, 300.0], &*data);
+        assert_eq!(&[0.0, 20.0, 80.0, 120.0, 240.0, 300.0], matrix.flatten());
+    }
+
+    #[test]
+    fn clone_row() {
+        let mut matrix = Matrix::allocate(3, 2);
+        matrix.clone_row(&[3.0, 4.0]);
+        assert_eq!(&[3.0, 4.0, 3.0, 4.0, 3.0, 4.0], matrix.flatten());
     }
 }
