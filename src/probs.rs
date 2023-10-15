@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 pub trait SliceExt {
     fn sum(&self) -> f64;
     fn normalize(&mut self) -> f64;
-    fn dilate(&mut self, factor: f64);
+    fn dilate_additive(&mut self, factor: f64);
     fn scale(&mut self, factor: f64);
 }
 impl SliceExt for [f64] {
@@ -15,15 +15,15 @@ impl SliceExt for [f64] {
 
     fn normalize(&mut self) -> f64 {
         let sum = self.sum();
-        self.scale(1.0/sum);
+        self.scale(1.0 / sum);
         sum
     }
 
-    fn dilate(&mut self, factor: f64) {
+    fn dilate_additive(&mut self, factor: f64) {
         if factor >= 0.0 {
-            dilate_pve(self, factor);
+            dilate_additive_pve(self, factor);
         } else {
-            dilate_nve(self, factor);
+            dilate_additive(self, factor);
         }
     }
 
@@ -35,7 +35,7 @@ impl SliceExt for [f64] {
 }
 
 #[inline(always)]
-fn dilate_pve(slice: &mut [f64], factor: f64) {
+fn dilate_additive_pve(slice: &mut [f64], factor: f64) {
     let share = factor / slice.len() as f64;
     for element in slice {
         *element = (*element + share) / (1.0 + factor)
@@ -43,7 +43,7 @@ fn dilate_pve(slice: &mut [f64], factor: f64) {
 }
 
 #[inline(always)]
-fn dilate_nve(slice: &mut [f64], factor: f64) {
+fn dilate_additive(slice: &mut [f64], factor: f64) {
     let share = factor / slice.len() as f64;
     let mut sum = 0.0;
     for element in &mut *slice {

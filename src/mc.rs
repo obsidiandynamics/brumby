@@ -1,10 +1,10 @@
 //! The core of the Monte Carlo simulator.
 
-use std::ops::DerefMut;
+use crate::capture::{Capture, CaptureMut};
 use crate::probs::Fraction;
 use crate::selection::Selection;
+use std::ops::DerefMut;
 use tinyrand::{Rand, StdRand};
-use crate::capture::{CaptureMut, Capture};
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
@@ -54,7 +54,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             &self.probabilities,
             &mut self.podium,
             &mut self.bitmap,
-           self.rand.deref_mut(),
+            self.rand.deref_mut(),
         )
     }
 }
@@ -102,7 +102,12 @@ pub fn run_many(
 }
 
 #[inline(always)]
-pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool], rand: &mut impl Rand) {
+pub fn run_once(
+    probabilities: &[f64],
+    podium: &mut [usize],
+    bitmap: &mut [bool],
+    rand: &mut impl Rand,
+) {
     debug_assert!(validate_args(probabilities, podium, bitmap));
 
     let runners = probabilities.len();
@@ -135,10 +140,20 @@ pub fn run_once(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]
 }
 
 fn validate_args(probabilities: &[f64], podium: &mut [usize], bitmap: &mut [bool]) -> bool {
-    assert!(!probabilities.is_empty(), "the probabilities slice cannot be empty");
-    assert_eq!(probabilities.len(), bitmap.len(), "a bitmap entry must exist for each runner");
+    assert!(
+        !probabilities.is_empty(),
+        "the probabilities slice cannot be empty"
+    );
+    assert_eq!(
+        probabilities.len(),
+        bitmap.len(),
+        "a bitmap entry must exist for each runner"
+    );
     assert!(!podium.is_empty(), "the podium slice cannot be empty");
-    assert!(podium.len() <= probabilities.len(), "number of podium entries cannot exceed number of runners");
+    assert!(
+        podium.len() <= probabilities.len(),
+        "number of podium entries cannot exceed number of runners"
+    );
     for &p in probabilities {
         assert!(p >= 0.0, "probabilities out of range: {probabilities:?}");
         assert!(p <= 1.0, "probabilities out of range: {probabilities:?}");

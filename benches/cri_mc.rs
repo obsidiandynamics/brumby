@@ -1,8 +1,8 @@
+use bentobox::mc;
+use bentobox::probs::SliceExt;
 use criterion::{criterion_group, criterion_main, Criterion};
 use tinyrand::{StdRand, Wyrand};
 use tinyrand_alloc::Mock;
-use bentobox::mc;
-use bentobox::probs::SliceExt;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut probs = [

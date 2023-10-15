@@ -58,7 +58,10 @@ fn main() {
     for runner in 0..probs.len() {
         let mut rank_data = vec![];
         for rank in 0..4 {
-            let frac = engine.simulate(&vec![Selection::Top { runner, rank }]);
+            let frac = engine.simulate(&vec![Selection::Span {
+                runner,
+                ranks: 0..rank + 1,
+            }]);
             rank_data.push(frac);
         }
         data.push(rank_data);
@@ -67,14 +70,8 @@ fn main() {
     let mut table = Table::default()
         .with_cols({
             let mut cols = vec![];
-            cols.push(Col::new(Styles::default().with(MinWidth(10)).with(HAlign::Centred)));
-            for _ in 0..podium_places {
-                cols.push(Col::new(
-                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
-                ));
-            }
             cols.push(Col::new(
-                Styles::default().with(Separator(true)).with(MinWidth(5)).with(HAlign::Centred),
+                Styles::default().with(MinWidth(10)).with(HAlign::Centred),
             ));
             for _ in 0..podium_places {
                 cols.push(Col::new(
@@ -82,7 +79,21 @@ fn main() {
                 ));
             }
             cols.push(Col::new(
-                Styles::default().with(Separator(true)).with(MinWidth(5)).with(HAlign::Centred),
+                Styles::default()
+                    .with(Separator(true))
+                    .with(MinWidth(5))
+                    .with(HAlign::Centred),
+            ));
+            for _ in 0..podium_places {
+                cols.push(Col::new(
+                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
+                ));
+            }
+            cols.push(Col::new(
+                Styles::default()
+                    .with(Separator(true))
+                    .with(MinWidth(5))
+                    .with(HAlign::Centred),
             ));
             for _ in 0..podium_places {
                 cols.push(Col::new(
@@ -147,9 +158,18 @@ fn main() {
 
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
-        Selection::Top { runner: 0, rank: 0 },
-        Selection::Top { runner: 1, rank: 1 },
-        Selection::Top { runner: 2, rank: 2 },
+        Selection::Span {
+            runner: 0,
+            ranks: 0..1,
+        },
+        Selection::Span {
+            runner: 1,
+            ranks: 0..2,
+        },
+        Selection::Span {
+            runner: 2,
+            ranks: 0..3,
+        },
     ];
     let frac = engine.simulate(&selections);
     println!(

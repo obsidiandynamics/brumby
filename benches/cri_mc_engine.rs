@@ -35,8 +35,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     {
         // sanity check
         let selections = [
-            Selection::Top { runner: 0, rank: 0 },
-            Selection::Top { runner: 1, rank: 1 },
+            Selection::Span {
+                runner: 0,
+                ranks: 0..1,
+            },
+            Selection::Span {
+                runner: 1,
+                ranks: 0..2,
+            },
         ];
         let frac = engine.simulate(&selections);
         assert!(frac.numerator > 0);
@@ -45,8 +51,14 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("cri_mc_engine_exacta", |b| {
         let selections = [
-            Selection::Top { runner: 0, rank: 0 },
-            Selection::Top { runner: 1, rank: 1 },
+            Selection::Span {
+                runner: 0,
+                ranks: 0..1,
+            },
+            Selection::Span {
+                runner: 1,
+                ranks: 0..2,
+            },
         ];
         b.iter(|| {
             engine.simulate(&selections);
@@ -54,9 +66,18 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("cri_mc_engine_trifecta", |b| {
         let selections = [
-            Selection::Top { runner: 0, rank: 0 },
-            Selection::Top { runner: 1, rank: 1 },
-            Selection::Top { runner: 2, rank: 2 },
+            Selection::Span {
+                runner: 0,
+                ranks: 0..1,
+            },
+            Selection::Span {
+                runner: 1,
+                ranks: 0..2,
+            },
+            Selection::Span {
+                runner: 2,
+                ranks: 0..3,
+            },
         ];
         b.iter(|| {
             engine.simulate(&selections);
@@ -64,10 +85,22 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("cri_mc_engine_first4", |b| {
         let selections = [
-            Selection::Top { runner: 0, rank: 0 },
-            Selection::Top { runner: 1, rank: 1 },
-            Selection::Top { runner: 2, rank: 2 },
-            Selection::Top { runner: 3, rank: 3 },
+            Selection::Span {
+                runner: 0,
+                ranks: 0..1,
+            },
+            Selection::Span {
+                runner: 1,
+                ranks: 0..2,
+            },
+            Selection::Span {
+                runner: 2,
+                ranks: 0..3,
+            },
+            Selection::Span {
+                runner: 3,
+                ranks: 0..4,
+            },
         ];
         b.iter(|| {
             engine.simulate(&selections);
