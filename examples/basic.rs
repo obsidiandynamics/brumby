@@ -1,8 +1,7 @@
-use bentobox::capture::{Capture, CaptureMut};
+use bentobox::capture::Capture;
 use bentobox::mc;
 use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
-use tinyrand::StdRand;
 
 fn main() {
     // probs taken from a popular website
@@ -26,9 +25,8 @@ fn main() {
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
-        .with_probabilities(Capture::Borrowed(&probs))
-        .with_podium_places(4)
-        .with_rand(CaptureMut::Owned(StdRand::default()));
+        .with_win_probs(Capture::Borrowed(&probs))
+        .with_podium_places(4);
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based

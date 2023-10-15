@@ -29,7 +29,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         .with_iterations(1_000)
         .with_podium_places(4)
         .with_bitmap(CaptureMut::Borrowed(&mut bitmap))
-        .with_probabilities(Capture::Borrowed(&probs))
+        .with_win_probs(Capture::Borrowed(&probs))
         .with_podium(CaptureMut::Borrowed(&mut podium));
 
     {

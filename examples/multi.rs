@@ -2,9 +2,8 @@ use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
-use tinyrand::StdRand;
 
-use bentobox::capture::{Capture, CaptureMut};
+use bentobox::capture::Capture;
 use bentobox::mc;
 use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
@@ -48,9 +47,8 @@ fn main() {
     let podium_places = 4;
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
-        .with_probabilities(Capture::Borrowed(&probs))
-        .with_podium_places(podium_places)
-        .with_rand(CaptureMut::Owned(StdRand::default()));
+        .with_win_probs(Capture::Borrowed(&probs))
+        .with_podium_places(podium_places);
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based

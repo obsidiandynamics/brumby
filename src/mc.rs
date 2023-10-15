@@ -8,19 +8,29 @@ use tinyrand::{Rand, StdRand};
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
-    probabilities: Capture<'a, Vec<f64>, [f64]>,
+    win_probs: Capture<'a, Vec<f64>, [f64]>,
     podium: CaptureMut<'a, Vec<usize>, [usize]>,
     bitmap: CaptureMut<'a, Vec<bool>, [bool]>,
     rand: CaptureMut<'a, R, R>,
 }
 impl<'a, R: Rand> MonteCarloEngine<'a, R> {
+    pub fn new(rand: CaptureMut<'a, R, R>) -> Self where R: Default {
+        Self {
+            iterations: 10_000,
+            win_probs: Capture::Owned(vec![]),
+            podium: CaptureMut::Owned(vec![]),
+            bitmap: CaptureMut::Owned(vec![]),
+            rand,
+        }
+    }
+
     pub fn with_iterations(mut self, iterations: u64) -> Self {
         self.iterations = iterations;
         self
     }
 
-    pub fn with_probabilities(mut self, probabilities: Capture<'a, Vec<f64>, [f64]>) -> Self {
-        self.probabilities = probabilities;
+    pub fn with_win_probs(mut self, win_probs: Capture<'a, Vec<f64>, [f64]>) -> Self {
+        self.win_probs = win_probs;
         self
     }
 
@@ -38,20 +48,15 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self
     }
 
-    pub fn with_rand(mut self, rand: CaptureMut<'a, R, R>) -> Self {
-        self.rand = rand;
-        self
-    }
-
     pub fn simulate(&mut self, selections: &[Selection]) -> Fraction {
         if self.bitmap.is_empty() {
-            self.bitmap = CaptureMut::Owned(vec![true; self.probabilities.len()]);
+            self.bitmap = CaptureMut::Owned(vec![true; self.win_probs.len()]);
         }
 
         run_many(
             self.iterations,
             selections,
-            &self.probabilities,
+            &self.win_probs,
             &mut self.podium,
             &mut self.bitmap,
             self.rand.deref_mut(),
@@ -61,13 +66,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
 impl Default for MonteCarloEngine<'_, StdRand> {
     fn default() -> Self {
-        Self {
-            iterations: 10_000,
-            probabilities: Capture::Owned(vec![]),
-            podium: CaptureMut::Owned(vec![]),
-            bitmap: CaptureMut::Owned(vec![]),
-            rand: CaptureMut::Owned(StdRand::default()),
-        }
+        Self::new(CaptureMut::Owned(StdRand::default()))
     }
 }
 
