@@ -38,7 +38,7 @@ println!("overround: {overround:.3}");
 
 // create an MC engine for reuse
 let mut engine = mc::MonteCarloEngine::default()
-    .with_iterations(100_000)
+    .with_iterations(10_000)
     .with_win_probs(Capture::Borrowed(&probs))
     .with_podium_places(4);
 

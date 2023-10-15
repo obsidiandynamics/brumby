@@ -11,7 +11,6 @@ pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
     probs: Option<Capture<'a, Matrix, Matrix>>,
     podium_places: Option<usize>,
-    dilatives: Option<Capture<'a, Vec<f64>, [f64]>>,
     win_probs: Option<Capture<'a, Vec<f64>, [f64]>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
@@ -23,7 +22,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             iterations: 10_000,
             probs: None,
             podium_places: None,
-            dilatives: None,
             win_probs: None,
             podium: None,
             bitmap: None,
@@ -43,11 +41,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
     pub fn with_podium_places(mut self, places: usize) -> Self {
         self.podium_places = Some(places);
-        self
-    }
-
-    pub fn with_dilatives(mut self, dilatives: Capture<'a, Vec<f64>, [f64]>) -> Self {
-        self.dilatives = Some(dilatives);
         self
     }
 
@@ -83,8 +76,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             podium.len()
         } else if let Some(probs) = &self.probs {
             probs.rows()
-        } else if let Some(dilatives) = &self.dilatives {
-            dilatives.len()
         } else {
             panic!("no podium specified");
         }
@@ -105,13 +96,10 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         if self.probs.is_none() {
             let mut probs = Matrix::allocate(self.num_ranks(), self.num_runners());
             probs.clone_row(&*self.win_probs.as_ref().unwrap());
-            if let Some(dilatives) = &self.dilatives {
-                dilatives.dilate_rows_additive(&mut probs);
-            }
             self.probs = Some(Capture::Owned(probs));
         }
 
-        println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
+        // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
 
         run_many(
             self.iterations,

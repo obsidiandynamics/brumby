@@ -5,6 +5,7 @@ use stanza::table::{Col, Row, Table};
 
 use bentobox::capture::Capture;
 use bentobox::mc;
+use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
 
@@ -39,17 +40,26 @@ fn main() {
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let overround = probs.normalize();
-    // let dilatives = [0.0, 0.1, 0.10, 0.15];
+
+    //TODO fav-longshot debias
+    // probs.dilate_additive(-0.02);
+
+    // let dilatives = [0.0, 0.15, 0.15, 0.15];
     let dilatives = [0.0, 0.0, 0.0, 0.0];
 
     println!("fair probs: {probs:?}");
+    println!("dilatives: {dilatives:?}");
     println!("overround: {overround:.3}");
 
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
-        .with_win_probs(Capture::Borrowed(&probs))
-        .with_dilatives(Capture::Borrowed(&dilatives));
+        .with_probs(Capture::Owned(
+            DilatedProbs::default()
+                .with_win_probs(Capture::Borrowed(&probs))
+                .with_dilatives(Capture::Borrowed(&dilatives))
+                .into(),
+        ));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
