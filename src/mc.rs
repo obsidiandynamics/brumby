@@ -153,7 +153,7 @@ impl From<DilatedProbs<'_>> for Matrix {
         let dilatives = probs.dilatives.expect("no dilatives specified");
         let mut matrix = Matrix::allocate(dilatives.len(), win_probs.len());
         matrix.clone_row(&win_probs);
-        dilatives.dilate_rows_additive(&mut matrix);
+        dilatives.dilate_rows_additive(&mut matrix); //TODO
         matrix
     }
 }
@@ -191,12 +191,11 @@ pub fn run_once(
     debug_assert!(validate_args(probs, podium, bitmap));
 
     let runners = probs.cols();
-    let mut prob_sum = 1.0;
     reset_bitmap(bitmap);
     // println!("podium.len: {}", podium.len());
     for (rank, ranked_runner) in podium.iter_mut().enumerate() {
         let mut cumulative = 0.0;
-        let random = random_f64(rand) * prob_sum;
+        let random = random_f64(rand);
         let rank_probs = probs.row_slice(rank);
         // println!("random={random:.3}, prob_sum={prob_sum}");
         for runner in 0..runners {
@@ -208,7 +207,6 @@ pub fn run_once(
                     // println!("chosen runner {runner} for rank {rank}");
                     *ranked_runner = runner;
                     bitmap[runner] = false;
-                    prob_sum -= prob;
                     break;
                 }
             } /*else {

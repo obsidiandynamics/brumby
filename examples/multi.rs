@@ -28,53 +28,69 @@ fn main() {
     //     1.0 / 5.0,
     //     1.0 / 21.0,
     // ];
+    // let mut probs = vec![
+    //     1.0 / 2.0,
+    //     1.0 / 12.0,
+    //     1.0 / 3.0,
+    //     1.0 / 9.50,
+    //     1.0 / 7.50,
+    //     1.0 / 126.0,
+    //     1.0 / 23.0,
+    //     1.0 / 14.0,
+    // ];
     let mut probs = vec![
-        1.0 / 2.0,
-        1.0 / 12.0,
-        1.0 / 3.0,
-        1.0 / 9.50,
-        1.0 / 7.50,
-        1.0 / 126.0,
-        1.0 / 23.0,
+        1.0 / 3.7,
         1.0 / 14.0,
+        1.0 / 5.50,
+        1.0 / 9.50,
+        1.0 / 1.90,
+        1.0 / 13.0,
     ];
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let overround = probs.normalize();
 
-    //TODO fav-longshot debias
-    // probs.dilate_additive(-0.02);
+    //TODO fav-longshot bias removal
+    let favlong_dilate = -0.0;
+    probs.dilate_additive(favlong_dilate);
 
-    // let dilatives = [0.0, 0.15, 0.15, 0.15];
+    // let dilatives = [0.0, 9.0, 0.0, 0.0];
     let dilatives = [0.0, 0.0, 0.0, 0.0];
+
+    let ranked_overrounds = [overround, 1.215, 1.136, 1.079];
 
     println!("fair probs: {probs:?}");
     println!("dilatives: {dilatives:?}");
     println!("overround: {overround:.3}");
 
+    let matrix: Matrix =  DilatedProbs::default()
+        .with_win_probs(Capture::Borrowed(&probs))
+        .with_dilatives(Capture::Borrowed(&dilatives))
+        .into();
+
+    println!("simulating with: \n{}", matrix.verbose());
+
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
-        .with_probs(Capture::Owned(
-            DilatedProbs::default()
-                .with_win_probs(Capture::Borrowed(&probs))
-                .with_dilatives(Capture::Borrowed(&dilatives))
-                .into(),
-        ));
+        .with_probs(Capture::Owned(matrix));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
     let podium_places = dilatives.len();
-    let mut derived = Matrix::allocate(probs.len(), podium_places);
+    let mut derived = Matrix::allocate(podium_places, probs.len());
     for runner in 0..probs.len() {
         for rank in 0..4 {
             let frac = engine.simulate(&vec![Selection::Span {
                 runner,
                 ranks: 0..rank + 1,
             }]);
-            derived[(runner, rank)] = frac.quotient();
+            derived[(rank, runner)] = frac.quotient();
         }
     }
+
+    //TODO fav-longshot bias addition
+    derived.row_slice_mut(0).dilate_additive(1.0/(1.0 + favlong_dilate) - 1.0);
 
     let mut table = Table::default()
         .with_cols({
@@ -147,19 +163,18 @@ fn main() {
         });
 
     for runner in 0..probs.len() {
-        let row_slice = derived.row_slice(runner);
         //println!("runner: {runner}");
         let mut row_cells = vec![format!("{}", runner + 1).into()];
-        for prob in row_slice {
-            row_cells.push(format!("{}", prob).into());
+        for rank in 0..podium_places {
+            row_cells.push(format!("{}", derived[(rank, runner)]).into());
         }
         row_cells.push(format!("{}", runner + 1).into());
-        for prob in row_slice {
-            row_cells.push(format!("{:.3}", 1.0 / prob).into());
+        for rank in 0..podium_places {
+            row_cells.push(format!("{:.3}", 1.0 / derived[(rank, runner)]).into());
         }
         row_cells.push(format!("{}", runner + 1).into());
-        for prob in row_slice {
-            let odds = f64::max(1.0, 1.0 / prob / overround);
+        for rank in 0..podium_places {
+            let odds = f64::max(1.0, 1.0 / derived[(rank, runner)] / ranked_overrounds[rank]);
             row_cells.push(format!("{odds:.3}").into());
         }
         table.push_row(Row::new(Styles::default(), row_cells.into()));
