@@ -2,6 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
+use crate::probs::SliceExt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Matrix {
@@ -40,8 +41,26 @@ impl Matrix {
         &mut self.data.as_mut_slice()[row_start..(row_start + self.cols)]
     }
 
+    pub fn scale_rows(&mut self, factors: &[f64]) {
+        debug_assert_eq!(
+            self.rows,
+            factors.len(),
+            "number of factors {} does not match number of rows {}",
+            factors.len(),
+            self.rows
+        );
+        for (row, &factor) in factors.iter().enumerate() {
+            let row_slice = self.row_slice_mut(row);
+            row_slice.scale(factor);
+        }
+    }
+
     pub fn verbose(&self) -> VerboseFormat {
         VerboseFormat { referent: self }
+    }
+
+    pub fn unpack(self) -> (Vec<f64>, usize, usize) {
+        (self.data, self.rows, self.cols)
     }
 
     fn validate_row_index(&self, row: usize) -> bool {
@@ -112,6 +131,14 @@ impl IndexMut<(usize, usize)> for Matrix {
 mod tests {
     use super::*;
 
+    fn populate_with_test_data(matrix: &mut Matrix) {
+        for row in 0..matrix.rows() {
+            for col in 0..matrix.cols() {
+                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
+            }
+        }
+    }
+
     #[test]
     fn index() {
         let mut matrix = Matrix::allocate(4, 3);
@@ -150,11 +177,7 @@ mod tests {
     #[test]
     fn row_slice() {
         let mut matrix = Matrix::allocate(3, 2);
-        for row in 0..matrix.rows() {
-            for col in 0..matrix.cols() {
-                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
-            }
-        }
+        populate_with_test_data(&mut matrix);
         assert_eq!(&[0.0, 10.0], matrix.row_slice(0));
         assert_eq!(&[20.0, 30.0], matrix.row_slice(1));
         assert_eq!(&[40.0, 50.0], matrix.row_slice(2));
@@ -173,11 +196,7 @@ mod tests {
     #[test]
     fn display() {
         let mut matrix = Matrix::allocate(3, 2);
-        for row in 0..matrix.rows() {
-            for col in 0..matrix.cols() {
-                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
-            }
-        }
+        populate_with_test_data(&mut matrix);
         let display = format!("{matrix}");
         assert_eq!("[0.0, 10.0][20.0, 30.0][40.0, 50.0]", display);
     }
@@ -185,11 +204,7 @@ mod tests {
     #[test]
     fn verbose_display() {
         let mut matrix = Matrix::allocate(3, 2);
-        for row in 0..matrix.rows() {
-            for col in 0..matrix.cols() {
-                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
-            }
-        }
+        populate_with_test_data(&mut matrix);
         let display = format!("{}", matrix.verbose());
         assert_eq!(
             "[0.0, 10.0]\n\
@@ -197,5 +212,24 @@ mod tests {
             [40.0, 50.0]\n",
             display
         );
+    }
+
+    #[test]
+    fn unpack() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        let (data, rows, cols) = matrix.unpack();
+        assert_eq!(3, rows);
+        assert_eq!(2, cols);
+        assert_eq!(&[0.0, 10.0, 20.0, 30.0, 40.0, 50.0], &*data);
+    }
+
+    #[test]
+    fn scale_rows() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        matrix.scale_rows(&[2.0, 4.0, 6.0]);
+        let (data, _, _) = matrix.unpack();
+        assert_eq!(&[0.0, 20.0, 80.0, 120.0, 240.0, 300.0], &*data);
     }
 }
