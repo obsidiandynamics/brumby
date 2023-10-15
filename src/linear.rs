@@ -1,16 +1,21 @@
 //! Support for linear algebra.
 
+use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct Matrix {
     data: Vec<f64>,
     rows: usize,
-    cols: usize
+    cols: usize,
 }
 impl Matrix {
     pub fn allocate(rows: usize, cols: usize) -> Self {
         let (len, overflow) = rows.overflowing_mul(cols);
-        assert!(!overflow, "allocation of a {rows}x{cols} matrix failed due to overflow");
+        assert!(
+            !overflow,
+            "allocation of a {rows}x{cols} matrix failed due to overflow"
+        );
         let data = vec![0.0; len];
         Self { data, rows, cols }
     }
@@ -35,14 +40,49 @@ impl Matrix {
         &mut self.data.as_mut_slice()[row_start..(row_start + self.cols)]
     }
 
+    pub fn verbose(&self) -> VerboseFormat {
+        VerboseFormat { referent: self }
+    }
+
     fn validate_row_index(&self, row: usize) -> bool {
-        assert!(row < self.rows, "invalid row index {row} for a {}x{} matrix", self.rows, self.cols);
+        assert!(
+            row < self.rows,
+            "invalid row index {row} for a {}x{} matrix",
+            self.rows,
+            self.cols
+        );
         true
     }
 
     fn validate_col_index(&self, col: usize) -> bool {
-        assert!(col < self.cols, "invalid column index {col} for a {}x{} matrix", self.rows, self.cols);
+        assert!(
+            col < self.cols,
+            "invalid column index {col} for a {}x{} matrix",
+            self.rows,
+            self.cols
+        );
         true
+    }
+}
+
+impl Display for Matrix {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for row in 0..self.rows {
+            write!(f, "{:?}", self.row_slice(row))?;
+        }
+        Ok(())
+    }
+}
+
+pub struct VerboseFormat<'a> {
+    referent: &'a Matrix,
+}
+impl Display for VerboseFormat<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for row in 0..self.referent.rows {
+            writeln!(f, "{:?}", self.referent.row_slice(row))?;
+        }
+        Ok(())
     }
 }
 
@@ -88,33 +128,74 @@ mod tests {
     }
 
     #[test]
-    #[should_panic="invalid row index 4 for a 4x3 matrix"]
-    fn row_overflow_panics() {
+    #[should_panic = "invalid row index 4 for a 4x3 matrix"]
+    fn row_overflow() {
         let matrix = Matrix::allocate(4, 3);
         matrix[(matrix.rows(), 0)];
     }
 
     #[test]
-    #[should_panic="invalid column index 3 for a 4x3 matrix"]
-    fn col_overflow_panics() {
+    #[should_panic = "invalid column index 3 for a 4x3 matrix"]
+    fn col_overflow() {
         let matrix = Matrix::allocate(4, 3);
         matrix[(0, matrix.cols())];
     }
 
     #[test]
     #[should_panic]
-    fn allocate_overflow_panics() {
+    fn allocate_overflow() {
         Matrix::allocate(usize::MAX, 2);
     }
 
     #[test]
     fn row_slice() {
-        let mut matrix = Matrix::allocate(4, 3);
+        let mut matrix = Matrix::allocate(3, 2);
         for row in 0..matrix.rows() {
             for col in 0..matrix.cols() {
                 matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
             }
         }
-        assert_eq!(&[0.0, 10.0, 20.0], matrix.row_slice(0));
+        assert_eq!(&[0.0, 10.0], matrix.row_slice(0));
+        assert_eq!(&[20.0, 30.0], matrix.row_slice(1));
+        assert_eq!(&[40.0, 50.0], matrix.row_slice(2));
+
+        matrix.row_slice_mut(1)[1] = 300.0;
+        assert_eq!(&[20.0, 300.0], matrix.row_slice(1));
+    }
+
+    #[test]
+    #[should_panic = "invalid row index 3 for a 3x2 matrix"]
+    fn row_slice_index_overflow() {
+        let matrix = Matrix::allocate(3, 2);
+        matrix.row_slice(matrix.rows());
+    }
+
+    #[test]
+    fn display() {
+        let mut matrix = Matrix::allocate(3, 2);
+        for row in 0..matrix.rows() {
+            for col in 0..matrix.cols() {
+                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
+            }
+        }
+        let display = format!("{matrix}");
+        assert_eq!("[0.0, 10.0][20.0, 30.0][40.0, 50.0]", display);
+    }
+
+    #[test]
+    fn verbose_display() {
+        let mut matrix = Matrix::allocate(3, 2);
+        for row in 0..matrix.rows() {
+            for col in 0..matrix.cols() {
+                matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
+            }
+        }
+        let display = format!("{}", matrix.verbose());
+        assert_eq!(
+            "[0.0, 10.0]\n\
+            [20.0, 30.0]\n\
+            [40.0, 50.0]\n",
+            display
+        );
     }
 }
