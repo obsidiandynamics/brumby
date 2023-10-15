@@ -38,7 +38,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             Selection::Top { runner: 0, rank: 0 },
             Selection::Top { runner: 1, rank: 1 },
         ];
-        assert!(engine.simulate(&selections).numerator > 0);
+        let frac = engine.simulate(&selections);
+        assert!(frac.numerator > 0);
+        assert_eq!(1_000, frac.denominator);
     }
 
     c.bench_function("cri_mc_engine_exacta", |b| {
