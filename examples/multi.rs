@@ -4,6 +4,7 @@ use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 
 use bentobox::capture::Capture;
+use bentobox::linear::Matrix;
 use bentobox::mc;
 use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
@@ -63,20 +64,18 @@ fn main() {
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
-    let mut data = vec![];
+    let podium_places = dilatives.len();
+    let mut derived = Matrix::allocate(probs.len(), podium_places);
     for runner in 0..probs.len() {
-        let mut rank_data = vec![];
         for rank in 0..4 {
             let frac = engine.simulate(&vec![Selection::Span {
                 runner,
                 ranks: 0..rank + 1,
             }]);
-            rank_data.push(frac);
+            derived[(runner, rank)] = frac.quotient();
         }
-        data.push(rank_data);
     }
 
-    let podium_places = dilatives.len();
     let mut table = Table::default()
         .with_cols({
             let mut cols = vec![];
@@ -147,19 +146,20 @@ fn main() {
             Row::new(Styles::default().with(Header(true)), header_cells.into())
         });
 
-    for (runner, rank_data) in data.iter().enumerate() {
+    for runner in 0..probs.len() {
+        let row_slice = derived.row_slice(runner);
         //println!("runner: {runner}");
         let mut row_cells = vec![format!("{}", runner + 1).into()];
-        for frac in rank_data {
-            row_cells.push(format!("{}", frac.quotient()).into());
+        for prob in row_slice {
+            row_cells.push(format!("{}", prob).into());
         }
         row_cells.push(format!("{}", runner + 1).into());
-        for frac in rank_data {
-            row_cells.push(format!("{:.3}", 1.0 / frac.quotient()).into());
+        for prob in row_slice {
+            row_cells.push(format!("{:.3}", 1.0 / prob).into());
         }
         row_cells.push(format!("{}", runner + 1).into());
-        for frac in rank_data {
-            let odds = f64::max(1.0, 1.0 / frac.quotient() / overround);
+        for prob in row_slice {
+            let odds = f64::max(1.0, 1.0 / prob / overround);
             row_cells.push(format!("{odds:.3}").into());
         }
         table.push_row(Row::new(Styles::default(), row_cells.into()));
