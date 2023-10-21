@@ -1,5 +1,5 @@
 use bentobox::capture::{Capture, CaptureMut};
-use bentobox::mc::MonteCarloEngine;
+use bentobox::mc::{DilatedProbs, MonteCarloEngine};
 use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -27,10 +27,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut bitmap = [true; 14];
     let mut engine = MonteCarloEngine::default()
         .with_iterations(1_000)
-        .with_podium_places(4)
         .with_bitmap(CaptureMut::Borrowed(&mut bitmap))
-        .with_win_probs(Capture::Borrowed(&probs))
-        .with_podium(CaptureMut::Borrowed(&mut podium));
+        .with_podium(CaptureMut::Borrowed(&mut podium))
+        .with_probs(Capture::Owned(
+            DilatedProbs::default()
+                .with_win_probs(Capture::Borrowed(&probs))
+                .with_podium_places(4)
+                .into(),
+        ));
 
     {
         // sanity check

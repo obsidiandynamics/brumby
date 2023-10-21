@@ -10,8 +10,6 @@ use crate::linear::Matrix;
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
     probs: Option<Capture<'a, Matrix, Matrix>>,
-    podium_places: Option<usize>,
-    win_probs: Option<Capture<'a, Vec<f64>, [f64]>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
     rand: CaptureMut<'a, R, R>,
@@ -21,8 +19,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         Self {
             iterations: 10_000,
             probs: None,
-            podium_places: None,
-            win_probs: None,
             podium: None,
             bitmap: None,
             rand,
@@ -39,16 +35,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self
     }
 
-    pub fn with_podium_places(mut self, places: usize) -> Self {
-        self.podium_places = Some(places);
-        self
-    }
-
-    pub fn with_win_probs(mut self, win_probs: Capture<'a, Vec<f64>, [f64]>) -> Self {
-        self.win_probs = Some(win_probs);
-        self
-    }
-
     pub fn with_podium(mut self, podium: CaptureMut<'a, Vec<usize>, [usize]>) -> Self {
         self.podium = Some(podium);
         self
@@ -62,17 +48,13 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
     fn num_runners(&self) -> usize {
         if let Some(probs) = &self.probs {
             probs.cols()
-        } else if let Some(win_probs) = &self.win_probs {
-            win_probs.len()
         } else {
             panic!("no probabilities specified");
         }
     }
 
     fn num_ranks(&self) -> usize {
-        if let Some(podium_places) = self.podium_places {
-            podium_places
-        } else if let Some(podium) = &self.podium {
+        if let Some(podium) = &self.podium {
             podium.len()
         } else if let Some(probs) = &self.probs {
             probs.rows()
@@ -81,22 +63,12 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         }
     }
 
-    fn validate_state(&self) {
-        todo!()
-    }
-
     pub fn simulate(&mut self, selections: &[Selection]) -> Fraction {
         if self.bitmap.is_none() {
             self.bitmap = Some(CaptureMut::Owned(vec![true; self.num_runners()]));
         }
         if self.podium.is_none() {
             self.podium = Some(CaptureMut::Owned(vec![usize::MAX; self.num_ranks()]))
-        }
-
-        if self.probs.is_none() {
-            let mut probs = Matrix::allocate(self.num_ranks(), self.num_runners());
-            probs.clone_row(&*self.win_probs.as_ref().unwrap());
-            self.probs = Some(Capture::Owned(probs));
         }
 
         // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
@@ -133,7 +105,7 @@ impl<'a> DilatedProbs<'a> {
         self
     }
 
-    pub fn undilated(self, podium_places: usize) -> Self {
+    pub fn with_podium_places(self, podium_places: usize) -> Self {
         self.with_dilatives(Capture::Owned(vec![0.0; podium_places]))
     }
 }
@@ -153,7 +125,7 @@ impl From<DilatedProbs<'_>> for Matrix {
         let dilatives = probs.dilatives.expect("no dilatives specified");
         let mut matrix = Matrix::allocate(dilatives.len(), win_probs.len());
         matrix.clone_row(&win_probs);
-        dilatives.dilate_rows_additive(&mut matrix); //TODO
+        dilatives.dilate_rows_power(&mut matrix); //TODO
         matrix
     }
 }

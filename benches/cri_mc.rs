@@ -26,7 +26,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     probs.normalise(1.0);
     let probs = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&probs))
-        .undilated(4)
+        .with_podium_places(4)
         .into();
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];

@@ -1,5 +1,6 @@
 use bentobox::capture::Capture;
 use bentobox::mc;
+use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
 use bentobox::selection::Selection;
 
@@ -25,8 +26,12 @@ fn main() {
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(100_000)
-        .with_win_probs(Capture::Borrowed(&probs))
-        .with_podium_places(4);
+        .with_probs(Capture::Owned(
+            DilatedProbs::default()
+                .with_win_probs(Capture::Borrowed(&probs))
+                .with_podium_places(4)
+                .into(),
+        ));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based

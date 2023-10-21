@@ -38,21 +38,31 @@ fn main() {
     //     1.0 / 23.0,
     //     1.0 / 14.0,
     // ];
+    // let mut probs = vec![
+    //     1.0 / 3.7,
+    //     1.0 / 14.0,
+    //     1.0 / 5.50,
+    //     1.0 / 9.50,
+    //     1.0 / 1.90,
+    //     1.0 / 13.0,
+    // ];
     let mut probs = vec![
-        1.0 / 3.7,
-        1.0 / 14.0,
-        1.0 / 5.50,
-        1.0 / 9.50,
-        1.0 / 1.90,
-        1.0 / 13.0,
+        1.0 / 1.55,
+        1.0 / 12.0,
+        1.0 / 6.50,
+        1.0 / 9.00,
+        1.0 / 9.00,
+        1.0 / 61.0,
+        1.0 / 7.5,
+        1.0 / 81.0,
     ];
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let overround = probs.normalise(1.0);
 
     //TODO fav-longshot bias removal
-    let favlong_dilate = -0.0;
-    probs.dilate_additive(favlong_dilate);
+    let favlong_dilate = -0.1;
+    probs.dilate_power(favlong_dilate);
 
     let dilatives = [0.0, 0.20, 0.35, 0.5];
     // let dilatives = [0.0, 0.0, 0.0, 0.0];
@@ -95,7 +105,7 @@ fn main() {
     }
 
     //TODO fav-longshot bias addition
-    derived.row_slice_mut(0).dilate_additive(1.0/(1.0 + favlong_dilate) - 1.0);
+    derived.row_slice_mut(0).dilate_power(1.0/(1.0 + favlong_dilate) - 1.0);
 
     let mut table = Table::default()
         .with_cols({

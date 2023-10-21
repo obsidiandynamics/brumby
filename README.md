@@ -13,6 +13,7 @@ Circa 10–20M simulations/sec of a top-4 podium over 14 runners using the [tiny
 Sourced from `examples/multi.rs`.
 
 ```rust
+/*
 use bentobox::capture::{Capture, CaptureMut};
 use bentobox::mc;
 use bentobox::probs::SliceExt;
@@ -82,4 +83,5 @@ println!(
     1.0 / frac.quotient(),
     1.0 / frac.quotient() / overround.powi(selections.len() as i32)
 );
+*/
 ```
