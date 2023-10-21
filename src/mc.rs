@@ -169,10 +169,12 @@ pub fn run_once(
         let mut cumulative = 0.0;
 
         let rank_probs = probs.row_slice(rank);
-        let mut prob_sum = 0.0;
-        for runner in 0..runners {
-            if bitmap[runner] {
-                prob_sum += rank_probs[runner];
+        let mut prob_sum = 1.0;
+        if rank > 0 {
+            for runner in 0..runners {
+                if !bitmap[runner] {
+                    prob_sum -= rank_probs[runner];
+                }
             }
         }
 
