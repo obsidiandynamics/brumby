@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 
 pub trait SliceExt {
     fn sum(&self) -> f64;
-    fn normalize(&mut self) -> f64;
+    fn normalise(&mut self, target: f64) -> f64;
     fn dilate_additive(&mut self, factor: f64);
     fn dilate_power(&mut self, factor: f64);
     fn scale(&mut self, factor: f64);
@@ -17,9 +17,9 @@ impl SliceExt for [f64] {
         self.iter().sum()
     }
 
-    fn normalize(&mut self) -> f64 {
+    fn normalise(&mut self, target: f64) -> f64 {
         let sum = self.sum();
-        self.scale(1.0 / sum);
+        self.scale(target / sum);
         sum
     }
 
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn normalize() {
         let mut data = [0.05, 0.1, 0.15, 0.2];
-        let sum = data.normalize();
+        let sum = data.normalise(1.0);
         assert_f64_near!(0.5, sum, 1);
         assert_slice_f64_near(&[0.1, 0.2, 0.3, 0.4], &data, 1);
     }

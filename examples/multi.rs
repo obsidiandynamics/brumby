@@ -48,14 +48,14 @@ fn main() {
     ];
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-    let overround = probs.normalize();
+    let overround = probs.normalise(1.0);
 
     //TODO fav-longshot bias removal
     let favlong_dilate = -0.0;
     probs.dilate_additive(favlong_dilate);
 
-    // let dilatives = [0.0, 9.0, 0.0, 0.0];
-    let dilatives = [0.0, 0.0, 0.0, 0.0];
+    let dilatives = [0.0, 0.20, 0.35, 0.5];
+    // let dilatives = [0.0, 0.0, 0.0, 0.0];
 
     let ranked_overrounds = [overround, 1.215, 1.136, 1.079];
 
@@ -87,6 +87,11 @@ fn main() {
             }]);
             derived[(rank, runner)] = frac.quotient();
         }
+    }
+
+    for row in 0..derived.rows() {
+        println!("sum for row {row}: {}", derived.row_slice(row).sum());
+        derived.row_slice_mut(row).normalise(row as f64 + 1.0);
     }
 
     //TODO fav-longshot bias addition
@@ -166,7 +171,7 @@ fn main() {
         //println!("runner: {runner}");
         let mut row_cells = vec![format!("{}", runner + 1).into()];
         for rank in 0..podium_places {
-            row_cells.push(format!("{}", derived[(rank, runner)]).into());
+            row_cells.push(format!("{:.6}", derived[(rank, runner)]).into());
         }
         row_cells.push(format!("{}", runner + 1).into());
         for rank in 0..podium_places {

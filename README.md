@@ -31,7 +31,7 @@ let mut probs = vec![
 ];
 
 // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-let overround = probs.normalize();
+let overround = probs.normalise(1.0);
 
 println!("fair probs: {probs:?}");
 println!("overround: {overround:.3}");

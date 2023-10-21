@@ -22,7 +22,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         1.0 / 21.0,
     ];
 
-    probs.normalize();
+    probs.normalise(1.0);
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];
     let mut engine = MonteCarloEngine::default()

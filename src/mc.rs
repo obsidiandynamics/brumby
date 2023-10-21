@@ -195,9 +195,18 @@ pub fn run_once(
     // println!("podium.len: {}", podium.len());
     for (rank, ranked_runner) in podium.iter_mut().enumerate() {
         let mut cumulative = 0.0;
-        let random = random_f64(rand);
+
         let rank_probs = probs.row_slice(rank);
+        let mut prob_sum = 0.0;
+        for runner in 0..runners {
+            if bitmap[runner] {
+                prob_sum += rank_probs[runner];
+            }
+        }
+
+        let random = random_f64(rand) * prob_sum;
         // println!("random={random:.3}, prob_sum={prob_sum}");
+        let mut chosen = false;
         for runner in 0..runners {
             if bitmap[runner] {
                 let prob = rank_probs[runner];
@@ -207,11 +216,15 @@ pub fn run_once(
                     // println!("chosen runner {runner} for rank {rank}");
                     *ranked_runner = runner;
                     bitmap[runner] = false;
+                    chosen = true;
                     break;
                 }
             } /*else {
                   println!("skipping runner {runner}");
               }*/
+        }
+        if !chosen {
+            panic!("no runner chosen! cumulative: {cumulative}, random: {random}");
         }
     }
 

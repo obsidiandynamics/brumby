@@ -23,7 +23,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         1.0 / 5.0,
         1.0 / 21.0,
     ];
-    probs.normalize();
+    probs.normalise(1.0);
     let probs = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&probs))
         .undilated(4)
