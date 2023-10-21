@@ -7,7 +7,7 @@ A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing e
 [![Build Status](https://img.shields.io/github/actions/workflow/status/obsidiandynamics/bentobox/master.yml?branch=master&style=flat-square&logo=github)](https://github.com/obsidiandynamics/bentobox/actions/workflows/master.yml)
 
 # Performance
-Circa 10–20M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. (Per thread, benchmarked on Apple M2 Pro.) Roughly 80% of time is spent in the RNG routine.
+Circa 15M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. (Per thread, benchmarked on Apple M2 Pro.) Roughly 70% of time is spent in the RNG routine.
 
 # Example
 Sourced from `examples/multi.rs`.

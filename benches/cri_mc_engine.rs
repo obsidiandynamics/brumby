@@ -25,9 +25,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     probs.normalise(1.0);
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];
+    let mut totals = [1.0; 4];
     let mut engine = MonteCarloEngine::default()
         .with_iterations(1_000)
         .with_bitmap(CaptureMut::Borrowed(&mut bitmap))
+        .with_totals(CaptureMut::Borrowed(&mut totals))
         .with_podium(CaptureMut::Borrowed(&mut podium))
         .with_probs(Capture::Owned(
             DilatedProbs::default()

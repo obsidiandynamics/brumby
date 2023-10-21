@@ -61,29 +61,30 @@ fn main() {
     let overround = probs.normalise(1.0);
 
     //TODO fav-longshot bias removal
-    let favlong_dilate = -0.1;
+    let favlong_dilate = -0.0;
     probs.dilate_power(favlong_dilate);
 
-    let dilatives = [0.0, 0.20, 0.35, 0.5];
+    // let dilatives = [0.0, 0.20, 0.35, 0.5];
+    let dilatives = [0.0, 0.50, 0.50, 0.50];
     // let dilatives = [0.0, 0.0, 0.0, 0.0];
 
-    let ranked_overrounds = [overround, 1.215, 1.136, 1.079];
+    let ranked_overrounds = [overround, 1.239, 1.169, 1.12];
 
     println!("fair probs: {probs:?}");
     println!("dilatives: {dilatives:?}");
     println!("overround: {overround:.3}");
 
-    let matrix: Matrix =  DilatedProbs::default()
+    let dilated_probs: Matrix =  DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&probs))
         .with_dilatives(Capture::Borrowed(&dilatives))
         .into();
 
-    println!("simulating with: \n{}", matrix.verbose());
+    println!("rank-runner probabilities: \n{}", dilated_probs.verbose());
 
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(100_000)
-        .with_probs(Capture::Owned(matrix));
+        .with_iterations(1_000_000)
+        .with_probs(Capture::Owned(dilated_probs));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
@@ -100,7 +101,7 @@ fn main() {
     }
 
     for row in 0..derived.rows() {
-        println!("sum for row {row}: {}", derived.row_slice(row).sum());
+        // println!("sum for row {row}: {}", derived.row_slice(row).sum());
         derived.row_slice_mut(row).normalise(row as f64 + 1.0);
     }
 
@@ -189,7 +190,7 @@ fn main() {
         }
         row_cells.push(format!("{}", runner + 1).into());
         for rank in 0..podium_places {
-            let odds = f64::max(1.0, 1.0 / derived[(rank, runner)] / ranked_overrounds[rank]);
+            let odds = f64::max(1.04, 1.0 / derived[(rank, runner)] / ranked_overrounds[rank]);
             row_cells.push(format!("{odds:.3}").into());
         }
         table.push_row(Row::new(Styles::default(), row_cells.into()));

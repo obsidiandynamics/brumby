@@ -30,9 +30,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         .into();
     let mut podium = [usize::MAX; 4];
     let mut bitmap = [true; 14];
+    let mut totals = [1.0; 4];
 
     // sanity check
-    mc::run_once(&probs, &mut podium, &mut bitmap, &mut StdRand::default());
+    mc::run_once(&probs, &mut podium, &mut bitmap, &mut totals, &mut StdRand::default());
     for ranked_runner in podium {
         assert_ne!(usize::MAX, ranked_runner);
     }
@@ -41,14 +42,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_wyrand", |b| {
         let mut rand = Wyrand::default();
         b.iter(|| {
-            mc::run_once(&probs, &mut podium, &mut bitmap, &mut rand);
+            mc::run_once(&probs, &mut podium, &mut bitmap, &mut totals, &mut rand);
         });
     });
 
     c.bench_function("cri_mc_mock", |b| {
         let mut rand = Mock::default();
         b.iter(|| {
-            mc::run_once(&probs, &mut podium, &mut bitmap, &mut rand);
+            mc::run_once(&probs, &mut podium, &mut bitmap, &mut totals, &mut rand);
         });
     });
 }

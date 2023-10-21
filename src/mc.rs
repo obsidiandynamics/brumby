@@ -12,6 +12,7 @@ pub struct MonteCarloEngine<'a, R: Rand> {
     probs: Option<Capture<'a, Matrix, Matrix>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
+    totals:  Option<CaptureMut<'a, Vec<f64>, [f64]>>,
     rand: CaptureMut<'a, R, R>,
 }
 impl<'a, R: Rand> MonteCarloEngine<'a, R> {
@@ -21,6 +22,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             probs: None,
             podium: None,
             bitmap: None,
+            totals: None,
             rand,
         }
     }
@@ -42,6 +44,11 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
     pub fn with_bitmap(mut self, bitmap: CaptureMut<'a, Vec<bool>, [bool]>) -> Self {
         self.bitmap = Some(bitmap);
+        self
+    }
+
+    pub fn with_totals(mut self, totals: CaptureMut<'a, Vec<f64>, [f64]>) -> Self {
+        self.totals = Some(totals);
         self
     }
 
@@ -70,7 +77,9 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         if self.podium.is_none() {
             self.podium = Some(CaptureMut::Owned(vec![usize::MAX; self.num_ranks()]))
         }
-
+        if self.totals.is_none() {
+            self.totals = Some(CaptureMut::Owned(vec![1.0; self.num_ranks()]))
+        }
         // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
 
         run_many(
@@ -79,6 +88,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             self.probs.as_ref().unwrap(),
             self.podium.as_mut().unwrap(),
             self.bitmap.as_mut().unwrap(),
+            self.totals.as_mut().unwrap(),
             self.rand.deref_mut(),
         )
     }
@@ -90,6 +100,7 @@ impl Default for MonteCarloEngine<'_, StdRand> {
     }
 }
 
+#[derive(Default)]
 pub struct DilatedProbs<'a> {
     win_probs: Option<Capture<'a, Vec<f64>, [f64]>>,
     dilatives: Option<Capture<'a, Vec<f64>, [f64]>>,
@@ -110,15 +121,6 @@ impl<'a> DilatedProbs<'a> {
     }
 }
 
-impl Default for DilatedProbs<'_> {
-    fn default() -> Self {
-        Self {
-            win_probs: None,
-            dilatives: None
-        }
-    }
-}
-
 impl From<DilatedProbs<'_>> for Matrix {
     fn from(probs: DilatedProbs) -> Self {
         let win_probs = probs.win_probs.expect("no win probabilities specified");
@@ -130,12 +132,12 @@ impl From<DilatedProbs<'_>> for Matrix {
     }
 }
 
-pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], rand: &mut impl Rand,) -> Fraction {
-    assert!(validate_args(probs, podium, bitmap));
+pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64], rand: &mut impl Rand,) -> Fraction {
+    assert!(validate_args(probs, podium, bitmap, totals));
 
     let mut matching_iters = 0;
     for _ in 0..iterations {
-        run_once(probs, podium, bitmap, rand);
+        run_once(probs, podium, bitmap, totals, rand);
         let mut all_match = true;
         for selection in selections {
             if !selection.matches(podium) {
@@ -158,27 +160,23 @@ pub fn run_once(
     probs: &Matrix,
     podium: &mut [usize],
     bitmap: &mut [bool],
+    totals: &mut [f64],
     rand: &mut impl Rand,
 ) {
-    debug_assert!(validate_args(probs, podium, bitmap));
+    debug_assert!(validate_args(probs, podium, bitmap, totals));
+    bitmap.fill(true);
+    totals.fill(1.0);
 
     let runners = probs.cols();
-    reset_bitmap(bitmap);
+    let ranks = podium.len();
+    // reset_bitmap(bitmap);
     // println!("podium.len: {}", podium.len());
     for (rank, ranked_runner) in podium.iter_mut().enumerate() {
         let mut cumulative = 0.0;
 
         let rank_probs = probs.row_slice(rank);
-        let mut prob_sum = 1.0;
-        if rank > 0 {
-            for runner in 0..runners {
-                if !bitmap[runner] {
-                    prob_sum -= rank_probs[runner];
-                }
-            }
-        }
-
-        let random = random_f64(rand) * prob_sum;
+        let total = totals[rank];
+        let random = random_f64(rand) * total;
         // println!("random={random:.3}, prob_sum={prob_sum}");
         let mut chosen = false;
         for runner in 0..runners {
@@ -191,6 +189,9 @@ pub fn run_once(
                     *ranked_runner = runner;
                     bitmap[runner] = false;
                     chosen = true;
+                    for future_rank in rank+1..ranks {
+                        totals[future_rank] -= probs[(future_rank, runner)];
+                    }
                     break;
                 }
             } /*else {
@@ -205,10 +206,15 @@ pub fn run_once(
     // println!("podium: {podium:?}");
 }
 
-fn validate_args(probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool]) -> bool {
+fn validate_args(probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64]) -> bool {
     assert!(
         !probs.is_empty(),
         "the probabilities matrix cannot be empty"
+    );
+    assert!(!podium.is_empty(), "the podium slice cannot be empty");
+    assert!(
+        podium.len() <= probs.cols(),
+        "number of podium entries cannot exceed number of runners"
     );
     assert_eq!(
         probs.cols(),
@@ -216,27 +222,35 @@ fn validate_args(probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool]) -> b
         "a bitmap entry must exist for each runner"
     );
     assert_eq!(
+        totals.len(),
+        podium.len(),
+        "a total must exist for each podium rank"
+    );
+    assert_eq!(
         probs.rows(),
         podium.len(),
-        "a probability row must exist for each podium entry"
+        "a probability row must exist for each podium rank"
     );
-    assert!(!podium.is_empty(), "the podium slice cannot be empty");
-    assert!(
-        podium.len() <= probs.cols(),
-        "number of podium entries cannot exceed number of runners"
-    );
-    for &p in probs.flatten() {
-        assert!(p >= 0.0 && p <= 1.0, "probabilities out of range: {probs}");
+    for p in probs.flatten() {
+        assert!((0.0..=1.0).contains(p), "probabilities out of range: {probs}");
     }
     true
 }
 
-#[inline(always)]
-fn reset_bitmap(bitmap: &mut [bool]) {
-    for b in bitmap {
-        *b = true;
-    }
-}
+// #[inline(always)]
+// fn reset_bitmap(bitmap: &mut [bool]) {
+//     for b in bitmap {
+//         *b = true;
+//     }
+// }
+//
+// #[inline(always)]
+// fn reset_prob_sums(prob_sums: &mut [f64]) {
+//     prob_sums.fill(1.0);
+//     // for p in prob_sums {
+//     //     *p = 1.0;
+//     // }
+// }
 
 #[inline(always)]
 fn random_f64(rand: &mut impl Rand) -> f64 {

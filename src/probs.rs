@@ -6,6 +6,7 @@ use std::fmt::{Display, Formatter};
 pub trait SliceExt {
     fn sum(&self) -> f64;
     fn normalise(&mut self, target: f64) -> f64;
+    fn geometric_mean(&self) -> f64;
     fn dilate_additive(&mut self, factor: f64);
     fn dilate_power(&mut self, factor: f64);
     fn scale(&mut self, factor: f64);
@@ -21,6 +22,11 @@ impl SliceExt for [f64] {
         let sum = self.sum();
         self.scale(target / sum);
         sum
+    }
+
+    fn geometric_mean(&self) -> f64 {
+        let product: f64 = self.iter().product();
+        product.powf(1.0 / self.len() as f64)
     }
 
     fn dilate_additive(&mut self, factor: f64) {
@@ -51,10 +57,11 @@ impl SliceExt for [f64] {
     }
 
     fn dilate_power(&mut self, factor: f64) {
-        let len  = self.len() as f64;
         let mut sum = 0.0;
         for element in &mut *self {
-            *element = *element * (*element * len).powf(-factor);
+            // if *element > 0.02 {//TODO
+            *element = element.powf(1.0 - factor);
+            // }
             sum += *element;
         }
         self.scale(1.0 / sum);
@@ -124,11 +131,17 @@ mod tests {
     }
 
     #[test]
-    fn normalize() {
+    fn normalise() {
         let mut data = [0.05, 0.1, 0.15, 0.2];
         let sum = data.normalise(1.0);
         assert_f64_near!(0.5, sum, 1);
         assert_slice_f64_near(&[0.1, 0.2, 0.3, 0.4], &data, 1);
+    }
+
+    #[test]
+    fn geometric_mean() {
+        let data = [1.0, 3.0, 9.0];
+        assert_f64_near!(3.0, data.geometric_mean());
     }
 
     #[test]
