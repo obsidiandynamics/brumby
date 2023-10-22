@@ -9,6 +9,12 @@ pub enum Capture<'a, W: Borrow<B>, B: ?Sized> {
     Borrowed(&'a B),
 }
 
+impl<'a, W: Borrow<B> + Default, B: ?Sized> Default for Capture<'a, W, B> {
+    fn default() -> Self {
+        Self::Owned(W::default())
+    }
+}
+
 impl<'a, W: Borrow<B>, B: ?Sized> Deref for Capture<'a, W, B> {
     type Target = B;
 
@@ -20,9 +26,21 @@ impl<'a, W: Borrow<B>, B: ?Sized> Deref for Capture<'a, W, B> {
     }
 }
 
+impl<'a, W: Borrow<B>, B: ?Sized> From<W> for Capture<'a, W, B> {
+    fn from(value: W) -> Self {
+        Self::Owned(value)
+    }
+}
+
 pub enum CaptureMut<'a, W: BorrowMut<B>, B: ?Sized> {
     Owned(W),
     Borrowed(&'a mut B),
+}
+
+impl<'a, W: BorrowMut<B> + Default, B: ?Sized> Default for CaptureMut<'a, W, B> {
+    fn default() -> Self {
+        Self::Owned(W::default())
+    }
 }
 
 impl<'a, W: BorrowMut<B>, B: ?Sized> Deref for CaptureMut<'a, W, B> {
@@ -42,6 +60,12 @@ impl<'a, W: BorrowMut<B>, B: ?Sized> DerefMut for CaptureMut<'a, W, B> {
             CaptureMut::Owned(owned) => owned.borrow_mut(),
             CaptureMut::Borrowed(borrowed) => borrowed,
         }
+    }
+}
+
+impl<'a, W: BorrowMut<B>, B: ?Sized> From<W> for CaptureMut<'a, W, B> {
+    fn from(value: W) -> Self {
+        Self::Owned(value)
     }
 }
 

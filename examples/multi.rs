@@ -3,7 +3,6 @@ use stanza::renderer::Renderer;
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 
-use bentobox::capture::Capture;
 use bentobox::linear::Matrix;
 use bentobox::mc;
 use bentobox::mc::DilatedProbs;
@@ -65,7 +64,9 @@ fn main() {
     win_probs.dilate_power(favlong_dilate);
 
     // let dilatives = [0.0, 0.20, 0.35, 0.5];
-    let dilatives = [0.0, 0.50, 0.50, 0.50];
+    let dilatives = vec![0.0, 0.50, 0.50, 0.50];
+    let podium_places = dilatives.len();
+    let num_runners = win_probs.len();
     // let dilatives = [0.0, 0.0, 0.0, 0.0];
 
     let ranked_overrounds = [overround, 1.239, 1.169, 1.12];
@@ -74,39 +75,57 @@ fn main() {
     println!("dilatives: {dilatives:?}");
     println!("overround: {overround:.3}");
 
-    let dilated_probs: Matrix<_> =  DilatedProbs::default()
-        .with_win_probs(Capture::Borrowed(&win_probs))
-        .with_dilatives(Capture::Borrowed(&dilatives))
+    let dilated_probs: Matrix<_> = DilatedProbs::default()
+        .with_win_probs(win_probs.into())
+        .with_dilatives(dilatives.into())
         .into();
 
     println!("rank-runner probabilities: \n{}", dilated_probs.verbose());
 
-    // create an MC engine for reuse
-    let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(1_000_000)
-        .with_probs(Capture::Owned(dilated_probs));
 
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
-    let podium_places = dilatives.len();
-    let mut derived = Matrix::allocate(podium_places, win_probs.len());
-    for runner in 0..win_probs.len() {
-        for rank in 0..4 {
-            let frac = engine.simulate(&vec![Selection::Span {
+    let mut scenarios =
+        Matrix::allocate(podium_places, num_runners);
+    for runner in 0..num_runners {
+        for rank in 0..podium_places {
+            scenarios[(rank, runner)] = vec![Selection::Span {
                 runner,
                 ranks: 0..rank + 1,
-            }]);
-            derived[(rank, runner)] = frac.quotient();
+            }]
+            .into();
         }
     }
 
-    for row in 0..derived.rows() {
-        // println!("sum for row {row}: {}", derived.row_slice(row).sum());
-        derived.row_slice_mut(row).normalise(row as f64 + 1.0);
+    // create an MC engine for reuse
+    const ITERATIONS: u64 = 1_000_000;
+    let mut engine = mc::MonteCarloEngine::default()
+        .with_iterations(ITERATIONS)
+        .with_probs(dilated_probs.into());
+    let mut counts = Matrix::allocate(podium_places, num_runners);
+    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+
+    let mut derived = Matrix::allocate(podium_places, num_runners);
+    for runner in 0..num_runners {
+        for rank in 0..podium_places {
+            // let frac = engine.simulate(&vec![Selection::Span {
+            //     runner,
+            //     ranks: 0..rank + 1,
+            // }]);
+            // derived[(rank, runner)] = frac.quotient();
+            derived[(rank, runner)] = counts[(rank, runner)] as f64 / ITERATIONS as f64;
+        }
     }
 
+    // for row in 0..derived.rows() {
+    //     println!("sum for row {row}: {}", derived.row_slice(row).sum());
+    //     // derived.row_slice_mut(row).normalise(row as f64 + 1.0);
+    // }
+
     //TODO fav-longshot bias addition
-    derived.row_slice_mut(0).dilate_power(1.0/(1.0 + favlong_dilate) - 1.0);
+    derived
+        .row_slice_mut(0)
+        .dilate_power(1.0 / (1.0 + favlong_dilate) - 1.0);
 
     let mut table = Table::default()
         .with_cols({
@@ -178,7 +197,7 @@ fn main() {
             Row::new(Styles::default().with(Header(true)), header_cells.into())
         });
 
-    for runner in 0..win_probs.len() {
+    for runner in 0..num_runners {
         //println!("runner: {runner}");
         let mut row_cells = vec![format!("{}", runner + 1).into()];
         for rank in 0..podium_places {
@@ -190,7 +209,10 @@ fn main() {
         }
         row_cells.push(format!("{}", runner + 1).into());
         for rank in 0..podium_places {
-            let odds = f64::max(1.04, 1.0 / derived[(rank, runner)] / ranked_overrounds[rank]);
+            let odds = f64::max(
+                1.04,
+                1.0 / derived[(rank, runner)] / ranked_overrounds[rank],
+            );
             row_cells.push(format!("{odds:.3}").into());
         }
         table.push_row(Row::new(Styles::default(), row_cells.into()));

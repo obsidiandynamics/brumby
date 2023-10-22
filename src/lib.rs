@@ -2,6 +2,8 @@
 //! Derives probabilities for placing in arbitrary positions given only win probabilities.
 //! Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
+#![allow(clippy::too_many_arguments)]
+
 pub mod capture;
 pub mod linear;
 pub mod mc;
