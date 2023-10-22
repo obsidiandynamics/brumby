@@ -1,4 +1,9 @@
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 use std::ops::Range;
+use std::path::{PathBuf};
+use anyhow::bail;
 use clap::Parser;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
@@ -19,11 +24,30 @@ struct Args {
     /// selections to price
     #[clap(short = 's', long)]
     selections: Option<Selections<'static>>,
+
+    /// file to source the race data from
+    #[clap(short = 'f', long)]
+    file: Option<PathBuf>,
+
+    /// URL to source the race data from
+    #[clap(short = 'u', long)]
+    url: Option<String>
+}
+impl Args {
+    fn validate(&self) -> anyhow::Result<()> {
+        if self.file.is_none() && self.url.is_none() || !self.file.is_none() && !self.url.is_none(){
+            bail!("either the -f or the -u flag must be specified");
+        }
+        Ok(())
+    }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>>{
     let args = Args::parse();
+    args.validate()?;
     println!("args: {args:?}");
+
+    read_race_data(&args)?;
 
     let mut win_probs = vec![
         1.0 / 1.55,
@@ -105,6 +129,19 @@ fn main() {
             overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
         );
     }
+
+    Ok(())
+}
+
+fn read_race_data(args: &Args) -> anyhow::Result<()> {
+    if let Some(path) = args.file.as_ref() {
+        let mut file = File::open(path)?;
+        let mut data = String::new();
+        file.read_to_string(&mut data)?;
+        println!("data={data}");
+    }
+
+    Ok(())
 }
 
 fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
