@@ -29,7 +29,6 @@ impl Selection {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Runner(usize);
-
 impl Runner {
     pub fn number(number: usize) -> Self {
         Self::try_number(number).unwrap()
@@ -83,6 +82,39 @@ impl FromStr for Runner {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Position(usize);
+impl Position {
+    pub fn number(number: usize) -> Self {
+        Self::try_number(number).unwrap()
+    }
+
+    pub fn try_number(number: usize) -> anyhow::Result<Self> {
+        if number == 0 {
+            bail!("invalid position number");
+        }
+        Ok(Self(number - 1))
+    }
+
+    pub fn index(index: usize) -> Self {
+        Self(index)
+    }
+
+    pub fn as_index(&self) -> usize {
+        self.0
+    }
+
+    pub fn as_number(&self) -> usize {
+        self.0 + 1
+    }
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "p{}", self.as_number())
+    }
+}
+
 pub type Selections<'a> = Capture<'a, Vec<Selection>, [Selection]>;
 
 impl<'a> FromStr for Selections<'a> {
@@ -109,7 +141,7 @@ impl<'a> FromStr for Selections<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::selection::{Runner, Selection, Selections};
+    use super::*;
     use std::str::FromStr;
 
     #[test]
@@ -179,6 +211,24 @@ mod tests {
             "invalid digit found in string",
             Runner::from_str("rX").err().unwrap().to_string()
         );
+    }
+
+    #[test]
+    fn position_as_index() {
+        assert_eq!(6, Position::number(7).as_index());
+        assert_eq!(6, Position::index(6).as_index());
+    }
+
+    #[test]
+    fn position_display() {
+        let display = format!("{}", Position::number(7));
+        assert_eq!("p7", display);
+    }
+
+    #[test]
+    #[should_panic = "invalid position number"]
+    fn position_invalid_number() {
+        Position::number(0);
     }
 
     #[test]

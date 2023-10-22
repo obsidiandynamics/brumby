@@ -1,5 +1,5 @@
 use bentobox::capture::Capture;
-use bentobox::mc;
+use bentobox::{mc, overround};
 use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Runner, Selection};
@@ -18,10 +18,10 @@ fn main() {
     ];
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-    let overround = probs.normalise(1.0);
+    let win_overround = probs.normalise(1.0);
 
     println!("fair probs: {probs:?}");
-    println!("overround: {overround:.3}");
+    println!("overround: {win_overround:.3}");
 
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
@@ -46,31 +46,22 @@ fn main() {
                 "    rank: 0..={rank}, prob: {}, fair price: {:.3}, market odds: {:.3}",
                 frac.quotient(),
                 1.0 / frac.quotient(),
-                1.0 / frac.quotient() / overround
+                1.0 / frac.quotient() / win_overround
             );
         }
     }
 
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
-        Selection::Span {
-            runner: Runner::index(0),
-            ranks: 0..1,
-        },
-        Selection::Span {
-            runner: Runner::index(1),
-            ranks: 0..2,
-        },
-        Selection::Span {
-            runner: Runner::index(2),
-            ranks: 0..3,
-        },
+        Runner::number(1).top(1),
+        Runner::number(2).top(2),
+        Runner::number(3).top(3),
     ];
     let frac = engine.simulate(&selections);
     println!(
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        1.0 / frac.quotient() / overround.powi(selections.len() as i32)
+        overround::apply(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }

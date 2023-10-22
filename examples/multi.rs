@@ -1,11 +1,10 @@
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
-use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
-use stanza::table::{Col, Row, Table};
 
 use bentobox::linear::Matrix;
-use bentobox::mc;
+use bentobox::{mc, overround};
 use bentobox::mc::DilatedProbs;
+use bentobox::print::{DerivedPrice, tabulate};
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Runner, Selection};
 
@@ -59,9 +58,9 @@ fn main() {
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let win_overround = win_probs.normalise(1.0);
 
-    //TODO fav-longshot bias removal
-    let favlong_dilate = -0.0;
-    win_probs.dilate_power(favlong_dilate);
+    //fav-longshot bias removal
+    // let favlong_dilate = -0.0;
+    // win_probs.dilate_power(favlong_dilate);
 
     // let dilatives = [0.0, 0.20, 0.35, 0.5];
     // let dilatives = vec![0.0, 0.0, 0.0, 0.0];
@@ -108,7 +107,15 @@ fn main() {
     let mut derived = Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            derived[(rank, runner)] = counts[(rank, runner)] as f64 / ITERATIONS as f64;
+            let probability = counts[(rank, runner)] as f64 / ITERATIONS as f64;
+            let fair_price = 1.0 / probability;
+            let market_price = overround::apply(fair_price, ranked_overrounds[rank]);
+            let price = DerivedPrice {
+                probability,
+                fair_price,
+                market_price,
+            };
+            derived[(rank, runner)] = price;
         }
     }
 
@@ -117,123 +124,25 @@ fn main() {
     //     // derived.row_slice_mut(row).normalise(row as f64 + 1.0);
     // }
 
-    //TODO fav-longshot bias addition
-    derived
-        .row_slice_mut(0)
-        .dilate_power(1.0 / (1.0 + favlong_dilate) - 1.0);
+    //fav-longshot bias addition
+    // derived
+    //     .row_slice_mut(0)
+    //     .dilate_power(1.0 / (1.0 + favlong_dilate) - 1.0);
 
-    let mut table = Table::default()
-        .with_cols({
-            let mut cols = vec![];
-            cols.push(Col::new(
-                Styles::default().with(MinWidth(10)).with(HAlign::Centred),
-            ));
-            for _ in 0..podium_places {
-                cols.push(Col::new(
-                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
-                ));
-            }
-            cols.push(Col::new(
-                Styles::default()
-                    .with(Separator(true))
-                    .with(MinWidth(5))
-                    .with(HAlign::Centred),
-            ));
-            for _ in 0..podium_places {
-                cols.push(Col::new(
-                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
-                ));
-            }
-            cols.push(Col::new(
-                Styles::default()
-                    .with(Separator(true))
-                    .with(MinWidth(5))
-                    .with(HAlign::Centred),
-            ));
-            for _ in 0..podium_places {
-                cols.push(Col::new(
-                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
-                ));
-            }
-            cols
-        })
-        .with_row({
-            let mut header_cells = vec!["".into()];
-            header_cells.push("Probability".into());
-            for _ in 0..podium_places {
-                header_cells.push("".into());
-            }
-            header_cells.push("Fair price".into());
-            for _ in 0..podium_places {
-                header_cells.push("".into());
-            }
-            header_cells.push("Market odds".into());
-            for _ in 1..podium_places {
-                header_cells.push("".into());
-            }
-            Row::new(
-                Styles::default().with(Header(true)).with(Separator(true)),
-                header_cells.into(),
-            )
-        })
-        .with_row({
-            let mut header_cells = vec!["Runner".into()];
-            for rank in 0..podium_places {
-                header_cells.push(format!("Top-{}", rank + 1).into());
-            }
-            header_cells.push("".into());
-            for rank in 0..podium_places {
-                header_cells.push(format!("Top-{}", rank + 1).into());
-            }
-            header_cells.push("".into());
-            for rank in 0..podium_places {
-                header_cells.push(format!("Top-{}", rank + 1).into());
-            }
-            Row::new(Styles::default().with(Header(true)), header_cells.into())
-        });
-
-    for runner in 0..num_runners {
-        //println!("runner: {runner}");
-        let mut row_cells = vec![format!("{}", runner + 1).into()];
-        for rank in 0..podium_places {
-            row_cells.push(format!("{:.6}", derived[(rank, runner)]).into());
-        }
-        row_cells.push(format!("{}", runner + 1).into());
-        for rank in 0..podium_places {
-            row_cells.push(format!("{:.3}", 1.0 / derived[(rank, runner)]).into());
-        }
-        row_cells.push(format!("{}", runner + 1).into());
-        for rank in 0..podium_places {
-            let odds = f64::max(
-                1.04,
-                1.0 / derived[(rank, runner)] / ranked_overrounds[rank],
-            );
-            row_cells.push(format!("{odds:.3}").into());
-        }
-        table.push_row(Row::new(Styles::default(), row_cells.into()));
-    }
+    let table = tabulate(&derived);
     println!("{}", Console::default().render(&table));
 
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
-        Selection::Span {
-            runner: Runner::index(0),
-            ranks: 0..1,
-        },
-        Selection::Span {
-            runner: Runner::index(1),
-            ranks: 0..2,
-        },
-        Selection::Span {
-            runner: Runner::index(2),
-            ranks: 0..3,
-        },
+        Runner::number(1).top(1),
+        Runner::number(2).top(2),
+        Runner::number(3).top(3),
     ];
     let frac = engine.simulate(&selections);
     println!(
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        1.0 / frac.quotient() / win_overround.powi(selections.len() as i32)
+        overround::apply(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }
