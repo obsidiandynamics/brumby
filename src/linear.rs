@@ -65,6 +65,10 @@ impl<T> Matrix<T> {
         &self.data
     }
 
+    pub fn flatten_mut(&mut self) -> &mut [T] {
+        &mut self.data
+    }
+
     fn validate_row_index(&self, row: usize) -> bool {
         assert!(
             row < self.rows,
@@ -237,5 +241,14 @@ mod tests {
         let mut matrix = Matrix::allocate(3, 2);
         matrix.clone_row(&[3.0, 4.0]);
         assert_eq!(&[3.0, 4.0, 3.0, 4.0, 3.0, 4.0], matrix.flatten());
+    }
+
+    #[test]
+    fn flatten_mut() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        let flattened = matrix.flatten_mut();
+        flattened[3] = 400.0;
+        assert_eq!(400.0, matrix[(1, 1)]);
     }
 }
