@@ -1,6 +1,10 @@
 _help:
     @just --list
 
+# produce the prices for a race
+prices:
+    cargo run --release --bin prices
+
 # run the multi example
 multi:
     cargo run --example multi --release

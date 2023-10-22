@@ -57,23 +57,23 @@ fn main() {
     ];
 
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-    let overround = win_probs.normalise(1.0);
+    let win_overround = win_probs.normalise(1.0);
 
     //TODO fav-longshot bias removal
     let favlong_dilate = -0.0;
     win_probs.dilate_power(favlong_dilate);
 
     // let dilatives = [0.0, 0.20, 0.35, 0.5];
-    let dilatives = vec![0.0, 0.50, 0.50, 0.50];
+    // let dilatives = vec![0.0, 0.0, 0.0, 0.0];
+    let dilatives = vec![0.0, 0.182, 0.182, 0.0];
     let podium_places = dilatives.len();
     let num_runners = win_probs.len();
-    // let dilatives = [0.0, 0.0, 0.0, 0.0];
 
-    let ranked_overrounds = [overround, 1.239, 1.169, 1.12];
+    let ranked_overrounds = [win_overround, 1.239, 1.169, 1.12];
 
     println!("win probs: {win_probs:?}");
     println!("dilatives: {dilatives:?}");
-    println!("overround: {overround:.3}");
+    println!("overround: {win_overround:.3}");
 
     let dilated_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(win_probs.into())
@@ -239,6 +239,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        1.0 / frac.quotient() / overround.powi(selections.len() as i32)
+        1.0 / frac.quotient() / win_overround.powi(selections.len() as i32)
     );
 }

@@ -35,6 +35,8 @@ pub fn gd(config: GradientDescentConfig, mut loss_f: impl FnMut(f64) -> f64) -> 
             println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}, diff: {}", optimal_residual - new_residual);
             optimal_residual = new_residual;
             optimal_value = new_value;
+        } else if (new_residual - residual).abs() <= f64::EPSILON {
+            break;
         }
         residual = new_residual;
         value = new_value;
