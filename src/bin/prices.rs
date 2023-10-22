@@ -5,7 +5,7 @@ use bentobox::mc;
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig};
 use bentobox::probs::SliceExt;
-use bentobox::selection::Selection;
+use bentobox::selection::{Runner, Selection};
 
 fn main() {
     let mut win_probs = vec![
@@ -51,7 +51,7 @@ fn main() {
         for runner in 0..num_runners {
             for rank in 0..podium_places {
                 scenarios[(rank, runner)] = vec![Selection::Span {
-                    runner,
+                    runner: Runner::index(runner),
                     ranks: 0..rank + 1,
                 }]
                 .into();

@@ -2,7 +2,7 @@ use bentobox::capture::Capture;
 use bentobox::mc;
 use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
-use bentobox::selection::Selection;
+use bentobox::selection::{Runner, Selection};
 
 fn main() {
     // probs taken from a popular website
@@ -39,7 +39,7 @@ fn main() {
         println!("runner: {runner}");
         for rank in 0..4 {
             let frac = engine.simulate(&vec![Selection::Span {
-                runner,
+                runner: Runner::index(runner),
                 ranks: 0..rank + 1,
             }]);
             println!(
@@ -54,15 +54,15 @@ fn main() {
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
         Selection::Span {
-            runner: 0,
+            runner: Runner::index(0),
             ranks: 0..1,
         },
         Selection::Span {
-            runner: 1,
+            runner: Runner::index(1),
             ranks: 0..2,
         },
         Selection::Span {
-            runner: 2,
+            runner: Runner::index(2),
             ranks: 0..3,
         },
     ];

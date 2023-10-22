@@ -3,7 +3,7 @@
 use crate::capture::{Capture, CaptureMut};
 use crate::linear::Matrix;
 use crate::probs::{Fraction, SliceExt};
-use crate::selection::Selection;
+use crate::selection::{Selection, Selections};
 use std::ops::DerefMut;
 use tinyrand::{Rand, StdRand};
 
@@ -90,7 +90,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
     pub fn simulate_batch(
         &mut self,
-        scenarios: &[Capture<Vec<Selection>, [Selection]>],
+        scenarios: &[Selections],
         counts: &mut [u64],
     ) {
         self.ensure_init();
@@ -161,7 +161,7 @@ impl From<DilatedProbs<'_>> for Matrix<f64> {
 
 pub fn simulate_batch(
     iterations: u64,
-    scenarios: &[Capture<Vec<Selection>, [Selection]>],
+    scenarios: &[Selections],
     counts: &mut [u64],
     probs: &Matrix<f64>,
     podium: &mut [usize],
@@ -209,17 +209,6 @@ pub fn simulate(
         denominator: iterations,
     }
 }
-
-// #[inline]
-// fn all_match(podium: &[usize], selections: &[Selection]) -> bool {
-//     selections.iter().all(|selection| selection.matches(podium))
-//     // for selection in selections {
-//     //     if !selection.matches(podium) {
-//     //         return false;
-//     //     }
-//     // }
-//     // true
-// }
 
 #[inline(always)]
 pub fn run_once(

@@ -1,7 +1,7 @@
 use bentobox::capture::{Capture, CaptureMut};
 use bentobox::mc::{DilatedProbs, MonteCarloEngine};
 use bentobox::probs::SliceExt;
-use bentobox::selection::Selection;
+use bentobox::selection::{Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -42,11 +42,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         // sanity check
         let selections = [
             Selection::Span {
-                runner: 0,
+                runner: Runner::index(0),
                 ranks: 0..1,
             },
             Selection::Span {
-                runner: 1,
+                runner: Runner::index(1),
                 ranks: 0..2,
             },
         ];
@@ -58,11 +58,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_exacta_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: 0,
+                runner: Runner::index(0),
                 ranks: 0..1,
             },
             Selection::Span {
-                runner: 1,
+                runner: Runner::index(1),
                 ranks: 0..2,
             },
         ];
@@ -73,15 +73,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_trifecta_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: 0,
+                runner: Runner::index(0),
                 ranks: 0..1,
             },
             Selection::Span {
-                runner: 1,
+                runner: Runner::index(1),
                 ranks: 0..2,
             },
             Selection::Span {
-                runner: 2,
+                runner: Runner::index(2),
                 ranks: 0..3,
             },
         ];
@@ -92,19 +92,19 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_first4_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: 0,
+                runner: Runner::index(0),
                 ranks: 0..1,
             },
             Selection::Span {
-                runner: 1,
+                runner: Runner::index(1),
                 ranks: 0..2,
             },
             Selection::Span {
-                runner: 2,
+                runner: Runner::index(2),
                 ranks: 0..3,
             },
             Selection::Span {
-                runner: 3,
+                runner: Runner::index(3),
                 ranks: 0..4,
             },
         ];

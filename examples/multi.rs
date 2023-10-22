@@ -7,7 +7,7 @@ use bentobox::linear::Matrix;
 use bentobox::mc;
 use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
-use bentobox::selection::Selection;
+use bentobox::selection::{Runner, Selection};
 
 fn main() {
     // probs taken from a popular website
@@ -65,7 +65,7 @@ fn main() {
 
     // let dilatives = [0.0, 0.20, 0.35, 0.5];
     // let dilatives = vec![0.0, 0.0, 0.0, 0.0];
-    let dilatives = vec![0.0, 0.182, 0.182, 0.0];
+    let dilatives = vec![0.0, 0.268, 0.067, 0.0];
     let podium_places = dilatives.len();
     let num_runners = win_probs.len();
 
@@ -90,7 +90,7 @@ fn main() {
     for runner in 0..num_runners {
         for rank in 0..podium_places {
             scenarios[(rank, runner)] = vec![Selection::Span {
-                runner,
+                runner: Runner::index(runner),
                 ranks: 0..rank + 1,
             }]
             .into();
@@ -108,11 +108,6 @@ fn main() {
     let mut derived = Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            // let frac = engine.simulate(&vec![Selection::Span {
-            //     runner,
-            //     ranks: 0..rank + 1,
-            // }]);
-            // derived[(rank, runner)] = frac.quotient();
             derived[(rank, runner)] = counts[(rank, runner)] as f64 / ITERATIONS as f64;
         }
     }
@@ -222,15 +217,15 @@ fn main() {
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
         Selection::Span {
-            runner: 0,
+            runner: Runner::index(0),
             ranks: 0..1,
         },
         Selection::Span {
-            runner: 1,
+            runner: Runner::index(1),
             ranks: 0..2,
         },
         Selection::Span {
-            runner: 2,
+            runner: Runner::index(2),
             ranks: 0..3,
         },
     ];
