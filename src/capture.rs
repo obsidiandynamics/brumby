@@ -4,7 +4,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Capture<'a, W: Borrow<B>, B: ?Sized> {
     Owned(W),
     Borrowed(&'a B),
@@ -30,6 +30,15 @@ impl<'a, W: Borrow<B>, B: ?Sized> Deref for Capture<'a, W, B> {
 impl<'a, W: Borrow<B>, B: ?Sized> From<W> for Capture<'a, W, B> {
     fn from(value: W) -> Self {
         Self::Owned(value)
+    }
+}
+
+impl<'a, B: ?Sized + ToOwned> Clone for Capture<'a, B::Owned, B> {
+    fn clone(&self) -> Self {
+        match self {
+            Capture::Owned(owned) => Self::Owned(owned.borrow().to_owned()),
+            Capture::Borrowed(borrowed) => Self::Borrowed(borrowed),
+        }
     }
 }
 
@@ -80,6 +89,18 @@ mod tests {
     #[test]
     fn capture_not_clone() {
         Capture::Owned(NotClone);
+    }
+
+    #[test]
+    fn capture_clone() {
+        assert_eq!(
+            Capture::Owned(vec!["abc"]),
+            Capture::<Vec<&str>, [&str]>::Owned(vec!["abc"]).clone()
+        );
+        assert_eq!(
+            Capture::Borrowed(vec!["abc"].as_slice()),
+            Capture::<Vec<&str>, [&str]>::Borrowed(vec!["abc"].as_slice()).clone()
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
 //! A [Selection] is a predicate applied to a podium slice. It is used to determine whether a given
-//! runner has finished in a specific position or among the top-_N_ placings.
+//! runner has finished in a specific rank or among the top-_N_ placings.
 
 use crate::capture::Capture;
 use anyhow::{bail, Context};
@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::Range;
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Selection {
     Span { runner: Runner, ranks: Range<usize> },
     Exact { runner: usize, rank: usize },
@@ -83,15 +83,15 @@ impl FromStr for Runner {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Position(usize);
-impl Position {
+pub struct Rank(usize);
+impl Rank {
     pub fn number(number: usize) -> Self {
         Self::try_number(number).unwrap()
     }
 
     pub fn try_number(number: usize) -> anyhow::Result<Self> {
         if number == 0 {
-            bail!("invalid position number");
+            bail!("invalid rank number");
         }
         Ok(Self(number - 1))
     }
@@ -109,9 +109,9 @@ impl Position {
     }
 }
 
-impl Display for Position {
+impl Display for Rank {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "p{}", self.as_number())
+        write!(f, "k{}", self.as_number())
     }
 }
 
@@ -121,11 +121,11 @@ impl<'a> FromStr for Selections<'a> {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let frags = s.split("/");
+        let frags = s.split('/');
         let mut selections = vec![];
         for (rank, frag) in frags.enumerate() {
             if !frag.is_empty() {
-                let coranked = frag.split("+");
+                let coranked = frag.split('+');
                 for runner in coranked {
                     let runner = Runner::from_str(runner)?;
                     selections.push(Selection::Span {
@@ -214,21 +214,21 @@ mod tests {
     }
 
     #[test]
-    fn position_as_index() {
-        assert_eq!(6, Position::number(7).as_index());
-        assert_eq!(6, Position::index(6).as_index());
+    fn rank_as_index() {
+        assert_eq!(6, Rank::number(7).as_index());
+        assert_eq!(6, Rank::index(6).as_index());
     }
 
     #[test]
-    fn position_display() {
-        let display = format!("{}", Position::number(7));
-        assert_eq!("p7", display);
+    fn rank_display() {
+        let display = format!("{}", Rank::number(7));
+        assert_eq!("k7", display);
     }
 
     #[test]
-    #[should_panic = "invalid position number"]
-    fn position_invalid_number() {
-        Position::number(0);
+    #[should_panic = "invalid rank number"]
+    fn rank_invalid_number() {
+        Rank::number(0);
     }
 
     #[test]
@@ -256,6 +256,15 @@ mod tests {
                 Runner::number(9).top(3)
             ]),
             Selections::from_str("//r7+r8+r9").unwrap()
+        );
+    }
+
+    #[test]
+    fn selections_clone() {
+        let selections = Selections::Owned(vec![Runner::number(7).top(3)]);
+        assert_eq!(
+            Selections::Owned(vec![Runner::number(7).top(3)]),
+            selections.clone()
         );
     }
 }

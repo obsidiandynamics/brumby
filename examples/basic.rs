@@ -62,6 +62,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        overround::apply(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }

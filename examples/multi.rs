@@ -81,7 +81,6 @@ fn main() {
 
     println!("rank-runner probabilities: \n{}", dilated_probs.verbose());
 
-
     // simulate top-N rankings for all runners
     // NOTE: rankings and runner numbers are zero-based
     let mut scenarios =
@@ -109,7 +108,7 @@ fn main() {
         for rank in 0..podium_places {
             let probability = counts[(rank, runner)] as f64 / ITERATIONS as f64;
             let fair_price = 1.0 / probability;
-            let market_price = overround::apply(fair_price, ranked_overrounds[rank]);
+            let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
             let price = DerivedPrice {
                 probability,
                 fair_price,
@@ -143,6 +142,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        overround::apply(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }

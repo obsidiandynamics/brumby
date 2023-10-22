@@ -2,8 +2,8 @@ _help:
     @just --list
 
 # produce the prices for a race
-prices:
-    cargo run --release --bin prices
+prices *ARGS:
+    cargo run --release --bin prices -- {{ARGS}}
 
 # run the multi example
 multi:

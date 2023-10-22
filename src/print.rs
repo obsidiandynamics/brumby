@@ -61,7 +61,7 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
             }
             Row::new(
                 Styles::default().with(Header(true)).with(Separator(true)),
-                header_cells.into(),
+                header_cells,
             )
         })
         .with_row({
@@ -77,7 +77,7 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
             for rank in 0..derived.rows() {
                 header_cells.push(format!("Top-{}", rank + 1).into());
             }
-            Row::new(Styles::default().with(Header(true)), header_cells.into())
+            Row::new(Styles::default().with(Header(true)), header_cells)
         });
 
     for runner in 0..derived.cols() {
@@ -93,7 +93,7 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
         for rank in 0..derived.rows() {
             row_cells.push(format!("{:.3}", derived[(rank, runner)].market_price).into());
         }
-        table.push_row(Row::new(Styles::default(), row_cells.into()));
+        table.push_row(Row::new(Styles::default(), row_cells));
     }
 
     table
