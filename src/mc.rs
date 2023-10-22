@@ -1,22 +1,25 @@
 //! The core of the Monte Carlo simulator.
 
 use crate::capture::{Capture, CaptureMut};
+use crate::linear::Matrix;
 use crate::probs::{Fraction, SliceExt};
 use crate::selection::Selection;
 use std::ops::DerefMut;
 use tinyrand::{Rand, StdRand};
-use crate::linear::Matrix;
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
     probs: Option<Capture<'a, Matrix<f64>, Matrix<f64>>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
-    totals:  Option<CaptureMut<'a, Vec<f64>, [f64]>>,
+    totals: Option<CaptureMut<'a, Vec<f64>, [f64]>>,
     rand: CaptureMut<'a, R, R>,
 }
 impl<'a, R: Rand> MonteCarloEngine<'a, R> {
-    pub fn new(rand: CaptureMut<'a, R, R>) -> Self where R: Default {
+    pub fn new(rand: CaptureMut<'a, R, R>) -> Self
+    where
+        R: Default,
+    {
         Self {
             iterations: 10_000,
             probs: None,
@@ -71,6 +74,41 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
     }
 
     pub fn simulate(&mut self, selections: &[Selection]) -> Fraction {
+        self.ensure_init();
+        // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
+
+        simulate(
+            self.iterations,
+            selections,
+            self.probs.as_ref().unwrap(),
+            self.podium.as_mut().unwrap(),
+            self.bitmap.as_mut().unwrap(),
+            self.totals.as_mut().unwrap(),
+            self.rand.deref_mut(),
+        )
+    }
+
+    pub fn simulate_batch(
+        &mut self,
+        scenarios: &[Capture<Vec<Selection>, [Selection]>],
+        counts: &mut [u64],
+    ) {
+        self.ensure_init();
+        // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
+
+        simulate_batch(
+            self.iterations,
+            scenarios,
+            counts,
+            self.probs.as_ref().unwrap(),
+            self.podium.as_mut().unwrap(),
+            self.bitmap.as_mut().unwrap(),
+            self.totals.as_mut().unwrap(),
+            self.rand.deref_mut(),
+        )
+    }
+
+    fn ensure_init(&mut self) {
         if self.bitmap.is_none() {
             self.bitmap = Some(CaptureMut::Owned(vec![true; self.num_runners()]));
         }
@@ -80,17 +118,6 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         if self.totals.is_none() {
             self.totals = Some(CaptureMut::Owned(vec![1.0; self.num_ranks()]))
         }
-        // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
-
-        run_many(
-            self.iterations,
-            selections,
-            self.probs.as_ref().unwrap(),
-            self.podium.as_mut().unwrap(),
-            self.bitmap.as_mut().unwrap(),
-            self.totals.as_mut().unwrap(),
-            self.rand.deref_mut(),
-        )
     }
 }
 
@@ -132,20 +159,48 @@ impl From<DilatedProbs<'_>> for Matrix<f64> {
     }
 }
 
-pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix<f64>, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64], rand: &mut impl Rand,) -> Fraction {
+pub fn simulate_batch(
+    iterations: u64,
+    scenarios: &[Capture<Vec<Selection>, [Selection]>],
+    counts: &mut [u64],
+    probs: &Matrix<f64>,
+    podium: &mut [usize],
+    bitmap: &mut [bool],
+    totals: &mut [f64],
+    rand: &mut impl Rand,
+) {
+    assert!(validate_args(probs, podium, bitmap, totals));
+    assert_eq!(
+        scenarios.len(),
+        counts.len(),
+        "a count must exist for each scenario"
+    );
+
+    for _ in 0..iterations {
+        run_once(probs, podium, bitmap, totals, rand);
+        for (scenario_index, selections) in scenarios.iter().enumerate() {
+            if selections.iter().all(|selection| selection.matches(podium)) {
+                counts[scenario_index] += 1;
+            }
+        }
+    }
+}
+
+pub fn simulate(
+    iterations: u64,
+    selections: &[Selection],
+    probs: &Matrix<f64>,
+    podium: &mut [usize],
+    bitmap: &mut [bool],
+    totals: &mut [f64],
+    rand: &mut impl Rand,
+) -> Fraction {
     assert!(validate_args(probs, podium, bitmap, totals));
 
     let mut matching_iters = 0;
     for _ in 0..iterations {
         run_once(probs, podium, bitmap, totals, rand);
-        let mut all_match = true;
-        for selection in selections {
-            if !selection.matches(podium) {
-                all_match = false;
-                break;
-            }
-        }
-        if all_match {
+        if selections.iter().all(|selection| selection.matches(podium)) {
             matching_iters += 1;
         }
     }
@@ -154,6 +209,17 @@ pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix<f64>, 
         denominator: iterations,
     }
 }
+
+// #[inline]
+// fn all_match(podium: &[usize], selections: &[Selection]) -> bool {
+//     selections.iter().all(|selection| selection.matches(podium))
+//     // for selection in selections {
+//     //     if !selection.matches(podium) {
+//     //         return false;
+//     //     }
+//     // }
+//     // true
+// }
 
 #[inline(always)]
 pub fn run_once(
@@ -189,7 +255,7 @@ pub fn run_once(
                     *ranked_runner = runner;
                     bitmap[runner] = false;
                     chosen = true;
-                    for future_rank in rank+1..ranks {
+                    for future_rank in rank + 1..ranks {
                         totals[future_rank] -= probs[(future_rank, runner)];
                     }
                     break;
@@ -206,7 +272,12 @@ pub fn run_once(
     // println!("podium: {podium:?}");
 }
 
-fn validate_args(probs: &Matrix<f64>, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64]) -> bool {
+fn validate_args(
+    probs: &Matrix<f64>,
+    podium: &mut [usize],
+    bitmap: &mut [bool],
+    totals: &mut [f64],
+) -> bool {
     assert!(
         !probs.is_empty(),
         "the probabilities matrix cannot be empty"
@@ -232,7 +303,10 @@ fn validate_args(probs: &Matrix<f64>, podium: &mut [usize], bitmap: &mut [bool],
         "a probability row must exist for each podium rank"
     );
     for p in probs.flatten() {
-        assert!((0.0..=1.0).contains(p), "probabilities out of range: {probs}");
+        assert!(
+            (0.0..=1.0).contains(p),
+            "probabilities out of range: {probs}"
+        );
     }
     true
 }

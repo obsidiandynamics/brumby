@@ -55,7 +55,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         assert_eq!(1_000, frac.denominator);
     }
 
-    c.bench_function("cri_mc_engine_exacta", |b| {
+    c.bench_function("cri_mc_engine_exacta_1k", |b| {
         let selections = [
             Selection::Span {
                 runner: 0,
@@ -70,7 +70,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             engine.simulate(&selections);
         });
     });
-    c.bench_function("cri_mc_engine_trifecta", |b| {
+    c.bench_function("cri_mc_engine_trifecta_1k", |b| {
         let selections = [
             Selection::Span {
                 runner: 0,
@@ -89,7 +89,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             engine.simulate(&selections);
         });
     });
-    c.bench_function("cri_mc_engine_first4", |b| {
+    c.bench_function("cri_mc_engine_first4_1k", |b| {
         let selections = [
             Selection::Span {
                 runner: 0,
