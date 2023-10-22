@@ -1,6 +1,4 @@
 use std::error::Error;
-use std::fs::File;
-use std::io::Read;
 use std::ops::Range;
 use std::path::{PathBuf};
 use anyhow::bail;
@@ -11,6 +9,7 @@ use stanza::renderer::Renderer;
 use bentobox::capture::Capture;
 use bentobox::linear::Matrix;
 use bentobox::{mc, overround};
+use bentobox::data::{EventDetailExt, RaceSummary, read_from_file};
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
 use bentobox::print::{DerivedPrice, tabulate};
@@ -35,7 +34,7 @@ struct Args {
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
-        if self.file.is_none() && self.url.is_none() || !self.file.is_none() && !self.url.is_none(){
+        if self.file.is_none() && self.url.is_none() || self.file.is_some() && self.url.is_some(){
             bail!("either the -f or the -u flag must be specified");
         }
         Ok(())
@@ -47,34 +46,37 @@ fn main() -> Result<(), Box<dyn Error>>{
     args.validate()?;
     println!("args: {args:?}");
 
-    read_race_data(&args)?;
+    let race = read_race_data(&args)?;
+    println!("prices= {}", race.prices.verbose());
+    let mut win_probs: Vec<_> = race.prices.row_slice(0).iter().map(|price| 1.0 / price).collect();
+    let place_prices = race.prices.row_slice(3).to_vec();
 
-    let mut win_probs = vec![
-        1.0 / 1.55,
-        1.0 / 12.0,
-        1.0 / 6.50,
-        1.0 / 9.00,
-        1.0 / 9.00,
-        1.0 / 61.0,
-        1.0 / 7.5,
-        1.0 / 81.0,
-    ];
-    let place_prices = vec![
-        1.09,
-        2.55,
-        1.76,
-        2.15,
-        2.10,
-        10.5,
-        1.93,
-        13.5
-    ];
+    // let mut win_probs = vec![
+    //     1.0 / 1.55,
+    //     1.0 / 12.0,
+    //     1.0 / 6.50,
+    //     1.0 / 9.00,
+    //     1.0 / 9.00,
+    //     1.0 / 61.0,
+    //     1.0 / 7.5,
+    //     1.0 / 81.0,
+    // ];
+    // let place_prices = vec![
+    //     1.09,
+    //     2.55,
+    //     1.76,
+    //     2.15,
+    //     2.10,
+    //     10.5,
+    //     1.93,
+    //     13.5
+    // ];
 
     let win_overround = win_probs.normalise(1.0);
     let mut place_probs: Vec<_> = place_prices.iter().map(|odds| 1.0 / odds).collect();
     let place_overround = place_probs.normalise(3.0) / 3.0;
     let outcome = fit(&win_probs, &place_prices);
-    println!("gradient descent outcome: {outcome:?}");
+    println!("gradient descent outcome: {outcome:?}, RMSRE: {}", outcome.optimal_residual.sqrt());
 
     let dilatives = vec![0.0, outcome.optimal_value, outcome.optimal_value, outcome.optimal_value];
     let podium_places = dilatives.len();
@@ -133,15 +135,13 @@ fn main() -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
-fn read_race_data(args: &Args) -> anyhow::Result<()> {
+fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
     if let Some(path) = args.file.as_ref() {
-        let mut file = File::open(path)?;
-        let mut data = String::new();
-        file.read_to_string(&mut data)?;
-        println!("data={data}");
+        let event_detail = read_from_file(path)?;
+        return Ok(event_detail.summarise());
     }
 
-    Ok(())
+    unreachable!()
 }
 
 fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {

@@ -1,9 +1,9 @@
 //! Support for linear algebra.
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display, format, Formatter};
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Matrix<T> {
     data: Vec<T>,
     rows: usize,
@@ -89,6 +89,22 @@ impl<T> Matrix<T> {
         true
     }
 }
+
+// impl<T: Debug> Debug for Matrix<T> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         let alternate = f.alternate();
+//         let mut d = f.debug_struct("Matrix");
+//         d.field("rows", &self.rows);
+//         d.field("cols", &self.cols);
+//         if alternate {
+//             let pretty = format!("{}", self.verbose());
+//             d.field("data", &pretty);
+//         } else {
+//             d.field("data", &self.data);
+//         }
+//         d.finish()
+//     }
+// }
 
 impl<T> Display for Matrix<T> where T: Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -19,9 +19,11 @@ impl Selection {
             Selection::Span {
                 runner: Runner(runner),
                 ranks,
-            } => podium[ranks.start..ranks.end]
-                .iter()
-                .any(|ranked_runner| ranked_runner == runner),
+            } => {
+                podium[ranks.start..ranks.end]
+                    .iter()
+                    .any(|ranked_runner| ranked_runner == runner)
+            },
             Selection::Exact { runner, rank } => podium[*rank] == *runner,
         }
     }
