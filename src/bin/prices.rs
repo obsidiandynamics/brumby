@@ -103,21 +103,21 @@ fn main() -> Result<(), Box<dyn Error>>{
 
     let overround_step = (win_overround - place_overround) / 2.0;
     let ranked_overrounds = vec![win_overround, win_overround - overround_step, place_overround, place_overround - overround_step];
-    // {
-    //     let mut counts = Matrix::allocate(podium_places, num_runners);
-    //     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-    //     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
-    //     for runner in 0..num_runners {
-    //         for rank in 0..podium_places {
-    //             let probability = counts[(rank, runner)] as f64 / MC_ITERATIONS as f64;
-    //             let fair_price = 1.0 / probability;
-    //             let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
-    //             derived_prices[(rank, runner)] = market_price;
-    //         }
-    //     }
-    //     println!("fitted prices:  {:?}", derived_prices.row_slice(2));
-    //     println!("sample prices: {:?}", place_prices);
-    // }
+    {
+        let mut counts = Matrix::allocate(podium_places, num_runners);
+        engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+        let mut derived_prices = Matrix::allocate(podium_places, num_runners);
+        for runner in 0..num_runners {
+            for rank in 0..podium_places {
+                let probability = counts[(rank, runner)] as f64 / MC_ITERATIONS as f64;
+                let fair_price = 1.0 / probability;
+                let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
+                derived_prices[(rank, runner)] = market_price;
+            }
+        }
+        println!("fitted prices:  {:?}", derived_prices.row_slice(2));
+        println!("sample prices: {:?}", place_prices);
+    }
 
     let mut counts = Matrix::allocate(podium_places, num_runners);
     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
@@ -211,10 +211,11 @@ fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
                 sq_error += relative_error.powi(2);
             }
         }
-        println!("dilative: {value}, sq_error: {sq_error}");
+        let mse = sq_error / num_runners as f64;
+        println!("dilative: {value}, mse: {mse}");
         println!("derived_prices: {derived_prices:?}");
         println!("sample prices:  {place_prices:?}");
 
-        sq_error
+        mse
     })
 }
