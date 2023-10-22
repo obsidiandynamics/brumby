@@ -17,6 +17,7 @@ use bentobox::probs::SliceExt;
 use bentobox::selection::{Runner, Selection, Selections};
 
 const MC_ITERATIONS: u64 = 100_000;
+const FITTED_PRICE_RANGE: Range<f64> = 1.0..50.0;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -165,8 +166,6 @@ fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
     let mut place_probs: Vec<_> = place_prices.iter().map(|odds| 1.0 / odds).collect();
     let place_overround = place_probs.normalise(3.0) / 3.0;
 
-    const FITTED_PRICE_RANGE: Range<f64> = 1.0..50.0;
-
     gd(GradientDescentConfig {
         init_value: 0.0,
         step: 0.01,
@@ -199,23 +198,28 @@ fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
         let mut counts = Matrix::allocate(podium_places, num_runners);
         engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
 
-        let mut sq_error = 0.0;
         let mut derived_prices = vec![0.0; num_runners];
         for runner in 0..num_runners {
-            let sample_price = place_prices[runner];
-            if FITTED_PRICE_RANGE.contains(&sample_price) {
-                let derived_prob = counts[(2, runner)] as f64 / MC_ITERATIONS as f64;
-                let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
-                derived_prices[runner] = derived_price;
-                let relative_error = (sample_price - derived_price) / sample_price;
-                sq_error += relative_error.powi(2);
-            }
+            let derived_prob = counts[(2, runner)] as f64 / MC_ITERATIONS as f64;
+            let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
+            derived_prices[runner] = derived_price;
         }
-        let mse = sq_error / num_runners as f64;
+        let mse = compute_mse(&place_prices, &derived_prices);
         println!("dilative: {value}, mse: {mse}");
         println!("derived_prices: {derived_prices:?}");
         println!("sample prices:  {place_prices:?}");
-
         mse
     })
+}
+
+fn compute_mse(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
+    let mut sq_error = 0.0;
+    for (runner, sample_price) in sample_prices.iter().enumerate() {
+        let fitted_price = fitted_prices[runner];
+        if FITTED_PRICE_RANGE.contains(&sample_price) {
+            let relative_error = (sample_price - fitted_price) / sample_price;
+            sq_error += relative_error.powi(2);
+        }
+    }
+    sq_error / sample_prices.len() as f64
 }
