@@ -1,3 +1,4 @@
+use std::ops::Range;
 use bentobox::capture::Capture;
 use bentobox::linear::Matrix;
 use bentobox::mc;
@@ -32,6 +33,8 @@ fn main() {
     // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
     let _win_overround = win_probs.normalise(1.0);
     let place_overround = place_probs.normalise(3.0) / 3.0;
+
+    const FITTED_PRICE_RANGE: Range<f64> = 1.0..50.0;
 
     let outcome = gd(GradientDescentConfig {
         init_value: 0.0,
@@ -70,12 +73,14 @@ fn main() {
         let mut sq_error = 0.0;
         let mut derived_prices = vec![0.0; num_runners];
         for runner in 0..num_runners {
-            let derived_prob = counts[(2, runner)] as f64 / ITERATIONS as f64;
-            let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
-            derived_prices[runner] = derived_price;
             let sample_price = place_prices[runner];
-            let relative_error = (sample_price - derived_price) / sample_price;
-            sq_error += relative_error.powi(2);
+            if FITTED_PRICE_RANGE.contains(&sample_price) {
+                let derived_prob = counts[(2, runner)] as f64 / ITERATIONS as f64;
+                let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
+                derived_prices[runner] = derived_price;
+                let relative_error = (sample_price - derived_price) / sample_price;
+                sq_error += relative_error.powi(2);
+            }
         }
         println!("dilative: {value}, sq_error: {sq_error}");
         println!("derived_prices: {derived_prices:?}");
