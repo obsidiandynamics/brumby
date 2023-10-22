@@ -9,7 +9,7 @@ use crate::linear::Matrix;
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     iterations: u64,
-    probs: Option<Capture<'a, Matrix, Matrix>>,
+    probs: Option<Capture<'a, Matrix<f64>, Matrix<f64>>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
     totals:  Option<CaptureMut<'a, Vec<f64>, [f64]>>,
@@ -32,7 +32,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self
     }
 
-    pub fn with_probs(mut self, probs: Capture<'a, Matrix, Matrix>) -> Self {
+    pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) -> Self {
         self.probs = Some(probs);
         self
     }
@@ -121,18 +121,18 @@ impl<'a> DilatedProbs<'a> {
     }
 }
 
-impl From<DilatedProbs<'_>> for Matrix {
+impl From<DilatedProbs<'_>> for Matrix<f64> {
     fn from(probs: DilatedProbs) -> Self {
         let win_probs = probs.win_probs.expect("no win probabilities specified");
         let dilatives = probs.dilatives.expect("no dilatives specified");
         let mut matrix = Matrix::allocate(dilatives.len(), win_probs.len());
         matrix.clone_row(&win_probs);
-        dilatives.dilate_rows_power(&mut matrix); //TODO
+        dilatives.dilate_rows_power(&mut matrix);
         matrix
     }
 }
 
-pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64], rand: &mut impl Rand,) -> Fraction {
+pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix<f64>, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64], rand: &mut impl Rand,) -> Fraction {
     assert!(validate_args(probs, podium, bitmap, totals));
 
     let mut matching_iters = 0;
@@ -157,7 +157,7 @@ pub fn run_many(iterations: u64, selections: &[Selection], probs: &Matrix, podiu
 
 #[inline(always)]
 pub fn run_once(
-    probs: &Matrix,
+    probs: &Matrix<f64>,
     podium: &mut [usize],
     bitmap: &mut [bool],
     totals: &mut [f64],
@@ -206,7 +206,7 @@ pub fn run_once(
     // println!("podium: {podium:?}");
 }
 
-fn validate_args(probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64]) -> bool {
+fn validate_args(probs: &Matrix<f64>, podium: &mut [usize], bitmap: &mut [bool], totals: &mut [f64]) -> bool {
     assert!(
         !probs.is_empty(),
         "the probabilities matrix cannot be empty"
@@ -236,21 +236,6 @@ fn validate_args(probs: &Matrix, podium: &mut [usize], bitmap: &mut [bool], tota
     }
     true
 }
-
-// #[inline(always)]
-// fn reset_bitmap(bitmap: &mut [bool]) {
-//     for b in bitmap {
-//         *b = true;
-//     }
-// }
-//
-// #[inline(always)]
-// fn reset_prob_sums(prob_sums: &mut [f64]) {
-//     prob_sums.fill(1.0);
-//     // for p in prob_sums {
-//     //     *p = 1.0;
-//     // }
-// }
 
 #[inline(always)]
 fn random_f64(rand: &mut impl Rand) -> f64 {

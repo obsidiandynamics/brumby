@@ -32,7 +32,7 @@ pub fn gd(config: GradientDescentConfig, mut loss_f: impl FnMut(f64) -> f64) -> 
             }
         } else if new_residual < optimal_residual {
             boost = f64::min(new_residual / (optimal_residual - new_residual), 10.0);
-            println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}");
+            println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}, diff: {}", optimal_residual - new_residual);
             optimal_residual = new_residual;
             optimal_value = new_value;
         }

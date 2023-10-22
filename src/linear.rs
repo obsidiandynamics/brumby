@@ -1,23 +1,23 @@
 //! Support for linear algebra.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
-use crate::probs::SliceExt;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Matrix {
-    data: Vec<f64>,
+pub struct Matrix<T> {
+    data: Vec<T>,
     rows: usize,
     cols: usize,
 }
-impl Matrix {
-    pub fn allocate(rows: usize, cols: usize) -> Self {
+impl<T> Matrix<T> {
+    pub fn allocate(rows: usize, cols: usize) -> Self where T: Default {
         let (len, overflow) = rows.overflowing_mul(cols);
         assert!(
             !overflow,
             "allocation of a {rows}x{cols} matrix failed due to overflow"
         );
-        let data = vec![0.0; len];
+        let mut data = Vec::with_capacity(len);
+        data.resize_with(len, T::default);
         Self { data, rows, cols }
     }
 
@@ -33,33 +33,19 @@ impl Matrix {
         self.data.is_empty()
     }
 
-    pub fn row_slice(&self, row: usize) -> &[f64] {
+    pub fn row_slice(&self, row: usize) -> &[T] {
         debug_assert!(self.validate_row_index(row));
         let row_start = row * self.cols;
         &self.data.as_slice()[row_start..(row_start + self.cols)]
     }
 
-    pub fn row_slice_mut(&mut self, row: usize) -> &mut [f64] {
+    pub fn row_slice_mut(&mut self, row: usize) -> &mut [T] {
         debug_assert!(self.validate_row_index(row));
         let row_start = row * self.cols;
         &mut self.data.as_mut_slice()[row_start..(row_start + self.cols)]
     }
 
-    pub fn scale_rows(&mut self, factors: &[f64]) {
-        debug_assert_eq!(
-            self.rows,
-            factors.len(),
-            "number of factors {} does not match number of rows {}",
-            factors.len(),
-            self.rows
-        );
-        for (row, &factor) in factors.iter().enumerate() {
-            let row_slice = self.row_slice_mut(row);
-            row_slice.scale(factor);
-        }
-    }
-
-    pub fn clone_row(&mut self, source_row: &[f64]) {
+    pub fn clone_row(&mut self, source_row: &[T]) where T: Copy {
         debug_assert_eq!(self.cols, source_row.len(), "length of source row {} does not match number of columns {}", source_row.len(), self.cols);
         for row in 0..self.rows {
             let row_slice = self.row_slice_mut(row);
@@ -67,15 +53,15 @@ impl Matrix {
         }
     }
 
-    pub fn verbose(&self) -> VerboseFormat {
+    pub fn verbose(&self) -> VerboseFormat<T> {
         VerboseFormat { referent: self }
     }
 
-    pub fn unpack(self) -> (Vec<f64>, usize, usize) {
+    pub fn unpack(self) -> (Vec<T>, usize, usize) {
         (self.data, self.rows, self.cols)
     }
     
-    pub fn flatten(&self) -> &[f64] {
+    pub fn flatten(&self) -> &[T] {
         &self.data
     }
 
@@ -100,7 +86,7 @@ impl Matrix {
     }
 }
 
-impl Display for Matrix {
+impl<T> Display for Matrix<T> where T: Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.rows {
             write!(f, "{:?}", self.row_slice(row))?;
@@ -109,10 +95,10 @@ impl Display for Matrix {
     }
 }
 
-pub struct VerboseFormat<'a> {
-    referent: &'a Matrix,
+pub struct VerboseFormat<'a, T> {
+    referent: &'a Matrix<T>,
 }
-impl Display for VerboseFormat<'_> {
+impl<T> Display for VerboseFormat<'_, T> where T: Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.referent.rows {
             writeln!(f, "{:?}", self.referent.row_slice(row))?;
@@ -121,8 +107,8 @@ impl Display for VerboseFormat<'_> {
     }
 }
 
-impl Index<(usize, usize)> for Matrix {
-    type Output = f64;
+impl<T> Index<(usize, usize)> for Matrix<T> {
+    type Output = T;
 
     #[inline]
     fn index(&self, index: (usize, usize)) -> &Self::Output {
@@ -133,7 +119,7 @@ impl Index<(usize, usize)> for Matrix {
     }
 }
 
-impl IndexMut<(usize, usize)> for Matrix {
+impl<T> IndexMut<(usize, usize)> for Matrix<T> {
     #[inline]
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         let (row, col) = index;
@@ -144,16 +130,22 @@ impl IndexMut<(usize, usize)> for Matrix {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod matrix_fixtures {
     use super::*;
 
-    fn populate_with_test_data(matrix: &mut Matrix) {
+    pub fn populate_with_test_data(matrix: &mut Matrix<f64>) {
         for row in 0..matrix.rows() {
             for col in 0..matrix.cols() {
                 matrix[(row, col)] = (row * matrix.cols() + col) as f64 * 10.0;
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::linear::matrix_fixtures::populate_with_test_data;
+    use super::*;
 
     #[test]
     fn index() {
@@ -173,21 +165,21 @@ mod tests {
     #[test]
     #[should_panic = "invalid row index 4 for a 4x3 matrix"]
     fn row_overflow() {
-        let matrix = Matrix::allocate(4, 3);
+        let matrix = Matrix::<()>::allocate(4, 3);
         matrix[(matrix.rows(), 0)];
     }
 
     #[test]
     #[should_panic = "invalid column index 3 for a 4x3 matrix"]
     fn col_overflow() {
-        let matrix = Matrix::allocate(4, 3);
+        let matrix = Matrix::<()>::allocate(4, 3);
         matrix[(0, matrix.cols())];
     }
 
     #[test]
     #[should_panic]
     fn allocate_overflow() {
-        Matrix::allocate(usize::MAX, 2);
+        Matrix::<()>::allocate(usize::MAX, 2);
     }
 
     #[test]
@@ -205,7 +197,7 @@ mod tests {
     #[test]
     #[should_panic = "invalid row index 3 for a 3x2 matrix"]
     fn row_slice_index_overflow() {
-        let matrix = Matrix::allocate(3, 2);
+        let matrix = Matrix::<()>::allocate(3, 2);
         matrix.row_slice(matrix.rows());
     }
 
@@ -238,14 +230,6 @@ mod tests {
         assert_eq!(3, rows);
         assert_eq!(2, cols);
         assert_eq!(&[0.0, 10.0, 20.0, 30.0, 40.0, 50.0], &*data);
-    }
-
-    #[test]
-    fn scale_rows() {
-        let mut matrix = Matrix::allocate(3, 2);
-        populate_with_test_data(&mut matrix);
-        matrix.scale_rows(&[2.0, 4.0, 6.0]);
-        assert_eq!(&[0.0, 20.0, 80.0, 120.0, 240.0, 300.0], matrix.flatten());
     }
 
     #[test]

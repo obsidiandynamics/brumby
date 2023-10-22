@@ -10,8 +10,9 @@ pub trait SliceExt {
     fn dilate_additive(&mut self, factor: f64);
     fn dilate_power(&mut self, factor: f64);
     fn scale(&mut self, factor: f64);
-    fn dilate_rows_additive(&self, matrix: &mut Matrix);
-    fn dilate_rows_power(&self, matrix: &mut Matrix);
+    fn scale_rows(&self, target: &mut Matrix<f64>);
+    fn dilate_rows_additive(&self, matrix: &mut Matrix<f64>);
+    fn dilate_rows_power(&self, matrix: &mut Matrix<f64>);
 }
 impl SliceExt for [f64] {
     fn sum(&self) -> f64 {
@@ -73,7 +74,21 @@ impl SliceExt for [f64] {
         }
     }
 
-    fn dilate_rows_additive(&self, matrix: &mut Matrix) {
+    fn scale_rows(&self, target: &mut Matrix<f64>) {
+        debug_assert_eq!(
+            target.rows(),
+            self.len(),
+            "number of factors {} does not match number of rows {}",
+            self.len(),
+            target.rows()
+        );
+        for (row, &factor) in self.iter().enumerate() {
+            let row_slice = target.row_slice_mut(row);
+            row_slice.scale(factor);
+        }
+    }
+
+    fn dilate_rows_additive(&self, matrix: &mut Matrix<f64>) {
         debug_assert_eq!(
             self.len(),
             matrix.rows(),
@@ -87,7 +102,7 @@ impl SliceExt for [f64] {
         }
     }
 
-    fn dilate_rows_power(&self, matrix: &mut Matrix) {
+    fn dilate_rows_power(&self, matrix: &mut Matrix<f64>) {
         debug_assert_eq!(
             self.len(),
             matrix.rows(),
@@ -123,6 +138,7 @@ impl Display for Fraction {
 mod tests {
     use super::*;
     use assert_float_eq::*;
+    use crate::linear::matrix_fixtures::populate_with_test_data;
 
     #[test]
     fn sum() {
@@ -136,6 +152,14 @@ mod tests {
         let sum = data.normalise(1.0);
         assert_f64_near!(0.5, sum, 1);
         assert_slice_f64_near(&[0.1, 0.2, 0.3, 0.4], &data, 1);
+    }
+
+    #[test]
+    fn scale_rows() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        [2.0, 4.0, 6.0].scale_rows(&mut matrix);
+        assert_eq!(&[0.0, 20.0, 80.0, 120.0, 240.0, 300.0], matrix.flatten());
     }
 
     #[test]
