@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>>{
     let race = read_race_data(&args)?;
     println!("prices= {}", race.prices.verbose());
     let mut win_probs: Vec<_> = race.prices.row_slice(0).iter().map(|price| 1.0 / price).collect();
-    let place_prices = race.prices.row_slice(3).to_vec();
+    let place_prices = race.prices.row_slice(2).to_vec();
 
     // let mut win_probs = vec![
     //     1.0 / 1.55,
@@ -100,11 +100,28 @@ fn main() -> Result<(), Box<dyn Error>>{
             .into();
         }
     }
-    let mut counts = Matrix::allocate(podium_places, num_runners);
-    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-    let mut derived = Matrix::allocate(podium_places, num_runners);
+
     let overround_step = (win_overround - place_overround) / 2.0;
     let ranked_overrounds = vec![win_overround, win_overround - overround_step, place_overround, place_overround - overround_step];
+    // {
+    //     let mut counts = Matrix::allocate(podium_places, num_runners);
+    //     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+    //     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
+    //     for runner in 0..num_runners {
+    //         for rank in 0..podium_places {
+    //             let probability = counts[(rank, runner)] as f64 / MC_ITERATIONS as f64;
+    //             let fair_price = 1.0 / probability;
+    //             let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
+    //             derived_prices[(rank, runner)] = market_price;
+    //         }
+    //     }
+    //     println!("fitted prices:  {:?}", derived_prices.row_slice(2));
+    //     println!("sample prices: {:?}", place_prices);
+    // }
+
+    let mut counts = Matrix::allocate(podium_places, num_runners);
+    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+    let mut derived_prices = Matrix::allocate(podium_places, num_runners);
     println!("ranked overrounds: {ranked_overrounds:?}");
     for runner in 0..num_runners {
         for rank in 0..podium_places {
@@ -116,10 +133,10 @@ fn main() -> Result<(), Box<dyn Error>>{
                 fair_price,
                 market_price,
             };
-            derived[(rank, runner)] = price;
+            derived_prices[(rank, runner)] = price;
         }
     }
-    let table = tabulate(&derived);
+    let table = tabulate(&derived_prices);
     println!("{}", Console::default().render(&table));
 
     if let Some(selections) = args.selections {

@@ -1,6 +1,6 @@
 //! Support for linear algebra.
 
-use std::fmt::{Debug, Display, format, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 #[derive(PartialEq, Clone, Debug)]
