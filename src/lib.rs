@@ -5,6 +5,7 @@
 pub mod capture;
 pub mod linear;
 pub mod mc;
+pub mod opt;
 pub mod probs;
 pub mod selection;
 
