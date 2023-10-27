@@ -3,8 +3,9 @@ use stanza::renderer::Renderer;
 
 use bentobox::linear::Matrix;
 use bentobox::{mc, overround};
+use bentobox::display::DisplaySlice;
 use bentobox::mc::DilatedProbs;
-use bentobox::print::{DerivedPrice, DisplaySlice, tabulate};
+use bentobox::print::{DerivedPrice, tabulate};
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Rank, Runner};
 

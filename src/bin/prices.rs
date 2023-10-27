@@ -13,10 +13,11 @@ use bentobox::data::{download_by_id, read_from_file, EventDetailExt, RaceSummary
 use bentobox::linear::Matrix;
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
-use bentobox::print::{tabulate, DerivedPrice, DisplaySlice};
+use bentobox::print::{tabulate, DerivedPrice};
 use bentobox::probs::{MarketPrice, SliceExt};
 use bentobox::selection::{Rank, Runner, Selection, Selections};
 use bentobox::{mc, overround};
+use bentobox::display::DisplaySlice;
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;

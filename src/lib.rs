@@ -6,6 +6,7 @@
 
 pub mod capture;
 pub mod data;
+pub mod display;
 pub mod linear;
 pub mod mc;
 pub mod opt;
