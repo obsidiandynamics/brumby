@@ -5,7 +5,7 @@ use bentobox::linear::Matrix;
 use bentobox::{mc, overround};
 use bentobox::display::DisplaySlice;
 use bentobox::mc::DilatedProbs;
-use bentobox::print::{DerivedPrice, tabulate};
+use bentobox::print::{DerivedPrice, tabulate_derived_prices};
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Rank, Runner};
 
@@ -126,7 +126,7 @@ fn main() {
     //     .row_slice_mut(0)
     //     .dilate_power(1.0 / (1.0 + favlong_dilate) - 1.0);
 
-    let table = tabulate(&derived);
+    let table = tabulate_derived_prices(&derived);
     println!("{}", Console::default().render(&table));
 
     // simulate a same-race multi for a chosen selection vector

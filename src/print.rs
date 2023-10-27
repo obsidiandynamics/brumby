@@ -2,7 +2,7 @@ use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use crate::linear::Matrix;
 use crate::probs::MarketPrice;
-use crate::selection::Runner;
+use crate::selection::{Rank, Runner};
 
 #[derive(Debug, Default)]
 pub struct DerivedPrice {
@@ -17,7 +17,7 @@ impl MarketPrice for DerivedPrice {
     }
 }
 
-pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
+pub fn tabulate_derived_prices(derived: &Matrix<DerivedPrice>) -> Table {
     let mut table = Table::default()
         .with_cols({
             let mut cols = vec![];
@@ -55,11 +55,11 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
         })
         .with_row({
             let mut header_cells = vec!["".into()];
-            header_cells.push("Probability".into());
+            header_cells.push("Probabilities".into());
             for _ in 0..derived.rows() {
                 header_cells.push("".into());
             }
-            header_cells.push("Fair price".into());
+            header_cells.push("Fair prices".into());
             for _ in 0..derived.rows() {
                 header_cells.push("".into());
             }
@@ -100,6 +100,94 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
         row_cells.push(format!("{}", Runner::index(runner)).into());
         for rank in 0..derived.rows() {
             row_cells.push(format!("{:.3}", derived[(rank, runner)].market_price).into());
+        }
+        table.push_row(Row::new(Styles::default(), row_cells));
+    }
+
+    table
+}
+
+pub fn tabulate_values(values: &[f64], header: &str) -> Table {
+    let mut table = Table::default()
+        .with_cols(vec![
+            Col::new(Styles::default().with(MinWidth(10)).with(HAlign::Centred)),
+            Col::new(Styles::default().with(MinWidth(10)).with(HAlign::Right)),
+        ])
+        .with_row(Row::new(
+            Styles::default().with(Header(true)),
+            vec!["Rank".into(), format!("{header}").into()],
+        ));
+    for (rank, error) in values.iter().enumerate() {
+        table.push_row(Row::new(
+            Styles::default(),
+            vec![
+                format!("{}", Rank::index(rank)).into(),
+                format!("{:.6}", error).into(),
+            ],
+        ));
+    }
+    table
+}
+
+pub fn tabulate_probs(probs: &Matrix<f64>) -> Table {
+    let mut table = Table::default()
+        .with_cols({
+            let mut cols = vec![];
+            cols.push(Col::new(
+                Styles::default().with(MinWidth(10)).with(HAlign::Centred),
+            ));
+            for _ in 0..probs.rows() {
+                cols.push(Col::new(
+                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
+                ));
+            }
+            cols
+        })
+        .with_row({
+            let mut header_cells = vec!["Runner".into()];
+            for rank in 0..probs.rows() {
+                header_cells.push(format!("{}", Rank::index(rank)).into());
+            }
+            Row::new(Styles::default().with(Header(true)), header_cells)
+        });
+
+    for runner in 0..probs.cols() {
+        let mut row_cells = vec![format!("{}", Runner::index(runner)).into()];
+        for rank in 0..probs.rows() {
+            row_cells.push(format!("{:.6}", probs[(rank, runner)]).into());
+        }
+        table.push_row(Row::new(Styles::default(), row_cells));
+    }
+
+    table
+}
+
+pub fn tabulate_prices(prices: &Matrix<f64>) -> Table {
+    let mut table = Table::default()
+        .with_cols({
+            let mut cols = vec![];
+            cols.push(Col::new(
+                Styles::default().with(MinWidth(10)).with(HAlign::Centred),
+            ));
+            for _ in 0..prices.rows() {
+                cols.push(Col::new(
+                    Styles::default().with(MinWidth(10)).with(HAlign::Right),
+                ));
+            }
+            cols
+        })
+        .with_row({
+            let mut header_cells = vec!["Runner".into()];
+            for rank in 0..prices.rows() {
+                header_cells.push(format!("Top-{}", rank + 1).into());
+            }
+            Row::new(Styles::default().with(Header(true)), header_cells)
+        });
+
+    for runner in 0..prices.cols() {
+        let mut row_cells = vec![format!("{}", Runner::index(runner)).into()];
+        for rank in 0..prices.rows() {
+            row_cells.push(format!("{:.6}", prices[(rank, runner)]).into());
         }
         table.push_row(Row::new(Styles::default(), row_cells));
     }
