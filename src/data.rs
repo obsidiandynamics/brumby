@@ -38,7 +38,7 @@ impl EventDetailExt for EventDetail {
             race_type: self.race_type,
             race_number: self.race_number,
             capture_time: self.capture_time,
-            places_paying: self.places_paying,
+            places_paying: self.places_paying as usize,
             class_name: self.class_name,
             prices,
         }
@@ -53,7 +53,7 @@ pub struct RaceSummary {
     pub race_type: EventType,
     pub race_number: u8,
     pub capture_time: DateTime<Utc>,
-    pub places_paying: u8,
+    pub places_paying: usize,
     pub class_name: String,
     pub prices: Matrix<f64>,
 }
