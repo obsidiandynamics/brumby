@@ -50,27 +50,34 @@ pub fn fit_place(options: FitOptions, sample_prices: &Matrix<f64>, dilatives: &[
         }
     }
 
-    let overrounds = match place_rank {
-        1 => {
-            let overround_step = win_overround - place_overround;
-            vec![
-                win_overround,
-                place_overround,
-                place_overround - overround_step,
-                place_overround - 2.0 * overround_step,
-            ]
-        },
-        2 => {
-            let overround_step = (win_overround - place_overround) / 2.0;
-            vec![
-                win_overround,
-                win_overround - overround_step,
-                place_overround,
-                place_overround - overround_step,
-            ]
-        },
-        _ => unimplemented!("unsupported place rank {place_rank}")
-    };
+    //TODO fit overrounds separately
+    // let overrounds = match place_rank {
+    //     1 => {
+    //         let overround_step = win_overround - place_overround;
+    //         vec![
+    //             win_overround,
+    //             place_overround,
+    //             place_overround - overround_step,
+    //             place_overround - 2.0 * overround_step,
+    //         ]
+    //     },
+    //     2 => {
+    //         let overround_step = (win_overround - place_overround) / 2.0;
+    //         vec![
+    //             win_overround,
+    //             win_overround - overround_step,
+    //             place_overround,
+    //             place_overround - overround_step,
+    //         ]
+    //     },
+    //     _ => unimplemented!("unsupported place rank {place_rank}")
+    // };
+    let overrounds = vec![
+        win_overround,
+        sample_prices.row_slice(1).invert().sum::<f64>() / 2.0,
+        sample_prices.row_slice(2).invert().sum::<f64>() / 3.0,
+        sample_prices.row_slice(3).invert().sum::<f64>() / 4.0,
+    ];
 
     let outcome = fit_individual(
         &scenarios,
