@@ -9,7 +9,7 @@ use std::ops::{Deref, Range};
 use std::path::PathBuf;
 
 use bentobox::capture::Capture;
-use bentobox::data::{read_from_file, EventDetailExt, RaceSummary};
+use bentobox::data::{read_from_file, EventDetailExt, RaceSummary, download_by_id};
 use bentobox::linear::Matrix;
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
@@ -32,14 +32,14 @@ struct Args {
     #[clap(short = 'f', long)]
     file: Option<PathBuf>,
 
-    /// URL to source the race data from
-    #[clap(short = 'u', long)]
-    url: Option<String>,
+    /// download race data by ID
+    #[clap(short = 'd', long)]
+    download: Option<u64>,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
-        if self.file.is_none() && self.url.is_none() || self.file.is_some() && self.url.is_some() {
-            bail!("either the -f or the -u flag must be specified");
+        if self.file.is_none() && self.download.is_none() || self.file.is_some() && self.download.is_some() {
+            bail!("either the -f or the -d flag must be specified");
         }
         Ok(())
     }
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     println!("args: {args:?}");
 
-    let race = read_race_data(&args)?;
+    let race = read_race_data(&args).await?;
     println!("prices= {}",race.prices.verbose());
     let mut win_probs: Vec<_> = race
         .prices
@@ -261,10 +261,14 @@ fn scale_prob_capped(prob: &mut f64, adj: f64) {
     *prob = scaled
 }
 
-fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
+async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
     if let Some(path) = args.file.as_ref() {
         let event_detail = read_from_file(path)?;
         return Ok(event_detail.summarise());
+    }
+    if let Some(&id) = args.download.as_ref() {
+        let event_detail = download_by_id(id).await?;
+        return Ok(event_detail.summarise())
     }
 
     unreachable!()

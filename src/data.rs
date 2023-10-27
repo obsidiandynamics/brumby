@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 use chrono::{DateTime, Utc};
+use racing_scraper::get_racing_data;
 use racing_scraper::models::{EventDetail, EventType};
 use crate::linear::Matrix;
 
@@ -60,5 +61,11 @@ pub struct RaceSummary {
 pub fn read_from_file(path: impl AsRef<Path>) -> anyhow::Result<EventDetail> {
     let file = File::open(path)?;
     let event_detail = serde_json::from_reader(file)?;
+    Ok(event_detail)
+}
+
+pub async fn download_by_id(id: u64) -> anyhow::Result<EventDetail> {
+    let event_detail = get_racing_data(&id).await.unwrap();
+    //TODO handle the error properly
     Ok(event_detail)
 }
