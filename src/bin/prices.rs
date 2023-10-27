@@ -2,7 +2,7 @@ use anyhow::bail;
 use clap::Parser;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
-use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
+use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use std::error::Error;
 use std::ops::{Deref, Range, RangeInclusive};
@@ -198,14 +198,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let summary_table = Table::with_styles(Styles::default().with(HAlign::Centred))
         .with_cols(vec![
             Col::default(),
-            Col::new(Styles::default().with(Separator(true)).with(MinWidth(5))),
+            Col::new(Styles::default().with(Separator(true)).with(MinWidth(9))),
             Col::default(),
-            Col::new(Styles::default().with(Separator(true)).with(MinWidth(5))),
+            Col::new(Styles::default().with(Separator(true)).with(MinWidth(9))),
             Col::default(),
-            Col::new(Styles::default().with(Separator(true)).with(MinWidth(5))),
+            Col::new(Styles::default().with(Separator(true)).with(MinWidth(10))),
             Col::default()
         ])
-        .with_row(Row::from(["Initial dilatives", "", "Errors", "", "Overrounds", "", "Sample prices"]))
+        .with_row(Row::from(["Initial dilatives", "", "Fitting errors", "", "Sample overrounds", "", "Sample prices"]))
         .with_row(Row::new(Styles::default(), vec![
             dilatives_table.into(),
             "".into(),
@@ -232,7 +232,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         let frac = engine.simulate(&selections);
         println!(
-            "probability of {}: {}, fair price: {:.3}, overround: {overround:3}, market odds: {:.3}",
+            "probability of {}: {}, fair price: {:.3}, overround: {overround:.3}, market odds: {:.3}",
             DisplaySlice::from(&*selections),
             frac.quotient(),
             1.0 / frac.quotient(),
