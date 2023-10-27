@@ -251,27 +251,36 @@ pub fn run_once(
         let random = random_f64(rand) * total;
         // println!("random={random:.3}, prob_sum={prob_sum}");
         let mut chosen = false;
+        let mut last_eligible_runner = 0;
         for runner in 0..runners {
             if bitmap[runner] {
                 let prob = rank_probs[runner];
-                cumulative += prob;
-                // println!("probabilities[{runner}]={prob:.3}, cumulative={cumulative:.3}");
-                if cumulative >= random {
-                    // println!("chosen runner {runner} for rank {rank}");
-                    *ranked_runner = runner;
-                    bitmap[runner] = false;
-                    chosen = true;
-                    for future_rank in rank + 1..ranks {
-                        totals[future_rank] -= probs[(future_rank, runner)];
+                if prob > 0.0 {
+                    last_eligible_runner = runner;
+                    cumulative += prob;
+                    // println!("probabilities[{runner}]={prob:.3}, cumulative={cumulative:.3}");
+                    if cumulative >= random {
+                        // println!("chosen runner {runner} for rank {rank}");
+                        *ranked_runner = runner;
+                        bitmap[runner] = false;
+                        chosen = true;
+                        for future_rank in rank + 1..ranks {
+                            totals[future_rank] -= probs[(future_rank, runner)];
+                        }
+                        break;
                     }
-                    break;
                 }
             } /*else {
                   println!("skipping runner {runner}");
               }*/
         }
         if !chosen {
-            panic!("no runner chosen! cumulative: {cumulative}, random: {random}");
+            *ranked_runner = last_eligible_runner;
+            bitmap[last_eligible_runner] = false;
+            for future_rank in rank + 1..ranks {
+                totals[future_rank] -= probs[(future_rank, last_eligible_runner)];
+            }
+            //panic!("no runner chosen in rank {rank}! cumulative: {cumulative}, random: {random}, bitmap: {bitmap:?}, totals: {totals:?}");
         }
     }
 

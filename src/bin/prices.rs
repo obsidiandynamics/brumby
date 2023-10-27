@@ -20,6 +20,7 @@ use bentobox::{mc, overround};
 
 const MC_ITERATIONS: u64 = 100_000;
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
+const TARGET_MSRE: f64 = 1e-6;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -44,13 +45,14 @@ impl Args {
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     args.validate()?;
     println!("args: {args:?}");
 
     let race = read_race_data(&args)?;
-    println!("prices= {}", race.prices.verbose());
+    println!("prices= {}",race.prices.verbose());
     let mut win_probs: Vec<_> = race
         .prices
         .row_slice(0)
@@ -83,13 +85,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let win_overround = win_probs.normalise(1.0);
     let mut place_probs: Vec<_> = place_prices.iter().map(|odds| 1.0 / odds).collect();
     let place_overround = place_probs.normalise(3.0) / 3.0;
-    // let outcome = fit(&win_probs, &place_prices);
+    let outcome = fit(&win_probs, &place_prices);
     //TODO skipping the fit for now
-    let outcome = GradientDescentOutcome {
-        iterations: 0,
-        optimal_residual: 0.008487581502095446,
-        optimal_value: 0.12547299468220757,
-    };
+    // let outcome = GradientDescentOutcome {
+    //     iterations: 0,
+    //     optimal_residual: 0.008487581502095446,
+    //     optimal_value: 0.12547299468220757,
+    // };
     // let outcome = GradientDescentOutcome {
     //     iterations: 0,
     //     optimal_residual: 0.0,
@@ -159,15 +161,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         if msre < best_msre {
             best_msre = msre;
             best_probs = current_probs.clone();
+        } else if msre < TARGET_MSRE {
+            break;
         }
 
+        // let mut adjustments = vec![0.0; place_prices.len()];
         for (runner, sample_price) in place_prices.iter().enumerate() {
-            let fitted_price = fitted_prices[runner];
-            let adj = fitted_price / sample_price;
-            // scale_prob_capped(&mut current_probs[(1, runner)], adj);
-            scale_prob_capped(&mut current_probs[(2, runner)], adj);
+            if sample_price.is_finite() {
+                let fitted_price = fitted_prices[runner];
+                let adj = fitted_price / sample_price;
+                // adjustments[runner] = adj;
+                scale_prob_capped(&mut current_probs[(1, runner)], adj);
+                scale_prob_capped(&mut current_probs[(2, runner)], adj);
+                scale_prob_capped(&mut current_probs[(3, runner)], adj);
+            };
         }
+        current_probs.row_slice_mut(1).normalise(1.0);
         current_probs.row_slice_mut(2).normalise(1.0);
+        current_probs.row_slice_mut(3).normalise(1.0);
+        // println!("adjustments: {adjustments:?}");
         println!("adjusted probs: {:?}", current_probs.row_slice(2));
         engine.reset_rand();
         engine.set_probs(current_probs.into());
@@ -177,6 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "individual fitting complete: best_msre: {best_msre}, RMSRE: {}",
         best_msre.sqrt()
     );
+    println!("fitted probs:\n{}", best_probs.verbose());
     engine.reset_rand();
     engine.set_probs(best_probs.into());
 
@@ -318,7 +331,7 @@ fn compute_msre<P: MarketPrice>(
     let mut counted = 0;
     for (runner, sample_price) in sample_prices.iter().enumerate() {
         let fitted_price: f64 = fitted_prices[runner].decimal();
-        if price_range.contains(&sample_price) {
+        if fitted_price.is_finite() && price_range.contains(&sample_price) {
             counted += 1;
             let relative_error = (sample_price - fitted_price) / sample_price;
             sq_rel_error += relative_error.powi(2);

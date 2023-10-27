@@ -16,7 +16,7 @@ impl EventDetailExt for EventDetail {
             let row_slice = prices.row_slice_mut(rank);
             for (runner_index, runner_data) in self.runners.iter().enumerate() {
                 row_slice[runner_index] = match runner_data.prices.as_ref() {
-                    None => 0.0,
+                    None => f64::INFINITY,
                     Some(prices) => {
                         let price = match rank {
                             0 => prices.win,
