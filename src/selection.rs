@@ -30,6 +30,19 @@ impl Selection {
     }
 }
 
+impl Display for Selection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Selection::Span { runner, ranks } => {
+                write!(f, "{runner} in {}~{}", ranks.start(), ranks.end())
+            }
+            Selection::Exact { runner, rank } => {
+                write!(f, "{runner} in {rank}")
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Runner(usize);
 impl Runner {

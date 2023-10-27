@@ -13,7 +13,7 @@ use bentobox::data::{read_from_file, EventDetailExt, RaceSummary, download_by_id
 use bentobox::linear::Matrix;
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
-use bentobox::print::{tabulate, DerivedPrice};
+use bentobox::print::{tabulate, DerivedPrice, DisplaySlice};
 use bentobox::probs::{MarketPrice, SliceExt};
 use bentobox::selection::{Rank, Runner, Selections};
 use bentobox::{mc, overround};
@@ -241,7 +241,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(selections) = args.selections {
         let frac = engine.simulate(&selections);
         println!(
-            "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
+            "probability of {}: {}, fair price: {:.3}, market odds: {:.3}",
+            DisplaySlice::from(&*selections),
             frac.quotient(),
             1.0 / frac.quotient(),
             overround::apply_with_cap(

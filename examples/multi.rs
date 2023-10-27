@@ -4,7 +4,7 @@ use stanza::renderer::Renderer;
 use bentobox::linear::Matrix;
 use bentobox::{mc, overround};
 use bentobox::mc::DilatedProbs;
-use bentobox::print::{DerivedPrice, tabulate};
+use bentobox::print::{DerivedPrice, DisplaySlice, tabulate};
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Rank, Runner};
 
@@ -136,7 +136,8 @@ fn main() {
     ];
     let frac = engine.simulate(&selections);
     println!(
-        "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
+        "probability of {}: {}, fair price: {:.3}, market odds: {:.3}",
+        DisplaySlice::from(&*selections),
         frac.quotient(),
         1.0 / frac.quotient(),
         overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
