@@ -40,7 +40,7 @@ pub fn fit_place(options: FitOptions, sample_prices: &Matrix<f64>, dilatives: &[
     let num_runners = win_probs.len();
     let dilated_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(win_probs.into())
-        .with_dilatives(Capture::Borrowed(&dilatives))
+        .with_dilatives(Capture::Borrowed(dilatives))
         .into();
 
     let mut scenarios = Matrix::allocate(podium_places, num_runners);
@@ -98,7 +98,7 @@ pub fn compute_msre<P: MarketPrice>(
     let mut counted = 0;
     for (runner, sample_price) in sample_prices.iter().enumerate() {
         let fitted_price: f64 = fitted_prices[runner].decimal();
-        if fitted_price.is_finite() && price_range.contains(&sample_price) {
+        if fitted_price.is_finite() && price_range.contains(sample_price) {
             counted += 1;
             let relative_error = (sample_price - fitted_price) / sample_price;
             sq_rel_error += relative_error.powi(2);
@@ -135,7 +135,7 @@ fn fit_individual(
     let num_runners = dilated_probs.cols();
     let mut engine = MonteCarloEngine::default()
         .with_iterations(mc_iterations)
-        .with_probs(Capture::Borrowed(&dilated_probs));
+        .with_probs(Capture::Borrowed(dilated_probs));
 
     let mut optimal_msre = f64::MAX;
     let mut optimal_probs = Matrix::empty();

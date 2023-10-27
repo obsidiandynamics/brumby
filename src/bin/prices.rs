@@ -306,7 +306,7 @@ fn fit_holistic(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutco
                 let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
                 derived_prices[runner] = derived_price;
             }
-            let msre = fit::compute_msre(&place_prices, &derived_prices, &FITTED_PRICE_RANGES[2]);
+            let msre = fit::compute_msre(place_prices, &derived_prices, &FITTED_PRICE_RANGES[2]);
             println!("dilative: {value}, msre: {msre}");
             println!("derived_prices: {derived_prices:?}");
             println!("sample prices:  {place_prices:?}");

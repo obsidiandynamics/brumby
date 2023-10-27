@@ -115,7 +115,7 @@ pub fn tabulate_values(values: &[f64], header: &str) -> Table {
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
-            vec!["Rank".into(), format!("{header}").into()],
+            vec!["Rank".into(), header.into()],
         ));
     for (rank, error) in values.iter().enumerate() {
         table.push_row(Row::new(
