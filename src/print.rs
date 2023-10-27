@@ -1,12 +1,20 @@
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use crate::linear::Matrix;
+use crate::probs::MarketPrice;
+use crate::selection::Runner;
 
 #[derive(Debug, Default)]
 pub struct DerivedPrice {
     pub probability: f64,
     pub fair_price: f64,
     pub market_price: f64,
+}
+
+impl MarketPrice for DerivedPrice {
+    fn decimal(&self) -> f64 {
+        self.market_price
+    }
 }
 
 pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
@@ -81,15 +89,15 @@ pub fn tabulate(derived: &Matrix<DerivedPrice>) -> Table {
         });
 
     for runner in 0..derived.cols() {
-        let mut row_cells = vec![format!("{}", runner + 1).into()];
+        let mut row_cells = vec![format!("{}", Runner::index(runner)).into()];
         for rank in 0..derived.rows() {
             row_cells.push(format!("{:.6}", derived[(rank, runner)].probability).into());
         }
-        row_cells.push(format!("{}", runner + 1).into());
+        row_cells.push(format!("{}", Runner::index(runner)).into());
         for rank in 0..derived.rows() {
             row_cells.push(format!("{:.3}", derived[(rank, runner)].fair_price).into());
         }
-        row_cells.push(format!("{}", runner + 1).into());
+        row_cells.push(format!("{}", Runner::index(runner)).into());
         for rank in 0..derived.rows() {
             row_cells.push(format!("{:.3}", derived[(rank, runner)].market_price).into());
         }

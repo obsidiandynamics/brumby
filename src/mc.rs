@@ -30,6 +30,14 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         }
     }
 
+    pub fn reset_rand(&mut self) where R: Default {
+        self.set_rand(R::default());
+    }
+
+    pub fn set_rand(&mut self, rand: R) {
+        self.rand = rand.into();
+    }
+
     pub fn with_iterations(mut self, iterations: u64) -> Self {
         self.iterations = iterations;
         self
@@ -38,6 +46,14 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
     pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) -> Self {
         self.probs = Some(probs);
         self
+    }
+
+    pub fn set_probs(&mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) {
+        self.probs = Some(probs);
+    }
+
+    pub fn probs(&self) -> Option<&Capture<'a, Matrix<f64>, Matrix<f64>>> {
+        self.probs.as_ref()
     }
 
     pub fn with_podium(mut self, podium: CaptureMut<'a, Vec<usize>, [usize]>) -> Self {
@@ -176,6 +192,7 @@ pub fn simulate_batch(
         "a count must exist for each scenario"
     );
 
+    counts.fill(0);
     for _ in 0..iterations {
         run_once(probs, podium, bitmap, totals, rand);
         for (scenario_index, selections) in scenarios.iter().enumerate() {

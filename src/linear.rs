@@ -10,6 +10,14 @@ pub struct Matrix<T> {
     cols: usize,
 }
 impl<T> Matrix<T> {
+    pub const fn empty() -> Self {
+        Self {
+            data: vec![],
+            rows: 0,
+            cols: 0
+        }
+    }
+
     pub fn allocate(rows: usize, cols: usize) -> Self where T: Default {
         let (len, overflow) = rows.overflowing_mul(cols);
         assert!(

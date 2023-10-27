@@ -134,6 +134,16 @@ impl Display for Fraction {
     }
 }
 
+pub trait MarketPrice {
+    fn decimal(&self) -> f64;
+}
+
+impl MarketPrice for f64 {
+    fn decimal(&self) -> f64 {
+        *self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

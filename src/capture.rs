@@ -9,6 +9,9 @@ pub enum Capture<'a, W: Borrow<B>, B: ?Sized> {
     Owned(W),
     Borrowed(&'a B),
 }
+// impl<W: Borrow<B> + Default, B: ?Sized> Capture<'_, W, B> {
+//     pub fn
+// }
 
 impl<'a, W: Borrow<B> + Default, B: ?Sized> Default for Capture<'a, W, B> {
     fn default() -> Self {

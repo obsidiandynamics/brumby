@@ -113,7 +113,7 @@ impl Rank {
 
 impl Display for Rank {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "k{}", self.as_number())
+        write!(f, "@{}", self.as_number())
     }
 }
 
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn rank_display() {
         let display = format!("{}", Rank::number(7));
-        assert_eq!("k7", display);
+        assert_eq!("@7", display);
     }
 
     #[test]
