@@ -4,12 +4,12 @@
 use crate::capture::Capture;
 use anyhow::{bail, Context};
 use std::fmt::{Display, Formatter};
-use std::ops::Range;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Selection {
-    Span { runner: Runner, ranks: Range<usize> },
+    Span { runner: Runner, ranks: RangeInclusive<Rank> },
     Exact { runner: usize, rank: usize },
 }
 impl Selection {
@@ -20,7 +20,8 @@ impl Selection {
                 runner: Runner(runner),
                 ranks,
             } => {
-                podium[ranks.start..ranks.end]
+                let (start, end) = (ranks.start().as_index(), ranks.end().as_index());
+                podium[start..=end]
                     .iter()
                     .any(|ranked_runner| ranked_runner == runner)
             },
@@ -43,22 +44,24 @@ impl Runner {
         Ok(Self(number - 1))
     }
 
-    pub fn index(index: usize) -> Self {
+    pub const fn index(index: usize) -> Self {
         Self(index)
     }
 
+    #[inline(always)]
     pub fn as_index(&self) -> usize {
         self.0
     }
 
+    #[inline(always)]
     pub fn as_number(&self) -> usize {
         self.0 + 1
     }
 
-    pub fn top(&self, podium_exc: usize) -> Selection {
+    pub fn top(&self, highest_rank: Rank) -> Selection {
         Selection::Span {
             runner: self.clone(),
-            ranks: 0..podium_exc,
+            ranks: Rank::first()..=highest_rank,
         }
     }
 }
@@ -91,6 +94,10 @@ impl Rank {
         Self::try_number(number).unwrap()
     }
 
+    pub const fn first() -> Self {
+        Self::index(0)
+    }
+
     pub fn try_number(number: usize) -> anyhow::Result<Self> {
         if number == 0 {
             bail!("invalid rank number");
@@ -98,14 +105,16 @@ impl Rank {
         Ok(Self(number - 1))
     }
 
-    pub fn index(index: usize) -> Self {
+    pub const fn index(index: usize) -> Self {
         Self(index)
     }
 
+    #[inline(always)]
     pub fn as_index(&self) -> usize {
         self.0
     }
 
+    #[inline(always)]
     pub fn as_number(&self) -> usize {
         self.0 + 1
     }
@@ -132,7 +141,7 @@ impl<'a> FromStr for Selections<'a> {
                     let runner = Runner::from_str(runner)?;
                     selections.push(Selection::Span {
                         runner,
-                        ranks: 0..rank + 1,
+                        ranks: Rank::first()..=Rank::index(rank),
                     })
                 }
             }
@@ -150,22 +159,22 @@ mod tests {
     fn top() {
         assert!(Selection::Span {
             runner: Runner::index(5),
-            ranks: 0..1
+            ranks: Rank::first()..=Rank::number(1)
         }
         .matches(&vec![5, 6, 7, 8]));
         assert!(!Selection::Span {
             runner: Runner::index(6),
-            ranks: 0..1
+            ranks: Rank::first()..=Rank::number(1)
         }
         .matches(&vec![5, 6, 7, 8]));
         assert!(Selection::Span {
             runner: Runner::index(6),
-            ranks: 0..2
+            ranks: Rank::first()..=Rank::number(2)
         }
         .matches(&vec![5, 6, 7, 8]));
         assert!(!Selection::Span {
             runner: Runner::index(7),
-            ranks: 0..2
+            ranks: Rank::first()..=Rank::number(2)
         }
         .matches(&vec![5, 6, 7, 8]));
     }
@@ -237,25 +246,25 @@ mod tests {
     fn selections_from_str() {
         assert_eq!(
             Selections::Owned(vec![
-                Runner::number(7).top(1),
-                Runner::number(8).top(2),
-                Runner::number(9).top(3)
+                Runner::number(7).top(Rank::number(1)),
+                Runner::number(8).top(Rank::number(2)),
+                Runner::number(9).top(Rank::number(3))
             ]),
             Selections::from_str("r7/r8/r9").unwrap()
         );
         assert_eq!(
             Selections::Owned(vec![
-                Runner::number(7).top(1),
-                Runner::number(8).top(3),
-                Runner::number(9).top(3)
+                Runner::number(7).top(Rank::number(1)),
+                Runner::number(8).top(Rank::number(3)),
+                Runner::number(9).top(Rank::number(3))
             ]),
             Selections::from_str("r7//r8+r9").unwrap()
         );
         assert_eq!(
             Selections::Owned(vec![
-                Runner::number(7).top(3),
-                Runner::number(8).top(3),
-                Runner::number(9).top(3)
+                Runner::number(7).top(Rank::number(3)),
+                Runner::number(8).top(Rank::number(3)),
+                Runner::number(9).top(Rank::number(3))
             ]),
             Selections::from_str("//r7+r8+r9").unwrap()
         );
@@ -263,9 +272,9 @@ mod tests {
 
     #[test]
     fn selections_clone() {
-        let selections = Selections::Owned(vec![Runner::number(7).top(3)]);
+        let selections = Selections::Owned(vec![Runner::number(7).top(Rank::number(3))]);
         assert_eq!(
-            Selections::Owned(vec![Runner::number(7).top(3)]),
+            Selections::Owned(vec![Runner::number(7).top(Rank::number(3))]),
             selections.clone()
         );
     }

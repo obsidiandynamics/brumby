@@ -15,10 +15,11 @@ use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
 use bentobox::print::{tabulate, DerivedPrice};
 use bentobox::probs::{MarketPrice, SliceExt};
-use bentobox::selection::{Rank, Runner, Selection, Selections};
+use bentobox::selection::{Rank, Runner, Selections};
 use bentobox::{mc, overround};
 
-const MC_ITERATIONS: u64 = 100_000;
+const MC_ITERATIONS_TRAIN: u64 = 100_000;
+const MC_ITERATIONS_EVAL: u64 = 1_000_000;
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const TARGET_MSRE: f64 = 1e-6;
 
@@ -85,18 +86,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let win_overround = win_probs.normalise(1.0);
     let mut place_probs: Vec<_> = place_prices.iter().map(|odds| 1.0 / odds).collect();
     let place_overround = place_probs.normalise(3.0) / 3.0;
-    let outcome = fit(&win_probs, &place_prices);
+    // let outcome = fit(&win_probs, &place_prices);
     //TODO skipping the fit for now
     // let outcome = GradientDescentOutcome {
     //     iterations: 0,
     //     optimal_residual: 0.008487581502095446,
     //     optimal_value: 0.12547299468220757,
     // };
-    // let outcome = GradientDescentOutcome {
-    //     iterations: 0,
-    //     optimal_residual: 0.0,
-    //     optimal_value: 0.0,
-    // };
+    let outcome = GradientDescentOutcome {
+        iterations: 0,
+        optimal_residual: 0.0,
+        optimal_value: 0.0,
+    };
     println!(
         "gradient descent outcome: {outcome:?}, RMSRE: {}",
         outcome.optimal_residual.sqrt()
@@ -115,16 +116,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_dilatives(dilatives.into())
         .into();
     let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(MC_ITERATIONS)
+        .with_iterations(MC_ITERATIONS_TRAIN)
         .with_probs(Capture::Borrowed(&dilated_probs));
 
     let mut scenarios = Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            scenarios[(rank, runner)] = vec![Selection::Span {
-                runner: Runner::index(runner),
-                ranks: 0..rank + 1,
-            }]
+            scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))]
             .into();
         }
     }
@@ -145,7 +143,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let mut derived_prices = Matrix::allocate(podium_places, num_runners);
         for runner in 0..num_runners {
             for rank in 0..podium_places {
-                let probability = counts[(rank, runner)] as f64 / MC_ITERATIONS as f64;
+                let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
                 let fair_price = 1.0 / probability;
                 let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
                 derived_prices[(rank, runner)] = market_price;
@@ -194,12 +192,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     engine.set_probs(best_probs.into());
 
     let mut counts = Matrix::allocate(podium_places, num_runners);
+    engine.set_iterations(MC_ITERATIONS_EVAL);
     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
     println!("ranked overrounds: {ranked_overrounds:?}");
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            let probability = counts[(rank, runner)] as f64 / MC_ITERATIONS as f64;
+            let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
             let fair_price = 1.0 / probability;
             let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
             let price = DerivedPrice {
@@ -293,10 +292,7 @@ fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
             let mut scenarios = Matrix::allocate(podium_places, num_runners);
             for runner in 0..num_runners {
                 for rank in 0..podium_places {
-                    scenarios[(rank, runner)] = vec![Selection::Span {
-                        runner: Runner::index(runner),
-                        ranks: 0..rank + 1,
-                    }]
+                    scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))]
                     .into();
                 }
             }
@@ -306,14 +302,14 @@ fn fit(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
                 .with_dilatives(dilatives.into())
                 .into();
             let mut engine = mc::MonteCarloEngine::default()
-                .with_iterations(MC_ITERATIONS)
+                .with_iterations(MC_ITERATIONS_TRAIN)
                 .with_probs(dilated_probs.into());
             let mut counts = Matrix::allocate(podium_places, num_runners);
             engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
 
             let mut derived_prices = vec![0.0; num_runners];
             for runner in 0..num_runners {
-                let derived_prob = counts[(2, runner)] as f64 / MC_ITERATIONS as f64;
+                let derived_prob = counts[(2, runner)] as f64 / engine.iterations() as f64;
                 let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
                 derived_prices[runner] = derived_price;
             }

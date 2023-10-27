@@ -1,7 +1,7 @@
 use bentobox::capture::{Capture, CaptureMut};
 use bentobox::mc::{DilatedProbs, MonteCarloEngine};
 use bentobox::probs::SliceExt;
-use bentobox::selection::{Runner, Selection};
+use bentobox::selection::{Rank, Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -42,12 +42,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         // sanity check
         let selections = [
             Selection::Span {
-                runner: Runner::index(0),
-                ranks: 0..1,
+                runner: Runner::number(1),
+                ranks: Rank::first()..=Rank::number(1),
             },
             Selection::Span {
-                runner: Runner::index(1),
-                ranks: 0..2,
+                runner: Runner::number(2),
+                ranks: Rank::first()..=Rank::number(2),
             },
         ];
         let frac = engine.simulate(&selections);
@@ -58,12 +58,12 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_exacta_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: Runner::index(0),
-                ranks: 0..1,
+                runner: Runner::number(1),
+                ranks: Rank::first()..=Rank::number(1),
             },
             Selection::Span {
-                runner: Runner::index(1),
-                ranks: 0..2,
+                runner: Runner::number(2),
+                ranks: Rank::first()..=Rank::number(2),
             },
         ];
         b.iter(|| {
@@ -73,16 +73,16 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_trifecta_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: Runner::index(0),
-                ranks: 0..1,
+                runner: Runner::number(1),
+                ranks: Rank::first()..=Rank::number(1),
             },
             Selection::Span {
-                runner: Runner::index(1),
-                ranks: 0..2,
+                runner: Runner::number(2),
+                ranks: Rank::first()..=Rank::number(2),
             },
             Selection::Span {
-                runner: Runner::index(2),
-                ranks: 0..3,
+                runner: Runner::number(3),
+                ranks: Rank::first()..=Rank::number(3),
             },
         ];
         b.iter(|| {
@@ -92,20 +92,20 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_mc_engine_first4_1k", |b| {
         let selections = [
             Selection::Span {
-                runner: Runner::index(0),
-                ranks: 0..1,
+                runner: Runner::number(1),
+                ranks: Rank::first()..=Rank::number(1),
             },
             Selection::Span {
-                runner: Runner::index(1),
-                ranks: 0..2,
+                runner: Runner::number(2),
+                ranks: Rank::first()..=Rank::number(2),
             },
             Selection::Span {
-                runner: Runner::index(2),
-                ranks: 0..3,
+                runner: Runner::number(3),
+                ranks: Rank::first()..=Rank::number(3),
             },
             Selection::Span {
-                runner: Runner::index(3),
-                ranks: 0..4,
+                runner: Runner::number(4),
+                ranks: Rank::first()..=Rank::number(4),
             },
         ];
         b.iter(|| {

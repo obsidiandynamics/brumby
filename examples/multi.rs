@@ -6,7 +6,7 @@ use bentobox::{mc, overround};
 use bentobox::mc::DilatedProbs;
 use bentobox::print::{DerivedPrice, tabulate};
 use bentobox::probs::SliceExt;
-use bentobox::selection::{Runner, Selection};
+use bentobox::selection::{Rank, Runner};
 
 fn main() {
     // probs taken from a popular website
@@ -87,10 +87,7 @@ fn main() {
         Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            scenarios[(rank, runner)] = vec![Selection::Span {
-                runner: Runner::index(runner),
-                ranks: 0..rank + 1,
-            }]
+            scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))]
             .into();
         }
     }
@@ -133,9 +130,9 @@ fn main() {
 
     // simulate a same-race multi for a chosen selection vector
     let selections = vec![
-        Runner::number(1).top(1),
-        Runner::number(2).top(2),
-        Runner::number(3).top(3),
+        Runner::number(1).top(Rank::number(1)),
+        Runner::number(2).top(Rank::number(2)),
+        Runner::number(3).top(Rank::number(3)),
     ];
     let frac = engine.simulate(&selections);
     println!(

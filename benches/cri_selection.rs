@@ -1,4 +1,4 @@
-use bentobox::selection::{Runner, Selection};
+use bentobox::selection::{Rank, Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -6,7 +6,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     {
         let selection = Selection::Span {
             runner: Runner::index(10),
-            ranks: 0..1,
+            ranks: Rank::first()..=Rank::number(1),
         };
         assert!(selection.matches(&podium));
         c.bench_function("cri_selection_top1", |b| {
@@ -16,7 +16,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     {
         let selection = Selection::Span {
             runner: Runner::index(20),
-            ranks: 0..2,
+            ranks: Rank::first()..=Rank::number(2),
         };
         assert!(selection.matches(&podium));
         c.bench_function("cri_selection_top2", |b| {
@@ -26,7 +26,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     {
         let selection = Selection::Span {
             runner: Runner::index(30),
-            ranks: 0..3,
+            ranks: Rank::first()..=Rank::number(3),
         };
         assert!(selection.matches(&podium));
         c.bench_function("cri_selection_top3", |b| {

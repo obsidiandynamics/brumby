@@ -43,6 +43,14 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self
     }
 
+    pub fn set_iterations(&mut self, iterations: u64) {
+        self.iterations = iterations;
+    }
+
+    pub fn iterations(&self) -> u64 {
+        self.iterations
+    }
+
     pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) -> Self {
         self.probs = Some(probs);
         self
