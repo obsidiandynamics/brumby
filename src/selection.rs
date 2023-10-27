@@ -10,7 +10,7 @@ use std::str::FromStr;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Selection {
     Span { runner: Runner, ranks: RangeInclusive<Rank> },
-    Exact { runner: usize, rank: usize },
+    Exact { runner: Runner, rank: Rank },
 }
 impl Selection {
     #[inline(always)]
@@ -25,7 +25,7 @@ impl Selection {
                     .iter()
                     .any(|ranked_runner| ranked_runner == runner)
             },
-            Selection::Exact { runner, rank } => podium[*rank] == *runner,
+            Selection::Exact { runner, rank } => podium[rank.as_index()] == runner.as_index(),
         }
     }
 }
@@ -194,9 +194,9 @@ mod tests {
 
     #[test]
     fn exact() {
-        assert!(Selection::Exact { runner: 5, rank: 0 }.matches(&vec![5, 6, 7, 8]));
-        assert!(Selection::Exact { runner: 6, rank: 1 }.matches(&vec![5, 6, 7, 8]));
-        assert!(!Selection::Exact { runner: 7, rank: 0 }.matches(&vec![5, 6, 7, 8]));
+        assert!(Selection::Exact { runner: Runner::index(5), rank: Rank::index(0) }.matches(&vec![5, 6, 7, 8]));
+        assert!(Selection::Exact { runner: Runner::index(6), rank: Rank::index(1) }.matches(&vec![5, 6, 7, 8]));
+        assert!(!Selection::Exact { runner: Runner::index(7), rank: Rank::index(0) }.matches(&vec![5, 6, 7, 8]));
     }
 
     #[test]

@@ -215,7 +215,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     overround *= ranked_overrounds[ranks.end().as_index()];
                 }
                 Selection::Exact { rank, .. } => {
-                    overround *= ranked_overrounds[*rank];
+                    overround *= ranked_overrounds[rank.as_index()];
                 }
             }
         }
