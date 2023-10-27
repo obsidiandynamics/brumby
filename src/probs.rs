@@ -2,10 +2,13 @@
 
 use crate::linear::Matrix;
 use std::fmt::{Display, Formatter};
+use std::iter::Map;
+use std::slice::Iter;
 
 pub trait SliceExt {
     fn sum(&self) -> f64;
     fn normalise(&mut self, target: f64) -> f64;
+    fn invert(&self) -> Map<Iter<f64>, fn(&f64) -> f64>;
     fn geometric_mean(&self) -> f64;
     fn dilate_additive(&mut self, factor: f64);
     fn dilate_power(&mut self, factor: f64);
@@ -23,6 +26,10 @@ impl SliceExt for [f64] {
         let sum = self.sum();
         self.scale(target / sum);
         sum
+    }
+    
+    fn invert(&self) -> Map<Iter<f64>, fn(&f64) -> f64> {
+        self.iter().map(|value| 1.0 / value)
     }
 
     fn geometric_mean(&self) -> f64 {
