@@ -282,6 +282,7 @@ fn fit_holistic(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutco
             step: 0.01,
             min_step: 0.001,
             max_steps: 100,
+            max_residual: 0.000001
         },
         |value| {
             let dilatives = vec![0.0, value, value, 0.0];

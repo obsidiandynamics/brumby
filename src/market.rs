@@ -1,3 +1,5 @@
+use crate::opt;
+use crate::opt::GradientDescentConfig;
 use crate::overround::apply_with_cap;
 use crate::probs::SliceExt;
 
@@ -19,7 +21,8 @@ pub struct Overround {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OverroundMethod {
-    Multiplicative
+    Multiplicative,
+    Power
 }
 
 #[derive(Debug)]
@@ -31,13 +34,15 @@ pub struct Market {
 impl Market {
     pub fn fit(method: OverroundMethod, prices: Vec<f64>, norm_sum: f64) -> Self {
         match method {
-            OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, norm_sum)
+            OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, norm_sum),
+            OverroundMethod::Power => Self::fit_power(prices, norm_sum),
         }
     }
 
     pub fn frame(method: OverroundMethod, probs: Vec<f64>, overround: f64) -> Self {
         match method {
-            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround)
+            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround),
+            OverroundMethod::Power => Self::frame_power(probs, overround),
         }
     }
 
@@ -54,6 +59,14 @@ impl Market {
         }
     }
 
+    fn fit_power(prices: Vec<f64>, norm_sum: f64) -> Market {
+        let prob_sum = prices.sum();
+        let rtp = 1.0 / norm_sum / prob_sum;
+        let initial_k = 1.0 + f64::ln(rtp) / f64::ln(prices.len() as f64);
+        todo!()
+    }
+
+
     fn frame_multiplicative(probs: Vec<f64>, overround: f64) -> Self {
         let prices: Vec<_> = probs.iter().map(|prob| apply_with_cap(1.0 / prob, overround)).collect();
         Self {
@@ -63,6 +76,33 @@ impl Market {
                 method: OverroundMethod::Multiplicative,
                 value: overround
             }
+        }
+    }
+
+    fn frame_power(probs: Vec<f64>, overround: f64) -> Market {
+        let rtp = 1.0 / overround;
+        let initial_k = 1.0 + f64::ln(rtp) / f64::ln(probs.len() as f64);
+        let outcome = opt::gd(GradientDescentConfig {
+            init_value: initial_k,
+            step: -0.01,
+            min_step: 0.0001,
+            max_steps: 1_000,
+            max_residual: 1e-9
+        }, |exponent| {
+            let mut sum = 0.0;
+            for &prob in &probs {
+                let price = prob.powf(-exponent);
+                sum += 1.0 / price;
+            }
+
+            (sum - overround).powi(2)
+        });
+        println!("gd outcome: {outcome:?}");
+        let prices: Vec<_> = probs.iter().map(|prob| prob.powf(-outcome.optimal_value)).collect();
+        Self {
+            probs,
+            prices,
+            overround: Overround { method: OverroundMethod::Multiplicative, value: overround },
         }
     }
 }
@@ -114,6 +154,27 @@ mod tests {
             let market = Market::frame(OverroundMethod::Multiplicative, probs, 1.1);
             assert_slice_f64_relative(&[4.5454, 2.2727, 1.5152, 1.1364], &market.prices, 0.001);
         }
+    }
+
+    #[test]
+    fn frame_power() {
+        {
+            let probs = vec![0.1, 0.2, 0.3, 0.4];
+            let market = Market::frame(OverroundMethod::Power, probs, 1.0);
+            println!("market: {:?}", market);
+            assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
+        }
+        {
+            let probs = vec![0.1, 0.2, 0.3, 0.4];
+            let market = Market::frame(OverroundMethod::Power, probs, 1.1);
+            println!("market: {:?}", market);
+            assert_slice_f64_relative(&[8.4319, 4.4381, 3.0489, 2.3359], &market.prices, 0.001);
+        }
+        // {
+        //     let probs = vec![0.2, 0.4, 0.6, 0.8];
+        //     let market = Market::frame(OverroundMethod::Multiplicative, probs, 1.1);
+        //     assert_slice_f64_relative(&[4.5454, 2.2727, 1.5152, 1.1364], &market.prices, 0.001);
+        // }
     }
 }
 

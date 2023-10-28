@@ -4,6 +4,7 @@ pub struct GradientDescentConfig {
     pub step: f64,
     pub min_step: f64,
     pub max_steps: u64,
+    pub max_residual: f64,
 }
 
 #[derive(Debug)]
@@ -19,7 +20,16 @@ pub fn gd(
 ) -> GradientDescentOutcome {
     let mut iterations = 0;
     let mut residual = loss_f(config.init_value);
+    if residual <= config.max_residual {
+        return GradientDescentOutcome {
+            iterations: 0,
+            optimal_value: config.init_value,
+            optimal_residual: residual
+        };
+    }
+
     let (mut value, mut step) = (config.init_value, config.step);
+    println!("initial value: {value}, residual: {residual}, step: {step}");
     let (mut optimal_value, mut optimal_residual) = (value, residual);
     let mut boost = 1.0;
     // let mut gradient: f64 = 1.0;
@@ -41,9 +51,13 @@ pub fn gd(
             println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}, diff: {}", optimal_residual - new_residual);
             optimal_residual = new_residual;
             optimal_value = new_value;
-        } else if (new_residual - residual).abs() <= f64::EPSILON {
+
+            if optimal_residual <= config.max_residual {
+                break;
+            }
+        } /*else if (new_residual - residual).abs() <= f64::EPSILON {
             break;
-        }
+        }*/
         residual = new_residual;
         value = new_value;
     }
@@ -178,6 +192,7 @@ mod tests {
             step: 0.1,
             min_step: 0.00001,
             max_steps: 100,
+            max_residual: 0.0
         };
         let outcome = gd(config.clone(), |value| (81.0 - value.powi(2)).powi(2));
         assert_float_absolute_eq!(9.0, outcome.optimal_value, config.min_step);
