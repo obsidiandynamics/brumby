@@ -29,7 +29,7 @@ pub fn gd(
     }
 
     let (mut value, mut step) = (config.init_value, config.step);
-    println!("initial value: {value}, residual: {residual}, step: {step}");
+    // println!("initial value: {value}, residual: {residual}, step: {step}");
     let (mut optimal_value, mut optimal_residual) = (value, residual);
     let mut boost = 1.0;
     // let mut gradient: f64 = 1.0;
@@ -38,7 +38,7 @@ pub fn gd(
         let new_value = value + step * boost; // * f64::min(gradient.abs(), 100.0);
         let new_residual = loss_f(new_value);
         let gradient = (new_residual - residual) / (new_value - value);
-        println!("iterations: {iterations}, value: {value}, residual: {residual}, step: {step}, new_value: {new_value}, new_residual: {new_residual}, gradient: {gradient}");
+        // println!("iterations: {iterations}, value: {value}, residual: {residual}, step: {step}, new_value: {new_value}, new_residual: {new_residual}, gradient: {gradient}");
 
         if new_residual > residual {
             step = -step * 0.5;
@@ -46,9 +46,8 @@ pub fn gd(
                 break;
             }
         } else if new_residual < optimal_residual {
-            // boost = f64::min(new_residual / (optimal_residual - new_residual), 10.0);
             boost = f64::min(gradient.abs(), 10.0);
-            println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}, diff: {}", optimal_residual - new_residual);
+            // println!("optimal_residual: {optimal_residual}, new_residual: {new_residual}, boost: {boost}, diff: {}", optimal_residual - new_residual);
             optimal_residual = new_residual;
             optimal_value = new_value;
 

@@ -10,8 +10,11 @@ pub fn assert_slice_f64_near(expected: &[f64], actual: &[f64], distance: u32) {
         expected.len(),
         actual.len()
     );
-    for (index, &value) in expected.iter().enumerate() {
-        assert_f64_near!(value, actual[index], distance);
+    for (index, &expected) in expected.iter().enumerate() {
+        let actual = actual[index];
+        if actual != expected {
+            assert_f64_near!(expected, actual, distance);
+        }
     }
 }
 
@@ -23,7 +26,10 @@ pub fn assert_slice_f64_relative(expected: &[f64], actual: &[f64], epsilon: f64)
         expected.len(),
         actual.len()
     );
-    for (index, &value) in expected.iter().enumerate() {
-        assert_float_relative_eq!(value, actual[index], epsilon);
+    for (index, &expected) in expected.iter().enumerate() {
+        let actual = actual[index];
+        if actual != expected {
+            assert_float_relative_eq!(expected, actual, epsilon);
+        }
     }
 }

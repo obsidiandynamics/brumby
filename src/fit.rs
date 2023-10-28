@@ -76,6 +76,7 @@ pub fn fit_place(options: FitOptions, win_market: &Market, place_market: &Market
         place_rank,
         1..=3,
         place_market.overround.value,
+        &place_market.overround.method,
         &place_market.prices,
     );
     PlaceFitOutcome {
@@ -123,6 +124,7 @@ fn fit_individual(
     rank: usize,
     adj_ranks: RangeInclusive<usize>,
     overround: f64,
+    overround_method: &OverroundMethod,
     sample_prices: &[f64],
 ) -> IndividualFitOutcome {
     let start_time = Instant::now();
@@ -141,7 +143,7 @@ fn fit_individual(
         let mut counts = Matrix::allocate(podium_places, num_runners);
         engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
         let fitted_probs: Vec<_> = counts.row_slice(rank).iter().map(|&count| count as f64 / engine.iterations() as f64).collect();
-        let market = Market::frame(OverroundMethod::Multiplicative, fitted_probs, overround);
+        let market = Market::frame(overround_method, fitted_probs, overround);
 
         // let mut derived_prices = Matrix::allocate(podium_places, num_runners);
         // for runner in 0..num_runners {

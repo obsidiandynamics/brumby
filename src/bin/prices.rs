@@ -25,6 +25,7 @@ use bentobox::selection::{Rank, Runner, Selection, Selections};
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
+// const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..100.0, 1.0..100.0, 1.0..100.0, 1.0..100.0];
 const TARGET_MSRE: f64 = 1e-6;
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
@@ -136,7 +137,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // );
     let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
         let prices = race.prices.row_slice(rank).to_vec();
-        Market::fit(OVERROUND_METHOD, prices, rank as f64 + 1.0)
+        Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
     }).collect();
 
     let place_fit_outcome = fit::fit_place(FitOptions {
@@ -194,7 +195,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
     for rank in 0..podium_places {
         let probs = derived_probs.row_slice(rank);
-        let framed = Market::frame(OVERROUND_METHOD, probs.into(), markets[rank].overround.value);
+        let framed = Market::frame(&OVERROUND_METHOD, probs.into(), markets[rank].overround.value);
         for runner in 0..num_runners {
             let probability = framed.probs[runner];
             let price = framed.prices[runner];
