@@ -9,12 +9,16 @@ pub mod data;
 pub mod display;
 pub mod fit;
 pub mod linear;
+pub mod market;
 pub mod mc;
 pub mod opt;
 pub mod overround;
 pub mod print;
 pub mod probs;
 pub mod selection;
+
+#[cfg(test)]
+pub(crate) mod testing;
 
 #[doc = include_str!("../README.md")]
 #[cfg(doc)]

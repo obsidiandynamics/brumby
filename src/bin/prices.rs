@@ -9,12 +9,13 @@ use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 
-use bentobox::{fit, mc, overround};
+use bentobox::{fit, market, mc, overround};
 use bentobox::capture::Capture;
 use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
 use bentobox::display::DisplaySlice;
 use bentobox::fit::FitOptions;
 use bentobox::linear::Matrix;
+use bentobox::market::Market;
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
 use bentobox::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
@@ -132,10 +133,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //     ranked_overrounds[2],
     //     race.prices.row_slice(2),
     // );
+    let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
+        let prices = race.prices.row_slice(rank).to_vec();
+        Market::fit(market::OverroundMethod::Multiplicative, prices, rank as f64 + 1.0)
+    }).collect();
+
     let place_fit_outcome = fit::fit_place(FitOptions {
         mc_iterations: MC_ITERATIONS_TRAIN,
         individual_target_msre: TARGET_MSRE,
-    }, &race.prices, &dilatives, place_rank);
+    }, &markets[0], &markets[place_rank], &dilatives, place_rank);
     println!(
         "individual fitting complete: optimal MSRE: {}, RMSRE: {}",
         place_fit_outcome.stats.optimal_msre,
@@ -180,11 +186,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         for rank in 0..podium_places {
             let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
             let fair_price = 1.0 / probability;
-            let market_price = overround::apply_with_cap(fair_price, place_fit_outcome.overrounds[rank]);
+            let price = overround::apply_with_cap(fair_price, markets[rank].overround.value);
             let price = DerivedPrice {
                 probability,
-                fair_price,
-                market_price,
+                price,
             };
             derived_prices[(rank, runner)] = price;
         }
@@ -202,7 +207,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let dilatives_table = tabulate_values(&dilatives, "Dilative");
     let errors_table = tabulate_values(&errors, "RMSRE");
-    let overrounds_table = tabulate_values(&place_fit_outcome.overrounds, "Overround");
+    let overrounds: Vec<_> = markets.iter().map(|market| market.overround.value).collect();
+    let overrounds_table = tabulate_values(&overrounds, "Overround");
     let sample_prices_table = tabulate_prices(&race.prices);
     let summary_table = Table::with_styles(Styles::default().with(HAlign::Centred))
         .with_cols(vec![
@@ -232,10 +238,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         for selection in &*selections {
             match selection {
                 Selection::Span { ranks, .. } => {
-                    overround *= place_fit_outcome.overrounds[ranks.end().as_index()];
+                    overround *= markets[ranks.end().as_index()].overround.value;
                 }
                 Selection::Exact { rank, .. } => {
-                    overround *= place_fit_outcome.overrounds[rank.as_index()];
+                    overround *= markets[rank.as_index()].overround.value;
                 }
             }
         }

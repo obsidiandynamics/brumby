@@ -1,12 +1,16 @@
 use std::ops::{Deref, Range, RangeInclusive};
 use std::time::Duration;
+
 use tokio::time::Instant;
+
 use mc::MonteCarloEngine;
+
+use crate::mc;
 use crate::capture::Capture;
 use crate::linear::Matrix;
-use crate::{mc, overround};
+use crate::market::{Market, MarketPrice, OverroundMethod};
 use crate::mc::DilatedProbs;
-use crate::probs::{MarketPrice, SliceExt};
+use crate::probs::SliceExt;
 use crate::selection::{Rank, Runner, Selections};
 
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
@@ -20,26 +24,13 @@ pub struct FitOptions {
 pub struct PlaceFitOutcome {
     pub stats: OptimiserStats,
     pub fitted_probs: Matrix<f64>,
-    pub overrounds: Vec<f64>,
 }
 
-pub fn fit_place(options: FitOptions, sample_prices: &Matrix<f64>, dilatives: &[f64], place_rank: usize) -> PlaceFitOutcome {
-    let mut win_probs: Vec<_> = sample_prices
-        .row_slice(0)
-        .invert()
-        .collect();
-    let win_overround = win_probs.normalise(1.0);
-    let place_prices = sample_prices.row_slice(place_rank).to_vec();
-    let place_overround = {
-        let place_probs: Vec<_> = place_prices.invert().collect();
-        let place_sum = place_rank as f64 + 1.0;
-        place_probs.sum() / place_sum
-    };
-
+pub fn fit_place(options: FitOptions, win_market: &Market, place_market: &Market, dilatives: &[f64], place_rank: usize) -> PlaceFitOutcome {
     let podium_places = dilatives.len();
-    let num_runners = win_probs.len();
+    let num_runners = win_market.probs.len();
     let dilated_probs: Matrix<_> = DilatedProbs::default()
-        .with_win_probs(win_probs.into())
+        .with_win_probs(Capture::Borrowed(&win_market.probs))
         .with_dilatives(Capture::Borrowed(dilatives))
         .into();
 
@@ -72,12 +63,10 @@ pub fn fit_place(options: FitOptions, sample_prices: &Matrix<f64>, dilatives: &[
     //     },
     //     _ => unimplemented!("unsupported place rank {place_rank}")
     // };
-    let overrounds = vec![
-        win_overround,
-        sample_prices.row_slice(1).invert().sum::<f64>() / 2.0,
-        sample_prices.row_slice(2).invert().sum::<f64>() / 3.0,
-        sample_prices.row_slice(3).invert().sum::<f64>() / 4.0,
-    ];
+    // let overrounds = vec![
+    //     win_market.overround.value,
+    //     place_market.overround.value
+    // ];
 
     let outcome = fit_individual(
         &scenarios,
@@ -86,13 +75,12 @@ pub fn fit_place(options: FitOptions, sample_prices: &Matrix<f64>, dilatives: &[
         options.individual_target_msre,
         place_rank,
         1..=3,
-        overrounds[place_rank],
-        &place_prices,
+        place_market.overround.value,
+        &place_market.prices,
     );
     PlaceFitOutcome {
         stats: outcome.stats,
         fitted_probs: outcome.optimal_probs,
-        overrounds
     }
 }
 
@@ -152,19 +140,22 @@ fn fit_individual(
         println!("INDIVIDUAL FITTING step {step}");
         let mut counts = Matrix::allocate(podium_places, num_runners);
         engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-        let mut derived_prices = Matrix::allocate(podium_places, num_runners);
-        for runner in 0..num_runners {
-            for rank in 0..podium_places {
-                let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-                let fair_price = 1.0 / probability;
-                let market_price = overround::apply_with_cap(fair_price, overround);
-                derived_prices[(rank, runner)] = market_price;
-            }
-        }
-        let fitted_prices = derived_prices.row_slice(rank);
-        println!("fitted prices:  {fitted_prices:?}");
+        let fitted_probs: Vec<_> = counts.row_slice(rank).iter().map(|&count| count as f64 / engine.iterations() as f64).collect();
+        let market = Market::frame(OverroundMethod::Multiplicative, fitted_probs, overround);
+
+        // let mut derived_prices = Matrix::allocate(podium_places, num_runners);
+        // for runner in 0..num_runners {
+        //     for rank in 0..podium_places {
+        //         let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
+        //         let fair_price = 1.0 / probability;
+        //         let market_price = overround::apply_with_cap(fair_price, overround);
+        //         derived_prices[(rank, runner)] = market_price;
+        //     }
+        // }
+        // let fitted_prices = derived_prices.row_slice(rank);
+        println!("fitted prices:  {:?}", market.prices);
         println!("sample prices: {sample_prices:?}");
-        let msre = compute_msre(sample_prices, fitted_prices, &FITTED_PRICE_RANGES[rank]);
+        let msre = compute_msre(sample_prices, &market.prices, &FITTED_PRICE_RANGES[rank]);
         println!("msre: {msre}, rmsre: {}", msre.sqrt());
 
         let mut current_probs = engine.probs().unwrap().deref().clone();
@@ -178,7 +169,7 @@ fn fit_individual(
         // let mut adjustments = vec![0.0; place_prices.len()];
         for (runner, sample_price) in sample_prices.iter().enumerate() {
             if sample_price.is_finite() {
-                let fitted_price = fitted_prices[runner];
+                let fitted_price = market.prices[runner];
                 let adj = fitted_price / sample_price;
                 // adjustments[runner] = adj;
                 for rank in adj_ranks.clone() {

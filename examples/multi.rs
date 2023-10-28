@@ -106,11 +106,10 @@ fn main() {
         for rank in 0..podium_places {
             let probability = counts[(rank, runner)] as f64 / ITERATIONS as f64;
             let fair_price = 1.0 / probability;
-            let market_price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
+            let price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
             let price = DerivedPrice {
                 probability,
-                fair_price,
-                market_price,
+                price,
             };
             derived[(rank, runner)] = price;
         }

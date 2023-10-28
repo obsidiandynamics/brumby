@@ -141,21 +141,13 @@ impl Display for Fraction {
     }
 }
 
-pub trait MarketPrice {
-    fn decimal(&self) -> f64;
-}
-
-impl MarketPrice for f64 {
-    fn decimal(&self) -> f64 {
-        *self
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use assert_float_eq::assert_f64_near;
     use super::*;
-    use assert_float_eq::*;
     use crate::linear::matrix_fixtures::populate_with_test_data;
+    use crate::testing::{assert_slice_f64_near, assert_slice_f64_relative};
+    use assert_float_eq::*;
 
     #[test]
     fn sum() {
@@ -225,31 +217,5 @@ mod tests {
         let mut data = [0.1, 0.2, 0.3, 0.4];
         data.dilate_power(-0.2);
         assert_slice_f64_relative(&[0.0812, 0.1866, 0.3035, 0.4287], &data, 0.0005);
-    }
-
-    fn assert_slice_f64_near(expected: &[f64], actual: &[f64], distance: u32) {
-        assert_eq!(
-            expected.len(),
-            actual.len(),
-            "lengths do not match: {} ≠ {}",
-            expected.len(),
-            actual.len()
-        );
-        for (index, &value) in expected.iter().enumerate() {
-            assert_f64_near!(value, actual[index], distance);
-        }
-    }
-
-    fn assert_slice_f64_relative(expected: &[f64], actual: &[f64], epsilon: f64) {
-        assert_eq!(
-            expected.len(),
-            actual.len(),
-            "lengths do not match: {} ≠ {}",
-            expected.len(),
-            actual.len()
-        );
-        for (index, &value) in expected.iter().enumerate() {
-            assert_float_relative_eq!(value, actual[index], epsilon);
-        }
     }
 }
