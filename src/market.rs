@@ -76,7 +76,6 @@ impl Market {
             let mut sum = 0.0;
             for &price in &prices {
                 let scaled_price = (price * fair_sum).powf(exponent);
-                // println!("scaled price: {scaled_price}");
                 sum += 1.0 / scaled_price;
             }
 

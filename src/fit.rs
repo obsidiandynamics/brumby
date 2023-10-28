@@ -2,6 +2,7 @@ use std::ops::{Deref, Range, RangeInclusive};
 use std::time::Duration;
 
 use tokio::time::Instant;
+use tracing::trace;
 
 use mc::MonteCarloEngine;
 
@@ -139,26 +140,15 @@ fn fit_individual(
     let mut step = 0;
     while step < MAX_INDIVIDUAL_STEPS {
         step += 1;
-        println!("INDIVIDUAL FITTING step {step}");
+        trace!("individual fitting step {step}");
         let mut counts = Matrix::allocate(podium_places, num_runners);
         engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
         let fitted_probs: Vec<_> = counts.row_slice(rank).iter().map(|&count| count as f64 / engine.iterations() as f64).collect();
         let market = Market::frame(overround_method, fitted_probs, overround);
-
-        // let mut derived_prices = Matrix::allocate(podium_places, num_runners);
-        // for runner in 0..num_runners {
-        //     for rank in 0..podium_places {
-        //         let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-        //         let fair_price = 1.0 / probability;
-        //         let market_price = overround::apply_with_cap(fair_price, overround);
-        //         derived_prices[(rank, runner)] = market_price;
-        //     }
-        // }
-        // let fitted_prices = derived_prices.row_slice(rank);
-        println!("fitted prices:  {:?}", market.prices);
-        println!("sample prices: {sample_prices:?}");
+        trace!("fitted prices:  {:?}", market.prices);
+        trace!("sample prices: {sample_prices:?}");
         let msre = compute_msre(sample_prices, &market.prices, &FITTED_PRICE_RANGES[rank]);
-        println!("msre: {msre}, rmsre: {}", msre.sqrt());
+        trace!("msre: {msre}, rmsre: {}", msre.sqrt());
 
         let mut current_probs = engine.probs().unwrap().deref().clone();
         if msre < optimal_msre {
@@ -168,7 +158,6 @@ fn fit_individual(
             break;
         }
 
-        // let mut adjustments = vec![0.0; place_prices.len()];
         for (runner, sample_price) in sample_prices.iter().enumerate() {
             if sample_price.is_finite() {
                 let fitted_price = market.prices[runner];
@@ -183,7 +172,7 @@ fn fit_individual(
             current_probs.row_slice_mut(rank).normalise(1.0);
         }
         // println!("adjustments: {adjustments:?}");
-        println!("adjusted probs: {:?}", current_probs.row_slice(rank));
+        trace!("adjusted probs: {:?}", current_probs.row_slice(rank));
         engine.reset_rand();
         engine.set_probs(current_probs.into());
     }

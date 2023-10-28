@@ -21,6 +21,8 @@ serde_json = "1.0.107"
 stanza = "0.3.0"
 tinyrand = "0.5.0"
 tokio={version="1.32.0",features=["full"]}
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
 
 [dev-dependencies]
 assert_float_eq = "1.1.3"

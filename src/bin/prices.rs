@@ -1,3 +1,4 @@
+use std::env;
 use std::error::Error;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -8,18 +9,16 @@ use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
+use tracing::{debug, info};
 
 use bentobox::{fit, market, mc};
-use bentobox::capture::Capture;
 use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
 use bentobox::display::DisplaySlice;
 use bentobox::fit::FitOptions;
 use bentobox::linear::Matrix;
 use bentobox::market::{Market, OverroundMethod};
-use bentobox::mc::DilatedProbs;
-use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
+use bentobox::opt::GradientDescentOutcome;
 use bentobox::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
-use bentobox::probs::SliceExt;
 use bentobox::selection::{Rank, Runner, Selection, Selections};
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
@@ -56,9 +55,17 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    if env::var("RUST_BACKTRACE").is_err() {
+        env::set_var("RUST_BACKTRACE", "full")
+    }
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info")
+    }
+    tracing_subscriber::fmt::init();
+
     let args = Args::parse();
     args.validate()?;
-    println!("args: {args:?}");
+    debug!("args: {args:?}");
 
     let race = read_race_data(&args).await?;
     println!("meeting: {}, race: {}, places_paying: {}", race.meeting_name, race.race_number, race.places_paying);
@@ -144,7 +151,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         mc_iterations: MC_ITERATIONS_TRAIN,
         individual_target_msre: TARGET_MSRE,
     }, &markets[0], &markets[place_rank], &dilatives, place_rank);
-    println!(
+    debug!(
         "individual fitting complete: optimal MSRE: {}, RMSRE: {}",
         place_fit_outcome.stats.optimal_msre,
         place_fit_outcome.stats.optimal_msre.sqrt()
@@ -153,33 +160,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let probs_table = tabulate_probs(&fitted_probs);
     println!("{}", Console::default().render(&probs_table));
 
-    // let mut probs = dilated_probs;
-    // for rank in 0..4 {
-    //     let individual_fit_outcome = fit_individual(
-    //         &scenarios,
-    //         &probs,
-    //         rank,
-    //         rank..=rank,
-    //         ranked_overrounds[rank],
-    //         race.prices.row_slice(rank),
-    //     );
-    //     println!(
-    //         "individual fitting complete for {}: best_msre: {}, RMSRE: {}",
-    //         Rank::index(rank),
-    //         individual_fit_outcome.optimal_msre,
-    //         individual_fit_outcome.optimal_msre.sqrt()
-    //     );
-    //     // println!("fitted probs:\n{}", individual_fit_outcome.optimal_probs.verbose());
-    //     println!("Fitted probs");
-    //     let probs_table = tabulate_probs(&individual_fit_outcome.optimal_probs);
-    //     println!("{}", Console::default().render(&probs_table));
-    //     probs = individual_fit_outcome.optimal_probs;
-    // }
-
     let mut engine = mc::MonteCarloEngine::default()
         .with_iterations(MC_ITERATIONS_EVAL)
         .with_probs(fitted_probs.into());
-    // engine.set_probs(individual_fit_outcome.optimal_probs.into());
 
     let mut counts = Matrix::allocate(podium_places, num_runners);
     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
@@ -207,20 +190,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // for runner in 0..num_runners {
-    //     for rank in 0..podium_places {
-    //         let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-    //         let fair_price = 1.0 / probability;
-    //         let price = overround::apply_with_cap(fair_price, markets[rank].overround.value);
-    //         let price = DerivedPrice {
-    //             probability,
-    //             price,
-    //         };
-    //         derived_prices[(rank, runner)] = price;
-    //     }
-    // }
     let table = tabulate_derived_prices(&derived_prices);
-    println!("{}", Console::default().render(&table));
+    info!("\n{}", Console::default().render(&table));
 
     let errors: Vec<_> = (0..podium_places).map(|rank| {
         fit::compute_msre(
@@ -255,7 +226,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "".into(),
             sample_prices_table.into()
         ]));
-    println!("{}", Console::default().render(&summary_table));
+    info!("\n{}", Console::default().render(&summary_table));
 
     if let Some(selections) = args.selections {
         // let overround = win_overround.powi(selections.len() as i32);
@@ -269,7 +240,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             overround *= derived_prices[(rank, runner)].overround();
         }
         let frac = engine.simulate(&selections);
-        println!(
+        info!(
             "probability of {}: {}, fair price: {:.3}, overround: {overround:.3}, market odds: {:.3}",
             DisplaySlice::from(&*selections),
             frac.quotient(),
@@ -295,52 +266,52 @@ async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
     unreachable!()
 }
 
-fn fit_holistic(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
-    let mut place_probs: Vec<_> = place_prices.invert().collect();
-    let place_overround = place_probs.normalise(3.0) / 3.0;
-
-    gd(
-        GradientDescentConfig {
-            init_value: 0.0,
-            step: 0.01,
-            min_step: 0.001,
-            max_steps: 100,
-            max_residual: 0.000001
-        },
-        |value| {
-            let dilatives = vec![0.0, value, value, 0.0];
-            let podium_places = dilatives.len();
-            let num_runners = win_probs.len();
-
-            let mut scenarios = Matrix::allocate(podium_places, num_runners);
-            for runner in 0..num_runners {
-                for rank in 0..podium_places {
-                    scenarios[(rank, runner)] =
-                        vec![Runner::index(runner).top(Rank::index(rank))].into();
-                }
-            }
-
-            let dilated_probs: Matrix<_> = DilatedProbs::default()
-                .with_win_probs(Capture::Borrowed(win_probs))
-                .with_dilatives(dilatives.into())
-                .into();
-            let mut engine = mc::MonteCarloEngine::default()
-                .with_iterations(MC_ITERATIONS_TRAIN)
-                .with_probs(dilated_probs.into());
-            let mut counts = Matrix::allocate(podium_places, num_runners);
-            engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-
-            let mut derived_prices = vec![0.0; num_runners];
-            for runner in 0..num_runners {
-                let derived_prob = counts[(2, runner)] as f64 / engine.iterations() as f64;
-                let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
-                derived_prices[runner] = derived_price;
-            }
-            let msre = fit::compute_msre(place_prices, &derived_prices, &FITTED_PRICE_RANGES[2]);
-            println!("dilative: {value}, msre: {msre}");
-            println!("derived_prices: {derived_prices:?}");
-            println!("sample prices:  {place_prices:?}");
-            msre
-        },
-    )
-}
+// fn fit_holistic(win_probs: &[f64], place_prices: &[f64]) -> GradientDescentOutcome {
+//     let mut place_probs: Vec<_> = place_prices.invert().collect();
+//     let place_overround = place_probs.normalise(3.0) / 3.0;
+//
+//     gd(
+//         GradientDescentConfig {
+//             init_value: 0.0,
+//             step: 0.01,
+//             min_step: 0.001,
+//             max_steps: 100,
+//             max_residual: 0.000001
+//         },
+//         |value| {
+//             let dilatives = vec![0.0, value, value, 0.0];
+//             let podium_places = dilatives.len();
+//             let num_runners = win_probs.len();
+//
+//             let mut scenarios = Matrix::allocate(podium_places, num_runners);
+//             for runner in 0..num_runners {
+//                 for rank in 0..podium_places {
+//                     scenarios[(rank, runner)] =
+//                         vec![Runner::index(runner).top(Rank::index(rank))].into();
+//                 }
+//             }
+//
+//             let dilated_probs: Matrix<_> = DilatedProbs::default()
+//                 .with_win_probs(Capture::Borrowed(win_probs))
+//                 .with_dilatives(dilatives.into())
+//                 .into();
+//             let mut engine = mc::MonteCarloEngine::default()
+//                 .with_iterations(MC_ITERATIONS_TRAIN)
+//                 .with_probs(dilated_probs.into());
+//             let mut counts = Matrix::allocate(podium_places, num_runners);
+//             engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+//
+//             let mut derived_prices = vec![0.0; num_runners];
+//             for runner in 0..num_runners {
+//                 let derived_prob = counts[(2, runner)] as f64 / engine.iterations() as f64;
+//                 let derived_price = f64::max(1.04, 1.0 / derived_prob / place_overround);
+//                 derived_prices[runner] = derived_price;
+//             }
+//             let msre = fit::compute_msre(place_prices, &derived_prices, &FITTED_PRICE_RANGES[2]);
+//             println!("dilative: {value}, msre: {msre}");
+//             println!("derived_prices: {derived_prices:?}");
+//             println!("sample prices:  {place_prices:?}");
+//             msre
+//         },
+//     )
+// }
