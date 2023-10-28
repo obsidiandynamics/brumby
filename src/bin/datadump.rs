@@ -70,8 +70,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
     let races: Vec<_> = races.into_iter().map(EventDetailExt::summarise).collect();
 
-    let podium_places = 4;
-    let dilatives = vec![0.0; podium_places];
     for (index, race) in races.iter().enumerate() {
         debug!("fitting race: {race:?} ({} of {})", index + 1, races.len());
         let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
@@ -81,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let fit_outcome = fit::fit_all(FitOptions {
             mc_iterations: MC_ITERATIONS_TRAIN,
             individual_target_msre: TARGET_MSRE,
-        }, &markets, &dilatives);
+        }, &markets);
         debug!("individual fitting complete: stats: {:?}, probs: \n{}", fit_outcome.stats, fit_outcome.fitted_probs.verbose());
 
         let num_runners = markets[0].probs.len();

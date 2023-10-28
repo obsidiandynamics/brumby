@@ -19,6 +19,7 @@ use crate::data::Factor;
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 const MAX_INDIVIDUAL_STEPS: u64 = 100;
+const PODIUM: usize = 4;
 
 pub struct FitOptions {
     pub mc_iterations: u64,
@@ -30,17 +31,16 @@ pub struct AllFitOutcome {
     pub fitted_probs: Matrix<f64>,
 }
 
-pub fn fit_all(options: FitOptions, markets: &[Market], dilatives: &[f64]) -> AllFitOutcome {
-    let podium_places = dilatives.len();
+pub fn fit_all(options: FitOptions, markets: &[Market]) -> AllFitOutcome {
     let num_runners = markets[0].probs.len();
     let mut weighted_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&markets[0].probs))
-        .with_dilatives(Capture::Borrowed(dilatives))
+        .with_podium_places(PODIUM)
         .into();
 
-    let scenarios = selection::top_n_matrix(podium_places, num_runners);
+    let scenarios = selection::top_n_matrix(PODIUM, num_runners);
 
-    let outcomes: Vec<_> = (1..podium_places)
+    let outcomes: Vec<_> = (1..PODIUM)
         .map(|rank| {
             let market = &markets[rank];
             let outcome = fit_individual(
@@ -59,8 +59,6 @@ pub fn fit_all(options: FitOptions, markets: &[Market], dilatives: &[f64]) -> Al
         })
         .collect();
 
-    // let fitted_probs = outcomes[podium_places - 2].optimal_probs.clone();
-    // let stats = outcomes.into_iter().map(|outcome| outcome.stats).collect();
     AllFitOutcome {
         stats: outcomes.into_iter().map(|outcome| outcome.stats).collect(),
         fitted_probs: weighted_probs,
@@ -76,15 +74,13 @@ pub fn fit_place(
     options: FitOptions,
     win_market: &Market,
     place_market: &Market,
-    dilatives: &[f64],
     place_rank: usize,
 ) -> PlaceFitOutcome {
-    let podium_places = dilatives.len();
     let num_runners = win_market.probs.len();
     let active_runners = win_market.probs.iter().filter(|&&prob| prob != 0.).count() as f64;
     let mut weighted_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&win_market.probs))
-        .with_dilatives(Capture::Borrowed(dilatives))
+        .with_podium_places(PODIUM)
         .into();
 
     struct Coefficients {
@@ -286,11 +282,11 @@ pub fn fit_place(
             weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, active_runners, stdev);
         }
     }
-    for rank in 1..podium_places {
+    for rank in 1..PODIUM {
         weighted_probs.row_slice_mut(rank).normalise(1.0);
     }
 
-    let scenarios = selection::top_n_matrix(podium_places, num_runners);
+    let scenarios = selection::top_n_matrix(PODIUM, num_runners);
     let outcome = fit_individual(
         &scenarios,
         &weighted_probs,
@@ -298,7 +294,7 @@ pub fn fit_place(
         options.individual_target_msre,
         place_rank,
         // place_rank..=place_rank,//1..=3, //todo
-        1..=podium_places - 1,
+        1..=PODIUM - 1,
         place_market.overround.value,
         &place_market.overround.method,
         &place_market.prices,

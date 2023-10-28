@@ -125,7 +125,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let fit_outcome = fit::fit_place(FitOptions {
         mc_iterations: MC_ITERATIONS_TRAIN,
         individual_target_msre: TARGET_MSRE,
-    }, &markets[0], &markets[place_rank], &dilatives, place_rank);
+    }, &markets[0], &markets[place_rank], place_rank);
     debug!(
         "individual fitting complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
         fit_outcome.stats.optimal_msre,
