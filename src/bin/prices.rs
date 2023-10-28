@@ -6,18 +6,21 @@ use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
+use racing_scraper::models::EventDetail;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::{fit, market, mc, selection};
-use brumby::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
+use brumby::{market, mc, selection};
+use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
-use brumby::fit::FitOptions;
+use brumby::file::FromJsonFile;
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, OverroundMethod};
+use brumby::model::fit;
+use brumby::model::fit::FitOptions;
 use brumby::opt::GradientDescentOutcome;
 use brumby::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
 use brumby::selection::{Selection, Selections};
@@ -250,7 +253,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
     if let Some(path) = args.file.as_ref() {
-        let event_detail = read_from_file(path)?;
+        let event_detail = EventDetail::from_json_file(path)?;
         return Ok(event_detail.summarise());
     }
     if let Some(&id) = args.download.as_ref() {

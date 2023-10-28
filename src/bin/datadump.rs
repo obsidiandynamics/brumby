@@ -7,11 +7,12 @@ use clap::Parser;
 use racing_scraper::models::EventType;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
-use brumby::{data, fit};
+use brumby::{data};
 use brumby::csv::{CsvWriter, Record};
 use brumby::data::{EventDetailExt, Factor, PredicateClosures};
-use brumby::fit::FitOptions;
 use brumby::market::{Market, OverroundMethod};
+use brumby::model::fit;
+use brumby::model::fit::FitOptions;
 use brumby::probs::SliceExt;
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;

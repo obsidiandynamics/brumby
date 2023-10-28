@@ -298,7 +298,7 @@ pub fn fit_place(
         options.individual_target_msre,
         place_rank,
         // place_rank..=place_rank,//1..=3, //todo
-        1..=3,
+        1..=podium_places - 1,
         place_market.overround.value,
         &place_market.overround.method,
         &place_market.prices,

@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use clap::Parser;
-use linregress::fit_low_level_regression_model;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
@@ -13,7 +12,7 @@ use brumby::data::Factor;
 use brumby::data::Factor::{ActiveRunners, Weight0};
 use brumby::linear::matrix::Matrix;
 use brumby::linear::regression;
-use brumby::linear::regression::Regressor::{Exponent, NilIntercept, Ordinal};
+use brumby::linear::regression::Regressor::{Exp, ZeroIntercept, Ordinal, Intercept};
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -92,15 +91,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let regressors = vec![
         Ordinal(Weight0),
-        Exponent(Box::new(Ordinal(Weight0)), 2),
-        Exponent(Box::new(Ordinal(Weight0)), 3),
+        Exp(Box::new(Ordinal(Weight0)), 2),
+        Exp(Box::new(Ordinal(Weight0)), 3),
         Ordinal(ActiveRunners),
-        Exponent(Box::new(Ordinal(ActiveRunners)), 2),
-        Exponent(Box::new(Ordinal(ActiveRunners)), 3),
-        NilIntercept
+        Exp(Box::new(Ordinal(ActiveRunners)), 2),
+        Exp(Box::new(Ordinal(ActiveRunners)), 3),
+        ZeroIntercept
     ];
     let model = regression::fit(Factor::Weight1, regressors, &data)?;
     info!("model:\n{:#?}", model);
+    let r_squared = model.predictor.r_squared(&Factor::Weight1, &data);
+    debug!("r_squared: {}", r_squared.unadjusted());
+    debug!("r_squared_adj: {}", r_squared.adjusted());
 
     // let records: Vec<_> = csv.collect();
     // let rows = records.len();
