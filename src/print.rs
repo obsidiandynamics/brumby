@@ -9,6 +9,15 @@ pub struct DerivedPrice {
     pub probability: f64,
     pub price: f64,
 }
+impl DerivedPrice {
+    pub fn fair_price(&self) -> f64 {
+        1.0 / self.probability
+    }
+
+    pub fn overround(&self) -> f64 {
+        1.0 / self.probability / self.price
+    }
+}
 
 impl MarketPrice for DerivedPrice {
     fn decimal(&self) -> f64 {
@@ -94,7 +103,7 @@ pub fn tabulate_derived_prices(derived: &Matrix<DerivedPrice>) -> Table {
         }
         row_cells.push(format!("{}", Runner::index(runner)).into());
         for rank in 0..derived.rows() {
-            row_cells.push(format!("{:.3}", 1.0 / derived[(rank, runner)].price).into());
+            row_cells.push(format!("{:.3}", derived[(rank, runner)].fair_price()).into());
         }
         row_cells.push(format!("{}", Runner::index(runner)).into());
         for rank in 0..derived.rows() {

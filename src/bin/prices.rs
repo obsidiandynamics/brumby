@@ -15,7 +15,7 @@ use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file
 use bentobox::display::DisplaySlice;
 use bentobox::fit::FitOptions;
 use bentobox::linear::Matrix;
-use bentobox::market::Market;
+use bentobox::market::{Market, OverroundMethod};
 use bentobox::mc::DilatedProbs;
 use bentobox::opt::{gd, GradientDescentConfig, GradientDescentOutcome};
 use bentobox::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
@@ -26,6 +26,7 @@ const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const TARGET_MSRE: f64 = 1e-6;
+const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -135,7 +136,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // );
     let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
         let prices = race.prices.row_slice(rank).to_vec();
-        Market::fit(market::OverroundMethod::Multiplicative, prices, rank as f64 + 1.0)
+        Market::fit(OVERROUND_METHOD, prices, rank as f64 + 1.0)
     }).collect();
 
     let place_fit_outcome = fit::fit_place(FitOptions {
@@ -181,12 +182,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut counts = Matrix::allocate(podium_places, num_runners);
     engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-    let mut derived_prices = Matrix::allocate(podium_places, num_runners);
+
+    let mut derived_probs = Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
             let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-            let fair_price = 1.0 / probability;
-            let price = overround::apply_with_cap(fair_price, markets[rank].overround.value);
+            derived_probs[(rank, runner)] = probability;
+        }
+    }
+
+    let mut derived_prices = Matrix::allocate(podium_places, num_runners);
+    for rank in 0..podium_places {
+        let probs = derived_probs.row_slice(rank);
+        let framed = Market::frame(OVERROUND_METHOD, probs.into(), markets[rank].overround.value);
+        for runner in 0..num_runners {
+            let probability = framed.probs[runner];
+            let price = framed.prices[runner];
             let price = DerivedPrice {
                 probability,
                 price,
@@ -194,6 +205,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
             derived_prices[(rank, runner)] = price;
         }
     }
+
+    // for runner in 0..num_runners {
+    //     for rank in 0..podium_places {
+    //         let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
+    //         let fair_price = 1.0 / probability;
+    //         let price = overround::apply_with_cap(fair_price, markets[rank].overround.value);
+    //         let price = DerivedPrice {
+    //             probability,
+    //             price,
+    //         };
+    //         derived_prices[(rank, runner)] = price;
+    //     }
+    // }
     let table = tabulate_derived_prices(&derived_prices);
     println!("{}", Console::default().render(&table));
 
@@ -236,14 +260,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // let overround = win_overround.powi(selections.len() as i32);
         let mut overround = 1.0;
         for selection in &*selections {
-            match selection {
-                Selection::Span { ranks, .. } => {
-                    overround *= markets[ranks.end().as_index()].overround.value;
-                }
-                Selection::Exact { rank, .. } => {
-                    overround *= markets[rank.as_index()].overround.value;
-                }
-            }
+            let (runner, rank) = match selection {
+                Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
+                Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
+            };
+            // overround *= markets[rank].overround.value;
+            overround *= derived_prices[(rank, runner)].overround();
         }
         let frac = engine.simulate(&selections);
         println!(
