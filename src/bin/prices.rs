@@ -12,15 +12,15 @@ use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use bentobox::{fit, market, mc, selection};
-use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
-use bentobox::display::DisplaySlice;
-use bentobox::fit::FitOptions;
-use bentobox::linear::Matrix;
-use bentobox::market::{Market, OverroundMethod};
-use bentobox::opt::GradientDescentOutcome;
-use bentobox::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
-use bentobox::selection::{Selection, Selections};
+use brumby::{fit, market, mc, selection};
+use brumby::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
+use brumby::display::DisplaySlice;
+use brumby::fit::FitOptions;
+use brumby::linear::Matrix;
+use brumby::market::{Market, OverroundMethod};
+use brumby::opt::GradientDescentOutcome;
+use brumby::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
+use brumby::selection::{Selection, Selections};
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;

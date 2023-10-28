@@ -1,7 +1,7 @@
-use bentobox::capture::Capture;
-use bentobox::mc;
-use bentobox::mc::DilatedProbs;
-use bentobox::probs::SliceExt;
+use brumby::capture::Capture;
+use brumby::mc;
+use brumby::mc::DilatedProbs;
+use brumby::probs::SliceExt;
 use criterion::{criterion_group, criterion_main, Criterion};
 use tinyrand::{StdRand, Wyrand};
 use tinyrand_alloc::Mock;

@@ -1,8 +1,8 @@
-use bentobox::capture::Capture;
-use bentobox::{market, mc};
-use bentobox::mc::DilatedProbs;
-use bentobox::probs::SliceExt;
-use bentobox::selection::{Rank, Runner};
+use brumby::capture::Capture;
+use brumby::{market, mc};
+use brumby::mc::DilatedProbs;
+use brumby::probs::SliceExt;
+use brumby::selection::{Rank, Runner};
 
 fn main() {
     // probs taken from a popular website

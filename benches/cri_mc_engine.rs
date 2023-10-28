@@ -1,7 +1,7 @@
-use bentobox::capture::{Capture, CaptureMut};
-use bentobox::mc::{DilatedProbs, MonteCarloEngine};
-use bentobox::probs::SliceExt;
-use bentobox::selection::{Rank, Runner, Selection};
+use brumby::capture::{Capture, CaptureMut};
+use brumby::mc::{DilatedProbs, MonteCarloEngine};
+use brumby::probs::SliceExt;
+use brumby::selection::{Rank, Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {

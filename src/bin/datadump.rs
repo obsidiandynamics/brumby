@@ -7,12 +7,12 @@ use clap::Parser;
 use racing_scraper::models::EventType;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
-use bentobox::{data, fit};
-use bentobox::csv::{CsvWriter, Record};
-use bentobox::data::{EventDetailExt, Factor, PredicateClosures};
-use bentobox::fit::FitOptions;
-use bentobox::market::{Market, OverroundMethod};
-use bentobox::probs::SliceExt;
+use brumby::{data, fit};
+use brumby::csv::{CsvWriter, Record};
+use brumby::data::{EventDetailExt, Factor, PredicateClosures};
+use brumby::fit::FitOptions;
+use brumby::market::{Market, OverroundMethod};
+use brumby::probs::SliceExt;
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const TARGET_MSRE: f64 = 1e-6;

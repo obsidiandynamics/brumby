@@ -5,12 +5,11 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use clap::Parser;
 use linregress::fit_low_level_regression_model;
-use strum::IntoEnumIterator;
 use tracing::debug;
 
-use bentobox::csv::CsvReader;
-use bentobox::data::Factor;
-use bentobox::linear::Matrix;
+use brumby::csv::CsvReader;
+use brumby::data::Factor;
+use brumby::linear::Matrix;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {

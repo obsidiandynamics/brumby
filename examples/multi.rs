@@ -1,13 +1,13 @@
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 
-use bentobox::{market, mc};
-use bentobox::display::DisplaySlice;
-use bentobox::linear::Matrix;
-use bentobox::mc::DilatedProbs;
-use bentobox::print::{DerivedPrice, tabulate_derived_prices};
-use bentobox::probs::SliceExt;
-use bentobox::selection::{Rank, Runner};
+use brumby::{market, mc};
+use brumby::display::DisplaySlice;
+use brumby::linear::Matrix;
+use brumby::mc::DilatedProbs;
+use brumby::print::{DerivedPrice, tabulate_derived_prices};
+use brumby::probs::SliceExt;
+use brumby::selection::{Rank, Runner};
 
 fn main() {
     // probs taken from a popular website

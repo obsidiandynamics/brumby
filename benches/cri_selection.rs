@@ -1,4 +1,4 @@
-use bentobox::selection::{Rank, Runner, Selection};
+use brumby::selection::{Rank, Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {

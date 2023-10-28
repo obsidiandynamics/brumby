@@ -1,10 +1,10 @@
-`bentobox`
+`brumby`
 ===
 A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing events. Derives probabilities for placing in arbitrary positions given only win probabilities. Also derives joint probability of multiple runners with arbitrary (exact and top-_N_) placings.
 
-[![Crates.io](https://img.shields.io/crates/v/bentobox?style=flat-square&logo=rust)](https://crates.io/crates/bentobox)
-[![docs.rs](https://img.shields.io/badge/docs.rs-bentobox-blue?style=flat-square&logo=docs.rs)](https://docs.rs/bentobox)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/obsidiandynamics/bentobox/master.yml?branch=master&style=flat-square&logo=github)](https://github.com/obsidiandynamics/bentobox/actions/workflows/master.yml)
+[![Crates.io](https://img.shields.io/crates/v/brumby?style=flat-square&logo=rust)](https://crates.io/crates/brumby)
+[![docs.rs](https://img.shields.io/badge/docs.rs-brumby-blue?style=flat-square&logo=docs.rs)](https://docs.rs/brumby)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/obsidiandynamics/brumby/master.yml?branch=master&style=flat-square&logo=github)](https://github.com/obsidiandynamics/brumby/actions/workflows/master.yml)
 
 # Performance
 Circa 15M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. (Per thread, benchmarked on Apple M2 Pro.) Roughly 70% of time is spent in the RNG routine.
@@ -14,10 +14,10 @@ Sourced from `examples/multi.rs`.
 
 ```rust
 /*
-use bentobox::capture::{Capture, CaptureMut};
-use bentobox::mc;
-use bentobox::probs::SliceExt;
-use bentobox::selection::Selection;
+use brumby::capture::{Capture, CaptureMut};
+use brumby::mc;
+use brumby::probs::SliceExt;
+use brumby::selection::Selection;
 
 // probs taken from a popular website
 let mut probs = vec![
