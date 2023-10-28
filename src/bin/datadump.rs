@@ -41,7 +41,7 @@ impl Args {
 fn parse_race_type(s: &str) -> anyhow::Result<EventType> {
     match s.to_lowercase().as_str() {
         "t" | "thoroughbred" => Ok(EventType::Thoroughbred),
-        "g" | "greyhound" => Ok(EventType::Thoroughbred),
+        "g" | "greyhound" => Ok(EventType::Greyhound),
         _ => Err(anyhow!("unsupported race type {s}")),
     }
 }

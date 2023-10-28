@@ -6,6 +6,7 @@ use std::io;
 use std::io::{BufRead, BufReader, BufWriter, Lines, Write};
 use std::ops::{Index, IndexMut};
 use std::path::Path;
+use std::vec::IntoIter;
 
 pub struct CsvWriter {
     writer: BufWriter<File>,
@@ -17,7 +18,7 @@ impl CsvWriter {
         Ok(Self { writer })
     }
 
-    pub fn append<'a, R>(&mut self, record: R) -> Result<(), io::Error>
+    pub fn append<R>(&mut self, record: R) -> Result<(), io::Error>
     where
         R: IntoIterator,
         R::Item: AsRef<str>,
@@ -100,11 +101,13 @@ impl Record {
     pub fn len(&self) -> usize {
         self.items.len()
     }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
 }
 
 impl IntoIterator for Record {
     type Item = Cow<'static, str>;
-    type IntoIter = alloc::vec::IntoIter<Cow<'static, str>>;
+    type IntoIter = IntoIter<Cow<'static, str>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()

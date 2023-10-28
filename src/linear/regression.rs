@@ -1,9 +1,16 @@
 //! Linear regression.
 
+use core::fmt::Debug;
+use std::ops::Range;
+use std::string::ToString;
+
 use anyhow::bail;
 use linregress::fit_low_level_regression_model;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use stanza::style::{HAlign, Header, MinWidth, Styles};
+use stanza::table::{Col, Row, Table};
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumCount, EnumIter};
 
 use crate::linear::matrix::Matrix;
 
@@ -34,10 +41,7 @@ impl<O: AsIndex> Regressor<O> {
     }
 
     pub fn is_constant(&self) -> bool {
-        match self {
-            Regressor::Intercept | Regressor::ZeroIntercept => true,
-            _ => false,
-        }
+        matches!(self, Regressor::Intercept | Regressor::ZeroIntercept)
     }
 }
 
@@ -95,8 +99,7 @@ impl<O: AsIndex> Predictor<O> {
         let has_zero_intercept = self
             .regressors
             .iter()
-            .find(|regressor| matches!(regressor, Regressor::ZeroIntercept))
-            .is_some();
+            .any(|regressor| matches!(regressor, Regressor::ZeroIntercept));
         let zero_intercepts = if has_zero_intercept { 1 } else { 0 };
         RSquared {
             sum_sq_regression: ssr,
@@ -116,62 +119,145 @@ pub struct RegressionModel<O: AsIndex> {
     pub r_squared: f64,
     pub r_squared_adj: f64,
 }
+impl<O: AsIndex> RegressionModel<O> {
+    pub fn fit(
+        response: O,
+        regressors: Vec<Regressor<O>>,
+        data: &Matrix<f64>,
+    ) -> Result<Self, anyhow::Error> {
+        if data.cols() < 2 {
+            bail!("insufficient number of columns in the data");
+        }
+        if regressors.len() < 2 {
+            bail!("insufficient number of regressors");
+        }
+        let constants = regressors
+            .iter()
+            .filter(|regressor| regressor.is_constant())
+            .count();
+        if constants != 1 {
+            bail!(
+                "must specify exactly one {} or {} regressor",
+                Regressor::<DummyOrdinal>::Intercept.to_string(),
+                Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
+            );
+        }
+
+        let mut subset: Matrix<f64> = Matrix::allocate(data.rows(), 1 + regressors.len());
+        for (row_index, row_data) in data.into_iter().enumerate() {
+            subset[(row_index, 0)] = row_data[response.as_index()];
+            for (regressor_index, regressor) in regressors.iter().enumerate() {
+                subset[(row_index, 1 + regressor_index)] = regressor.resolve(row_data);
+            }
+        }
+
+        let model = fit_low_level_regression_model(subset.flatten(), subset.rows(), subset.cols())?;
+        let coefficients = model.parameters().to_vec();
+        let std_errors = model.se().to_vec();
+        let p_values = model.p_values().to_vec();
+        let r_squared = model.rsquared();
+        let r_squared_adj = model.rsquared_adj();
+        Ok(RegressionModel {
+            response,
+            predictor: Predictor {
+                regressors,
+                coefficients,
+            },
+            std_errors,
+            p_values,
+            r_squared,
+            r_squared_adj,
+        })
+    }
+
+    pub fn tabulate(&self) -> Table
+    where
+        O: Debug,
+    {
+        let mut table = Table::default().with_cols(vec![
+            Col::new(Styles::default()),
+            Col::new(Styles::default().with(MinWidth(12)).with(HAlign::Right)),
+            Col::new(Styles::default().with(MinWidth(11)).with(HAlign::Right)),
+            Col::new(Styles::default().with(MinWidth(9)).with(HAlign::Right)),
+            Col::new(Styles::default().with(MinWidth(5))),
+        ]).with_row(Row::new(
+            Styles::default().with(Header(true)),
+            vec![
+                "Regressor".into(),
+                "Coefficient".into(),
+                "Std. error".into(),
+                "P-value".into(),
+                "".into(),
+            ],
+        ));
+        for (regressor_index, regressor) in self.predictor.regressors.iter().enumerate() {
+            table.push_row(Row::new(
+                Styles::default(),
+                vec![
+                    format!("{:?}", regressor).into(),
+                    format!("{:.8}", self.predictor.coefficients[regressor_index]).into(),
+                    format!("{:.6}", self.std_errors[regressor_index]).into(),
+                    format!("{:.6}", self.p_values[regressor_index]).into(),
+                    Significance::lookup(self.p_values[regressor_index])
+                        .to_string()
+                        .into(),
+                ],
+            ));
+        }
+
+        table
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, EnumCount, EnumIter)]
+pub enum Significance {
+    A,
+    B,
+    C,
+    D,
+    E,
+}
+impl Significance {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Significance::A => "***",
+            Significance::B => "**",
+            Significance::C => "*",
+            Significance::D => ".",
+            Significance::E => "",
+        }
+    }
+
+    pub fn range(&self) -> Range<f64> {
+        match self {
+            Significance::A => 0.0..0.001,
+            Significance::B => 0.001..0.01,
+            Significance::C => 0.01..0.05,
+            Significance::D => 0.05..0.1,
+            Significance::E => 0.1..1.0 + f64::EPSILON,
+        }
+    }
+
+    pub fn lookup(p_value: f64) -> Self {
+        for sig in Self::iter() {
+            if sig.range().contains(&p_value) {
+                return sig;
+            }
+        }
+        unreachable!()
+    }
+}
+impl ToString for Significance {
+    fn to_string(&self) -> String {
+        self.label().into()
+    }
+}
 
 struct DummyOrdinal;
 impl AsIndex for DummyOrdinal {
     fn as_index(&self) -> usize {
         0
     }
-}
-
-pub fn fit<O: AsIndex>(
-    response: O,
-    regressors: Vec<Regressor<O>>,
-    data: &Matrix<f64>,
-) -> Result<RegressionModel<O>, anyhow::Error> {
-    if data.cols() < 2 {
-        bail!("insufficient number of columns in the data");
-    }
-    if regressors.len() < 2 {
-        bail!("insufficient number of regressors");
-    }
-    let constants = regressors
-        .iter()
-        .filter(|regressor| regressor.is_constant())
-        .count();
-    if constants != 1 {
-        bail!(
-            "must specify exactly one {} or {} regressor",
-            Regressor::<DummyOrdinal>::Intercept,
-            Regressor::<DummyOrdinal>::ZeroIntercept
-        );
-    }
-
-    let mut subset: Matrix<f64> = Matrix::allocate(data.rows(), 1 + regressors.len());
-    for (row_index, row_data) in data.into_iter().enumerate() {
-        subset[(row_index, 0)] = row_data[response.as_index()];
-        for (regressor_index, regressor) in regressors.iter().enumerate() {
-            subset[(row_index, 1 + regressor_index)] = regressor.resolve(row_data);
-        }
-    }
-
-    let model = fit_low_level_regression_model(subset.flatten(), subset.rows(), subset.cols())?;
-    let coefficients = model.parameters().iter().map(|&val| val).collect();
-    let std_errors = model.se().iter().map(|&val| val).collect();
-    let p_values = model.p_values().iter().map(|&val| val).collect();
-    let r_squared = model.rsquared();
-    let r_squared_adj = model.rsquared_adj();
-    Ok(RegressionModel {
-        response,
-        predictor: Predictor {
-            regressors,
-            coefficients,
-        },
-        std_errors,
-        p_values,
-        r_squared,
-        r_squared_adj,
-    })
 }
 
 #[cfg(test)]
@@ -275,7 +361,8 @@ mod tests {
         const EPSILON: f64 = 1e-13;
         {
             // with intercept
-            let model = fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data).unwrap();
+            let model = RegressionModel::fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data)
+                .unwrap();
             assert_slice_f64_relative(
                 &model.predictor.coefficients,
                 &[0.28813559322033333, 0.7288135593220351],
@@ -306,7 +393,9 @@ mod tests {
         }
         {
             // without intercept
-            let model = fit(Factor::Y, vec![ZeroIntercept, Ordinal(Factor::X)], &data).unwrap();
+            let model =
+                RegressionModel::fit(Factor::Y, vec![ZeroIntercept, Ordinal(Factor::X)], &data)
+                    .unwrap();
             assert_slice_f64_relative(
                 &model.predictor.coefficients,
                 &[0.0, 0.7809523809523811],
@@ -329,7 +418,7 @@ mod tests {
         }
         {
             // with square term
-            let model = fit(
+            let model = RegressionModel::fit(
                 Factor::Y,
                 vec![
                     Intercept,
@@ -369,7 +458,7 @@ mod tests {
         }
         {
             // with multiple distinct regressors
-            let model = fit(
+            let model = RegressionModel::fit(
                 Factor::Y,
                 vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
                 &data,
@@ -405,7 +494,7 @@ mod tests {
         }
         {
             // with interaction term and zero intercept
-            let model = fit(
+            let model = RegressionModel::fit(
                 Factor::Y,
                 vec![
                     ZeroIntercept,
@@ -434,5 +523,19 @@ mod tests {
                 EPSILON
             );
         }
+    }
+
+    #[test]
+    fn significance_resolve() {
+        assert_eq!(Significance::A, Significance::lookup(0.0));
+        assert_eq!(Significance::A, Significance::lookup(0.0009));
+        assert_eq!(Significance::B, Significance::lookup(0.001));
+        assert_eq!(Significance::B, Significance::lookup(0.009));
+        assert_eq!(Significance::C, Significance::lookup(0.01));
+        assert_eq!(Significance::C, Significance::lookup(0.049));
+        assert_eq!(Significance::D, Significance::lookup(0.05));
+        assert_eq!(Significance::D, Significance::lookup(0.09));
+        assert_eq!(Significance::E, Significance::lookup(0.1));
+        assert_eq!(Significance::E, Significance::lookup(1.0));
     }
 }

@@ -15,6 +15,7 @@ use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
 use crate::{mc, selection};
 use crate::data::Factor;
+use crate::model::cf::Coefficients;
 
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
@@ -71,6 +72,7 @@ pub struct PlaceFitOutcome {
 }
 
 pub fn fit_place(
+    coefficients: Coefficients,
     options: FitOptions,
     win_market: &Market,
     place_market: &Market,
@@ -83,17 +85,17 @@ pub fn fit_place(
         .with_podium_places(PODIUM)
         .into();
 
-    struct Coefficients {
-        win: f64,
-        win_squared: f64,
-        win_cubed: f64,
-        num_runners: f64,
-        num_runners_squared: f64,
-        num_runners_cubed: f64,
-        stdev: f64,
-        stdev_squared: f64,
-        stdev_cubed: f64,
-    }
+    // struct Coefficients {
+    //     win: f64,
+    //     win_squared: f64,
+    //     win_cubed: f64,
+    //     num_runners: f64,
+    //     num_runners_squared: f64,
+    //     num_runners_cubed: f64,
+    //     stdev: f64,
+    //     stdev_squared: f64,
+    //     stdev_cubed: f64,
+    // }
     // let cf_1 = Coefficients {
     //     win: 1.594e+00,
     //     win_squared: -3.831e+00,
@@ -123,17 +125,17 @@ pub fn fit_place(
     //     stdev_squared: 0.0,
     //     stdev_cubed: 0.0,
     // };
-    let cf_1 = Coefficients {
-        win: 1.490e+00,
-        win_squared: -3.358e+00,
-        win_cubed: 3.394e+00,
-        num_runners: -2.079e-04,
-        num_runners_squared: 0.0,
-        num_runners_cubed: 0.0,
-        stdev: 0.0,
-        stdev_squared: 0.0,
-        stdev_cubed: 0.0,
-    };
+    // let cf_1 = Coefficients {
+    //     win: 1.490e+00,
+    //     win_squared: -3.358e+00,
+    //     win_cubed: 3.394e+00,
+    //     num_runners: -2.079e-04,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
     // let cf_1 = Coefficients {
     //     win: 1.529e+00,
     //     win_squared: -3.706e+00,
@@ -176,17 +178,17 @@ pub fn fit_place(
     //     stdev_squared: 0.0,
     //     stdev_cubed: 0.0,
     // };
-    let cf_2 = Coefficients {
-        win: 1.273e+00,
-        win_squared: -3.425e+00,
-        win_cubed: 3.621e+00,
-        num_runners: 8.103e-03,
-        num_runners_squared: -8.194e-04,
-        num_runners_cubed: 2.372e-05,
-        stdev: 0.0,
-        stdev_squared: 0.0,
-        stdev_cubed: 0.0,
-    };
+    // let cf_2 = Coefficients {
+    //     win: 1.273e+00,
+    //     win_squared: -3.425e+00,
+    //     win_cubed: 3.621e+00,
+    //     num_runners: 8.103e-03,
+    //     num_runners_squared: -8.194e-04,
+    //     num_runners_cubed: 2.372e-05,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
     // let cf_2 = Coefficients {
     //     win: 1.258e+00,
     //     win_squared: -3.455e+00,
@@ -229,17 +231,17 @@ pub fn fit_place(
     //     stdev_squared: 0.0,
     //     stdev_cubed: 0.0,
     // };
-    let cf_3 = Coefficients {
-        win: 1.254e+00,
-        win_squared: -4.023e+00,
-        win_cubed: 4.514e+00,
-        num_runners: 1.145e-02,
-        num_runners_squared: -1.139e-03,
-        num_runners_cubed: 3.254e-05,
-        stdev: 0.0,
-        stdev_squared: 0.0,
-        stdev_cubed: 0.0,
-    };
+    // let cf_3 = Coefficients {
+    //     win: 1.254e+00,
+    //     win_squared: -4.023e+00,
+    //     win_cubed: 4.514e+00,
+    //     num_runners: 1.145e-02,
+    //     num_runners_squared: -1.139e-03,
+    //     num_runners_cubed: 3.254e-05,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
     // let cf_3 = Coefficients {
     //     win: 1.205e+00,
     //     win_squared: -3.889e+00 ,
@@ -252,17 +254,17 @@ pub fn fit_place(
     //     stdev_cubed: 0.0,
     // };
 
-    fn linear_sum(cf: &Coefficients, win_prob: f64, active_runners: f64, stdev: f64) -> f64 {
-        win_prob * cf.win
-            + win_prob.powi(2) * cf.win_squared
-            + win_prob.powi(3) * cf.win_cubed
-            + active_runners * cf.num_runners
-            + active_runners.powi(2) * cf.num_runners_squared
-            + active_runners.powi(3) * cf.num_runners_cubed
-            + stdev * cf.stdev
-            + stdev.powi(2) * cf.stdev_squared
-            + stdev.powi(3) * cf.stdev_cubed
-    }
+    // fn linear_sum(cf: &Coefficients, win_prob: f64, active_runners: f64, stdev: f64) -> f64 {
+    //     win_prob * cf.win
+    //         + win_prob.powi(2) * cf.win_squared
+    //         + win_prob.powi(3) * cf.win_cubed
+    //         + active_runners * cf.num_runners
+    //         + active_runners.powi(2) * cf.num_runners_squared
+    //         + active_runners.powi(3) * cf.num_runners_cubed
+    //         + stdev * cf.stdev
+    //         + stdev.powi(2) * cf.stdev_squared
+    //         + stdev.powi(3) * cf.stdev_cubed
+    // }
 
     let stdev = win_market.probs.stdev();
     let places_paying = place_rank as f64 + 1.;
@@ -276,10 +278,14 @@ pub fn fit_place(
             input[Factor::Stdev.ordinal()] = stdev;
             input[Factor::Weight0.ordinal()] = win_prob;
 
+            weighted_probs[(1, runner)] = coefficients.w1.predict(&input);
+            weighted_probs[(2, runner)] = coefficients.w2.predict(&input);
+            weighted_probs[(3, runner)] = coefficients.w3.predict(&input);
+
             //TODO
-            weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, active_runners, stdev);
-            weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, active_runners, stdev);
-            weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, active_runners, stdev);
+            // weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, active_runners, stdev);
+            // weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, active_runners, stdev);
+            // weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, active_runners, stdev);
         }
     }
     for rank in 1..PODIUM {

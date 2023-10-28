@@ -6,24 +6,27 @@ use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
-use racing_scraper::models::EventDetail;
+use racing_scraper::models::{EventDetail, EventType};
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::{market, mc, selection};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, OverroundMethod};
+use brumby::model::cf::Coefficients;
 use brumby::model::fit;
 use brumby::model::fit::FitOptions;
 use brumby::opt::GradientDescentOutcome;
-use brumby::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
+use brumby::print::{
+    tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values, DerivedPrice,
+};
 use brumby::selection::{Selection, Selections};
+use brumby::{market, mc, selection};
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;
@@ -71,8 +74,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     debug!("args: {args:?}");
 
     let race = read_race_data(&args).await?;
-    println!("meeting: {}, race: {}, places_paying: {}", race.meeting_name, race.race_number, race.places_paying);
+    debug!(
+        "meeting: {}, race: {}, places_paying: {}",
+        race.meeting_name, race.race_number, race.places_paying
+    );
     let place_rank = race.places_paying - 1;
+
+    let coefficients_file = match race.race_type {
+        EventType::Thoroughbred => PathBuf::from("config/thoroughbred.cf.json"),
+        EventType::Greyhound => PathBuf::from("config/greyhound.cf.json"),
+        EventType::Harness => unimplemented!(),
+    };
+    debug!("loading coefficients from {coefficients_file:?}");
+    let coefficients = Coefficients::read_json_file(coefficients_file)?;
     // let mut win_probs: Vec<_> = race
     //     .prices
     //     .row_slice(0)
@@ -117,15 +131,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let num_runners = race.prices.row_slice(0).len();
     let scenarios = selection::top_n_matrix(podium_places, num_runners);
 
-    let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
-        let prices = race.prices.row_slice(rank).to_vec();
-        Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
-    }).collect();
+    let markets: Vec<_> = (0..race.prices.rows())
+        .map(|rank| {
+            let prices = race.prices.row_slice(rank).to_vec();
+            Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
+        })
+        .collect();
 
-    let fit_outcome = fit::fit_place(FitOptions {
-        mc_iterations: MC_ITERATIONS_TRAIN,
-        individual_target_msre: TARGET_MSRE,
-    }, &markets[0], &markets[place_rank], place_rank);
+    let fit_outcome = fit::fit_place(
+        coefficients,
+        FitOptions {
+            mc_iterations: MC_ITERATIONS_TRAIN,
+            individual_target_msre: TARGET_MSRE,
+        },
+        &markets[0],
+        &markets[place_rank],
+        place_rank,
+    );
     debug!(
         "individual fitting complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
         fit_outcome.stats.optimal_msre,
@@ -172,14 +194,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
     for rank in 0..podium_places {
         let probs = derived_probs.row_slice(rank);
-        let framed = Market::frame(&OVERROUND_METHOD, probs.into(), markets[rank].overround.value);
+        let framed = Market::frame(
+            &OVERROUND_METHOD,
+            probs.into(),
+            markets[rank].overround.value,
+        );
         for runner in 0..num_runners {
             let probability = framed.probs[runner];
             let price = framed.prices[runner];
-            let price = DerivedPrice {
-                probability,
-                price,
-            };
+            let price = DerivedPrice { probability, price };
             derived_prices[(rank, runner)] = price;
         }
     }
@@ -187,17 +210,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let table = tabulate_derived_prices(&derived_prices);
     info!("\n{}", Console::default().render(&table));
 
-    let errors: Vec<_> = (0..podium_places).map(|rank| {
-        fit::compute_msre(
-            race.prices.row_slice(rank),
-            derived_prices.row_slice(rank),
-            &FITTED_PRICE_RANGES[rank],
-        ).sqrt()
-    }).collect();
+    let errors: Vec<_> = (0..podium_places)
+        .map(|rank| {
+            fit::compute_msre(
+                race.prices.row_slice(rank),
+                derived_prices.row_slice(rank),
+                &FITTED_PRICE_RANGES[rank],
+            )
+            .sqrt()
+        })
+        .collect();
 
     let dilatives_table = tabulate_values(&dilatives, "Dilative");
     let errors_table = tabulate_values(&errors, "RMSRE");
-    let overrounds: Vec<_> = markets.iter().map(|market| market.overround.value).collect();
+    let overrounds: Vec<_> = markets
+        .iter()
+        .map(|market| market.overround.value)
+        .collect();
     let overrounds_table = tabulate_values(&overrounds, "Overround");
     let sample_prices_table = tabulate_prices(&race.prices);
     let summary_table = Table::with_styles(Styles::default().with(HAlign::Centred))
@@ -208,18 +237,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Col::new(Styles::default().with(Separator(true)).with(MinWidth(9))),
             Col::default(),
             Col::new(Styles::default().with(Separator(true)).with(MinWidth(10))),
-            Col::default()
+            Col::default(),
         ])
-        .with_row(Row::from(["Initial dilatives", "", "Fitting errors", "", "Fitted overrounds", "", "Sample prices"]))
-        .with_row(Row::new(Styles::default(), vec![
-            dilatives_table.into(),
-            "".into(),
-            errors_table.into(),
-            "".into(),
-            overrounds_table.into(),
-            "".into(),
-            sample_prices_table.into()
-        ]));
+        .with_row(Row::from([
+            "Initial dilatives",
+            "",
+            "Fitting errors",
+            "",
+            "Fitted overrounds",
+            "",
+            "Sample prices",
+        ]))
+        .with_row(Row::new(
+            Styles::default(),
+            vec![
+                dilatives_table.into(),
+                "".into(),
+                errors_table.into(),
+                "".into(),
+                overrounds_table.into(),
+                "".into(),
+                sample_prices_table.into(),
+            ],
+        ));
     info!("\n{}", Console::default().render(&summary_table));
 
     if let Some(selections) = args.selections {
@@ -246,7 +286,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 overround
             )
         );
-        debug!("price generation took {:.3}s", elapsed_time.as_millis() as f64 / 1_000.);
+        debug!(
+            "price generation took {:.3}s",
+            elapsed_time.as_millis() as f64 / 1_000.
+        );
     }
     Ok(())
 }

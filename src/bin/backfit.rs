@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use clap::Parser;
+use stanza::renderer::console::Console;
+use stanza::renderer::Renderer;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
@@ -11,7 +13,6 @@ use brumby::csv::CsvReader;
 use brumby::data::Factor;
 use brumby::file::{ReadJsonFile, WriteJsonFile};
 use brumby::linear::matrix::Matrix;
-use brumby::linear::regression;
 use brumby::linear::regression::{RegressionModel, Regressor};
 use brumby::model::cf::{Coefficients, Regressors};
 
@@ -22,7 +23,6 @@ struct Args {
     input: Option<PathBuf>,
 
     /// path to the regressors file
-    #[clap(short = 'g', long)]
     regressors: Option<PathBuf>,
 
     /// output file for the fitted coefficients
@@ -34,6 +34,9 @@ impl Args {
         self.input
             .as_ref()
             .ok_or(anyhow!("input file must be specified"))?;
+        self.input
+            .as_ref()
+            .ok_or(anyhow!("regressors file must be specified"))?;
         Ok(())
     }
 }
@@ -51,7 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     debug!("args: {args:?}");
 
-    let regressors_file = args.regressors.unwrap_or_else(|| PathBuf::from("config/regressors.json"));
+    let regressors_file = args
+        .regressors
+        .unwrap_or_else(|| PathBuf::from("../../config/greyhound.r.json"));
     let regressors = Regressors::read_json_file(regressors_file)?;
     debug!("regressors:\n{regressors:#?}");
 
@@ -75,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         w2: w2.predictor,
         w3: w3.predictor,
     };
-    info!("fitted coefficients:\n{coefficients:#?}");
+    debug!("fitted coefficients:\n{coefficients:#?}");
 
     if let Some(output) = args.output {
         coefficients.write_json_file(output)?;
@@ -84,9 +89,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn fit_linear_model(response: Factor, regressors: Vec<Regressor<Factor>>, data: &Matrix<f64>) -> Result<RegressionModel<Factor>, anyhow::Error> {
+fn fit_linear_model(
+    response: Factor,
+    regressors: Vec<Regressor<Factor>>,
+    data: &Matrix<f64>,
+) -> Result<RegressionModel<Factor>, anyhow::Error> {
     info!("fitting linear model for {response:?}...");
-    let model = regression::fit(response, regressors, &data)?;
-    info!("fitted model:\n{:#?}", model);
+    let model = RegressionModel::fit(response, regressors, data)?;
+    let table = model.tabulate();
+    info!(
+        "fitted model:\n{}\nr_squared:     {:.6}\nr_squared_adj: {:.6}",
+        Console::default().render(&table),
+        model.r_squared,
+        model.r_squared_adj
+    );
     Ok(model)
 }
