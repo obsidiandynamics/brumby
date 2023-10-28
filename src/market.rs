@@ -1,7 +1,9 @@
 use crate::opt;
 use crate::opt::GradientDescentConfig;
-use crate::overround::apply_with_cap;
 use crate::probs::SliceExt;
+
+const MIN_PRICE: f64 = 1.04;
+const MAX_PRICE: f64 = 10001.0;
 
 pub trait MarketPrice {
     fn decimal(&self) -> f64;
@@ -67,7 +69,7 @@ impl Market {
     }
 
     fn frame_multiplicative(probs: Vec<f64>, overround: f64) -> Self {
-        let prices: Vec<_> = probs.iter().map(|prob| apply_with_cap(1.0 / prob, overround)).collect();
+        let prices: Vec<_> = probs.iter().map(|prob| multiply_capped(1.0 / prob, overround)).collect();
         Self {
             probs,
             prices,
@@ -104,6 +106,15 @@ impl Market {
             prices,
             overround: Overround { method: OverroundMethod::Multiplicative, value: overround },
         }
+    }
+}
+
+pub fn multiply_capped(fair_price: f64, overround: f64) -> f64 {
+    let quotient = fair_price / overround;
+    if quotient.is_finite() {
+        f64::min(f64::max(MIN_PRICE, quotient), MAX_PRICE)
+    } else {
+        quotient
     }
 }
 

@@ -1,9 +1,9 @@
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 
-use bentobox::linear::Matrix;
-use bentobox::{mc, overround};
+use bentobox::{market, mc};
 use bentobox::display::DisplaySlice;
+use bentobox::linear::Matrix;
 use bentobox::mc::DilatedProbs;
 use bentobox::print::{DerivedPrice, tabulate_derived_prices};
 use bentobox::probs::SliceExt;
@@ -106,7 +106,7 @@ fn main() {
         for rank in 0..podium_places {
             let probability = counts[(rank, runner)] as f64 / ITERATIONS as f64;
             let fair_price = 1.0 / probability;
-            let price = overround::apply_with_cap(fair_price, ranked_overrounds[rank]);
+            let price = market::multiply_capped(fair_price, ranked_overrounds[rank]);
             let price = DerivedPrice {
                 probability,
                 price,
@@ -140,6 +140,6 @@ fn main() {
         DisplaySlice::from(&*selections),
         frac.quotient(),
         1.0 / frac.quotient(),
-        overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        market::multiply_capped(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }

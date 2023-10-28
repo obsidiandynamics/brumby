@@ -1,5 +1,5 @@
 use bentobox::capture::Capture;
-use bentobox::{mc, overround};
+use bentobox::{market, mc};
 use bentobox::mc::DilatedProbs;
 use bentobox::probs::SliceExt;
 use bentobox::selection::{Rank, Runner};
@@ -59,6 +59,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        overround::apply_with_cap(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        market::multiply_capped(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
     );
 }

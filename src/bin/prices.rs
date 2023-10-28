@@ -9,7 +9,7 @@ use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 
-use bentobox::{fit, market, mc, overround};
+use bentobox::{fit, market, mc};
 use bentobox::capture::Capture;
 use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
 use bentobox::display::DisplaySlice;
@@ -273,7 +273,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             DisplaySlice::from(&*selections),
             frac.quotient(),
             1.0 / frac.quotient(),
-            overround::apply_with_cap(
+            market::multiply_capped(
                 1.0 / frac.quotient(),
                 overround
             )
