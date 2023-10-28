@@ -2,6 +2,7 @@ use std::env;
 use std::error::Error;
 use std::ops::Range;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
@@ -11,7 +12,7 @@ use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use bentobox::{fit, market, mc};
+use bentobox::{fit, market, mc, selection};
 use bentobox::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
 use bentobox::display::DisplaySlice;
 use bentobox::fit::FitOptions;
@@ -19,21 +20,17 @@ use bentobox::linear::Matrix;
 use bentobox::market::{Market, OverroundMethod};
 use bentobox::opt::GradientDescentOutcome;
 use bentobox::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
-use bentobox::selection::{Rank, Runner, Selection, Selections};
+use bentobox::selection::{Selection, Selections};
 
 const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;
-const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
-// const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..100.0, 1.0..100.0, 1.0..100.0, 1.0..100.0];
+// const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
+const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 const TARGET_MSRE: f64 = 1e-6;
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
-    /// selections to price
-    #[clap(short = 's', long)]
-    selections: Option<Selections<'static>>,
-
     /// file to source the race data from
     #[clap(short = 'f', long)]
     file: Option<PathBuf>,
@@ -41,6 +38,9 @@ struct Args {
     /// download race data by ID
     #[clap(short = 'd', long)]
     download: Option<u64>,
+
+    /// selections to price
+    selections: Option<Selections<'static>>,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -69,7 +69,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let race = read_race_data(&args).await?;
     println!("meeting: {}, race: {}, places_paying: {}", race.meeting_name, race.race_number, race.places_paying);
-    println!("prices= {}", race.prices.verbose());
     let place_rank = race.places_paying - 1;
     // let mut win_probs: Vec<_> = race
     //     .prices
@@ -113,50 +112,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let podium_places = 4;
     let num_runners = race.prices.row_slice(0).len();
-    let mut scenarios = Matrix::allocate(podium_places, num_runners);
-    for runner in 0..num_runners {
-        for rank in 0..podium_places {
-            scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))].into();
-        }
-    }
+    let scenarios = selection::top_n_matrix(podium_places, num_runners);
 
-    // let overround_step = (win_overround - place_overround) / 2.0;
-    // let ranked_overrounds = vec![
-    //     win_overround,
-    //     win_overround - overround_step,
-    //     place_overround,
-    //     place_overround - overround_step,
-    // ];
-    // let ranked_overrounds = vec![
-    //     win_overround,
-    //     race.prices.row_slice(1).invert().sum::<f64>() / 2.0,
-    //     place_overround,
-    //     race.prices.row_slice(3).invert().sum::<f64>() / 4.0,
-    // ];
-
-    // let individual_fit_outcome = fit_individual(
-    //     &scenarios,
-    //     &dilated_probs,
-    //     2,
-    //     1..=3,
-    //     ranked_overrounds[2],
-    //     race.prices.row_slice(2),
-    // );
     let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
         let prices = race.prices.row_slice(rank).to_vec();
         Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
     }).collect();
 
-    let place_fit_outcome = fit::fit_place(FitOptions {
+    let fit_outcome = fit::fit_place(FitOptions {
         mc_iterations: MC_ITERATIONS_TRAIN,
         individual_target_msre: TARGET_MSRE,
     }, &markets[0], &markets[place_rank], &dilatives, place_rank);
     debug!(
-        "individual fitting complete: optimal MSRE: {}, RMSRE: {}",
-        place_fit_outcome.stats.optimal_msre,
-        place_fit_outcome.stats.optimal_msre.sqrt()
+        "individual fitting complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
+        fit_outcome.stats.optimal_msre,
+        fit_outcome.stats.optimal_msre.sqrt(),
+        fit_outcome.stats.steps,
+        fit_outcome.stats.time.as_millis() as f64 / 1_000.00
     );
-    let fitted_probs = place_fit_outcome.fitted_probs;
+    // let fit_outcome = fit::fit_all(FitOptions {
+    //     mc_iterations: MC_ITERATIONS_TRAIN,
+    //     individual_target_msre: TARGET_MSRE,
+    // }, &markets, &dilatives);
+    // debug!("individual fitting complete: stats: {:?}", fit_outcome.stats);
+
+    let fitted_probs = fit_outcome.fitted_probs;
+    // if place_rank == 2 {
+    //     for runner in 0..num_runners {
+    //         let win_prob = markets[0].probs[runner];
+    //         if win_prob != 0.0 {
+    //             let place_prob = fitted_probs[(place_rank, runner)];
+    //             fitted_probs[(1, runner)] = win_prob * 0.3347010 + place_prob * 0.7379683 + num_runners as f64 * 0.0004262 + -0.0113370;
+    //             fitted_probs[(3, runner)] = win_prob * -1.819e-01 + place_prob * 1.141e+00 + num_runners as f64 * -2.370e-04 + 6.303e-03;
+    //         }
+    //     }
+    // }
+
     let probs_table = tabulate_probs(&fitted_probs);
     println!("{}", Console::default().render(&probs_table));
 
@@ -229,6 +220,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("\n{}", Console::default().render(&summary_table));
 
     if let Some(selections) = args.selections {
+        let start_time = Instant::now();
         // let overround = win_overround.powi(selections.len() as i32);
         let mut overround = 1.0;
         for selection in &*selections {
@@ -240,6 +232,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             overround *= derived_prices[(rank, runner)].overround();
         }
         let frac = engine.simulate(&selections);
+        let elapsed_time = start_time.elapsed();
         info!(
             "probability of {}: {}, fair price: {:.3}, overround: {overround:.3}, market odds: {:.3}",
             DisplaySlice::from(&*selections),
@@ -250,6 +243,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 overround
             )
         );
+        debug!("price generation took {:.3}s", elapsed_time.as_millis() as f64 / 1_000.00);
     }
     Ok(())
 }

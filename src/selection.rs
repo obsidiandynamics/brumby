@@ -6,6 +6,7 @@ use anyhow::{bail, Context};
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
 use std::str::FromStr;
+use crate::linear::Matrix;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Selection {
@@ -161,6 +162,17 @@ impl<'a> FromStr for Selections<'a> {
         }
         Ok(selections.into())
     }
+}
+
+/// Builds a `podium_places` x `num_runners` matrix populated with top-_N_ selections.
+pub fn top_n_matrix(podium_places: usize, num_runners: usize) -> Matrix<Selections<'static>> {
+    let mut scenarios = Matrix::allocate(podium_places, num_runners);
+    for runner in 0..num_runners {
+        for rank in 0..podium_places {
+            scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))].into();
+        }
+    }
+    scenarios
 }
 
 #[cfg(test)]

@@ -16,6 +16,9 @@ pub trait SliceExt {
     fn scale_rows(&self, target: &mut Matrix<f64>);
     fn dilate_rows_additive(&self, matrix: &mut Matrix<f64>);
     fn dilate_rows_power(&self, matrix: &mut Matrix<f64>);
+    fn mean(&self) -> f64;
+    fn variance(&self) -> f64;
+    fn stdev(&self) -> f64;
 }
 impl SliceExt for [f64] {
     fn sum(&self) -> f64 {
@@ -122,6 +125,20 @@ impl SliceExt for [f64] {
             row_slice.dilate_power(*factor);
         }
     }
+
+    fn mean(&self) -> f64 {
+        self.sum() / self.len() as f64
+    }
+
+    fn variance(&self) -> f64 {
+        let mean = self.mean();
+        let sum_of_squares: f64 = self.iter().map(|sample| (sample - mean).powi(2)).sum();
+        sum_of_squares / (self.len() - 1) as f64
+    }
+
+    fn stdev(&self) -> f64 {
+        self.variance().sqrt()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -143,16 +160,27 @@ impl Display for Fraction {
 
 #[cfg(test)]
 mod tests {
-    use assert_float_eq::assert_f64_near;
+    use assert_float_eq::*;
     use super::*;
     use crate::linear::matrix_fixtures::populate_with_test_data;
     use crate::testing::{assert_slice_f64_near, assert_slice_f64_relative};
-    use assert_float_eq::*;
 
     #[test]
     fn sum() {
         let data = [0.0, 0.1, 0.2];
         assert_f64_near!(0.3, data.sum(), 1);
+    }
+
+    #[test]
+    fn mean() {
+        let data = [0.05, 0.1, 0.15, 0.2];
+        assert_f64_near!(0.125, data.mean());
+    }
+
+    #[test]
+    fn variance() {
+        let data = [0.05, 0.1, 0.15, 0.2];
+        assert_float_relative_eq!(0.00416667, data.variance(), 1e-6);
     }
 
     #[test]

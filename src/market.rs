@@ -65,7 +65,7 @@ impl Market {
         let overround = prices.invert().sum::<f64>() / fair_sum;
         let est_rtp = 1.0 / overround;
         let initial_k = 1.0 + f64::ln(est_rtp) / f64::ln(prices.len() as f64);
-        println!("fit_power: initial_k: {initial_k}");
+        // println!("fit_power: initial_k: {initial_k}");
         let outcome = opt::gd(GradientDescentConfig {
             init_value: initial_k,
             step: -0.01,

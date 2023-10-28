@@ -5,6 +5,10 @@ _help:
 prices *ARGS:
     cargo run --release --bin prices -- {{ARGS}}
 
+# backfit a set of races
+backfit *ARGS:
+    cargo run --release --bin backfit -- {{ARGS}}
+
 # run the multi example
 multi:
     cargo run --example multi --release
