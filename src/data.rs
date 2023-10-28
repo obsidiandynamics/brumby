@@ -4,10 +4,11 @@ use chrono::{DateTime, Utc};
 use ordinalizer::Ordinal;
 use racing_scraper::get_racing_data;
 use racing_scraper::models::{EventDetail, EventType};
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumCount, EnumIter};
 
 use crate::file;
-use crate::file::FromJsonFile;
+use crate::file::ReadJsonFile;
 use crate::linear::matrix::Matrix;
 use crate::linear::regression::AsIndex;
 
@@ -125,7 +126,7 @@ pub fn read_from_dir(
     let mut races = Vec::with_capacity(files.len());
     let mut closure = closurelike.into();
     for file in files {
-        let race = EventDetail::from_json_file(file)?;
+        let race = EventDetail::read_json_file(file)?;
         if closure(&race) {
             races.push(race);
         }
@@ -151,7 +152,7 @@ pub async fn download_by_id(id: u64) -> anyhow::Result<EventDetail> {
     Ok(event_detail)
 }
 
-#[derive(Debug, Ordinal, EnumCount, EnumIter, Display)]
+#[derive(Debug, Clone, PartialEq, Ordinal, EnumCount, EnumIter, Display, Serialize, Deserialize)]
 pub enum Factor {
     RaceId,
     RunnerIndex,

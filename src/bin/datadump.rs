@@ -24,9 +24,9 @@ struct Args {
     /// directory to source the race data from
     dir: Option<PathBuf>,
 
-    // /// race type to analyse
-    // #[clap(short = 'f', long)]
-    // race_type: Option<EventType>,
+    /// race type
+    #[clap(short = 'r', long, value_parser = parse_race_type)]
+    race_type: Option<EventType>,
 
     /// where to write the CSV to
     out: Option<PathBuf>,
@@ -36,6 +36,13 @@ impl Args {
         self.dir.as_ref().ok_or(anyhow!("data directory must be specified"))?;
         self.out.as_ref().ok_or(anyhow!("output file must be specified"))?;
         Ok(())
+    }
+}
+fn parse_race_type(s: &str) -> anyhow::Result<EventType> {
+    match s.to_lowercase().as_str() {
+        "t" | "thoroughbred" => Ok(EventType::Thoroughbred),
+        "g" | "greyhound" => Ok(EventType::Thoroughbred),
+        _ => Err(anyhow!("unsupported race type {s}")),
     }
 }
 
@@ -57,7 +64,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     csv.append(Record::with_values(Factor::iter()))?;
 
     let mut predicates = vec![];
-    predicates.push(data::Predicate::Type { race_type: EventType::Thoroughbred });
+    if let Some(race_type) = args.race_type {
+        predicates.push(data::Predicate::Type { race_type });
+    }
     let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
     let races: Vec<_> = races.into_iter().map(EventDetailExt::summarise).collect();
 

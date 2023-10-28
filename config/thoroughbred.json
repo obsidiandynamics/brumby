@@ -1,0 +1,158 @@
+{
+  "w1": {
+    "regressors": [
+      {
+        "Ordinal": "Weight0"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          3
+        ]
+      },
+      {
+        "Ordinal": "ActiveRunners"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          3
+        ]
+      },
+      "ZeroIntercept"
+    ],
+    "coefficients": [
+      1.4985894825901513,
+      -3.4256962255368646,
+      3.496014191021021,
+      0.00799235972086406,
+      -0.001493919057524865,
+      0.0000655375726245257,
+      0.0
+    ]
+  },
+  "w2": {
+    "regressors": [
+      {
+        "Ordinal": "Weight0"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          3
+        ]
+      },
+      {
+        "Ordinal": "ActiveRunners"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          3
+        ]
+      },
+      "ZeroIntercept"
+    ],
+    "coefficients": [
+      1.2509934471005844,
+      -3.3375411444285583,
+      3.484140678043037,
+      0.021321982259795643,
+      -0.0031838942434562483,
+      0.0001246815225332824,
+      0.0
+    ]
+  },
+  "w3": {
+    "regressors": [
+      {
+        "Ordinal": "Weight0"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "Weight0"
+          },
+          3
+        ]
+      },
+      {
+        "Ordinal": "ActiveRunners"
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          2
+        ]
+      },
+      {
+        "Exp": [
+          {
+            "Ordinal": "ActiveRunners"
+          },
+          3
+        ]
+      },
+      "ZeroIntercept"
+    ],
+    "coefficients": [
+      1.2256689723498777,
+      -3.9060600742759886,
+      4.327019991005541,
+      0.02774897868356071,
+      -0.004056881944653616,
+      0.00015679153263628917,
+      0.0
+    ]
+  }
+}

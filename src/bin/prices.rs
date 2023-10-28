@@ -16,7 +16,7 @@ use tracing::{debug, info};
 use brumby::{market, mc, selection};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
-use brumby::file::FromJsonFile;
+use brumby::file::ReadJsonFile;
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::fit;
@@ -253,7 +253,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
     if let Some(path) = args.file.as_ref() {
-        let event_detail = EventDetail::from_json_file(path)?;
+        let event_detail = EventDetail::read_json_file(path)?;
         return Ok(event_detail.summarise());
     }
     if let Some(&id) = args.download.as_ref() {

@@ -59,7 +59,7 @@ impl RSquared {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Predictor<O: AsIndex> {
     pub regressors: Vec<Regressor<O>>,
     pub coefficients: Vec<f64>,

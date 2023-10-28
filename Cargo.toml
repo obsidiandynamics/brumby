@@ -16,7 +16,7 @@ exclude = ["/images", "/bin", "/.idea", "/.github", "/coverage", "/doc", "/examp
 anyhow = "1.0.75"
 chrono = "0.4.31"
 clap = { version =  "4.4.6", features = ["derive"] }
-racing_scraper = "0.0.5"
+racing_scraper = "0.0.6"
 serde_json = "1.0.107"
 stanza = "0.3.0"
 tinyrand = "0.5.0"

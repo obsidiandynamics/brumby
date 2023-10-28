@@ -1,0 +1,29 @@
+{
+  "w1": [
+    { "Ordinal": "Weight0" },
+    { "Exp": [{ "Ordinal": "Weight0" }, 2]},
+    { "Exp": [{ "Ordinal": "Weight0" }, 3]},
+    { "Ordinal": "ActiveRunners" },
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
+    "ZeroIntercept"
+  ],
+  "w2": [
+    { "Ordinal": "Weight0" },
+    { "Exp": [{ "Ordinal": "Weight0" }, 2]},
+    { "Exp": [{ "Ordinal": "Weight0" }, 3]},
+    { "Ordinal": "ActiveRunners" },
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
+    "ZeroIntercept"
+  ],
+  "w3": [
+    { "Ordinal": "Weight0" },
+    { "Exp": [{ "Ordinal": "Weight0" }, 2]},
+    { "Exp": [{ "Ordinal": "Weight0" }, 3]},
+    { "Ordinal": "ActiveRunners" },
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
+    { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
+    "ZeroIntercept"
+  ]
+}
