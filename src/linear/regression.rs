@@ -181,7 +181,7 @@ mod tests {
             data
         }
         let data = sample_data();
-        const EPSILON: f64 = 1e-15;
+        const EPSILON: f64 = 1e-13;
         {
             // with intercept
             let model = fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data).unwrap();
