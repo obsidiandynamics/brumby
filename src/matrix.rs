@@ -179,7 +179,7 @@ pub(crate) mod matrix_fixtures {
 
 #[cfg(test)]
 mod tests {
-    use crate::linear::matrix_fixtures::populate_with_test_data;
+    use crate::matrix::matrix_fixtures::populate_with_test_data;
     use super::*;
 
     #[test]

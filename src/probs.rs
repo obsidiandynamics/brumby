@@ -1,6 +1,6 @@
 //! Utilities for working with probabilities.
 
-use crate::linear::Matrix;
+use crate::matrix::Matrix;
 use std::fmt::{Display, Formatter};
 use std::iter::Map;
 use std::slice::Iter;
@@ -170,7 +170,7 @@ impl Display for Fraction {
 mod tests {
     use assert_float_eq::*;
     use super::*;
-    use crate::linear::matrix_fixtures::populate_with_test_data;
+    use crate::matrix::matrix_fixtures::populate_with_test_data;
     use crate::testing::{assert_slice_f64_near, assert_slice_f64_relative};
 
     #[test]

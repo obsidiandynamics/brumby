@@ -12,7 +12,7 @@ pub mod csv;
 pub mod data;
 pub mod display;
 pub mod fit;
-pub mod linear;
+pub mod matrix;
 pub mod market;
 pub mod mc;
 pub mod opt;

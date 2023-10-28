@@ -16,7 +16,7 @@ use brumby::{fit, market, mc, selection};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary, read_from_file};
 use brumby::display::DisplaySlice;
 use brumby::fit::FitOptions;
-use brumby::linear::Matrix;
+use brumby::matrix::Matrix;
 use brumby::market::{Market, OverroundMethod};
 use brumby::opt::GradientDescentOutcome;
 use brumby::print::{DerivedPrice, tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};

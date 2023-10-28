@@ -9,7 +9,7 @@ use racing_scraper::models::{EventDetail, EventType};
 use strum_macros::{Display, EnumCount, EnumIter};
 use tracing::trace;
 
-use crate::linear::Matrix;
+use crate::matrix::Matrix;
 
 const PODIUM: usize = 4;
 

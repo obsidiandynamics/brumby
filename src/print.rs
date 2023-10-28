@@ -1,6 +1,6 @@
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
-use crate::linear::Matrix;
+use crate::matrix::Matrix;
 use crate::market::MarketPrice;
 use crate::selection::{Rank, Runner};
 

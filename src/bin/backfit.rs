@@ -9,7 +9,7 @@ use tracing::debug;
 
 use brumby::csv::CsvReader;
 use brumby::data::Factor;
-use brumby::linear::Matrix;
+use brumby::matrix::Matrix;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {

@@ -6,7 +6,7 @@ use anyhow::{bail, Context};
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
 use std::str::FromStr;
-use crate::linear::Matrix;
+use crate::matrix::Matrix;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Selection {

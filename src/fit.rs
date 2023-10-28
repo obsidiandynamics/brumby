@@ -7,7 +7,7 @@ use tracing::trace;
 use mc::MonteCarloEngine;
 
 use crate::capture::Capture;
-use crate::linear::Matrix;
+use crate::matrix::Matrix;
 use crate::market::{Market, MarketPrice, OverroundMethod};
 use crate::mc::DilatedProbs;
 use crate::probs::SliceExt;
