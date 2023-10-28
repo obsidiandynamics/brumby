@@ -57,13 +57,13 @@ pub fn fit<O: AsIndex>(
         }
     }
 
-    println!("subset: \n{}", subset.verbose());
+    // println!("subset: \n{}", subset.verbose());
     let model = fit_low_level_regression_model(subset.flatten(), subset.rows(), subset.cols())?;
-    println!("params: {:?}", model.parameters());
-    println!("std_errors: {:?}", model.se());
-    println!("p_values: {:?}", model.p_values());
-    println!("r_squared: {}", model.rsquared());
-    println!("r_squared_adj: {}", model.rsquared_adj());
+    // println!("params: {:?}", model.parameters());
+    // println!("std_errors: {:?}", model.se());
+    // println!("p_values: {:?}", model.p_values());
+    // println!("r_squared: {}", model.rsquared());
+    // println!("r_squared_adj: {}", model.rsquared_adj());
 
     let coefficients = model.parameters().iter().map(|&val| val).collect();
     let std_errors = model.se().iter().map(|&val| val).collect();

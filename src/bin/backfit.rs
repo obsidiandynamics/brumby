@@ -5,11 +5,15 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use clap::Parser;
 use linregress::fit_low_level_regression_model;
-use tracing::debug;
+use strum::{EnumCount, IntoEnumIterator};
+use tracing::{debug, info};
 
 use brumby::csv::CsvReader;
 use brumby::data::Factor;
+use brumby::data::Factor::{ActiveRunners, Weight0};
 use brumby::linear::matrix::Matrix;
+use brumby::linear::regression;
+use brumby::linear::regression::Regressor::{Exponent, NilIntercept, Ordinal};
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -18,7 +22,9 @@ struct Args {
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
-        self.file.as_ref().ok_or(anyhow!("input file must be specified"))?;
+        self.file
+            .as_ref()
+            .ok_or(anyhow!("input file must be specified"))?;
         Ok(())
     }
 }
@@ -36,28 +42,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     debug!("args: {args:?}");
 
-    let data_row_major: Vec<f64> = vec![
-        1., 0.0, 1., 7.,
-        3., 0.0, 2., 6.,
-        4., 0.0, 3., 5.,
-        5., 0.0, 4., 4.,
-        2., 0.0, 5., 3.,
-        3., 0.0, 6., 2.,
-        4., 0.0, 7., 1.,
-    ];
-
-    let model = fit_low_level_regression_model(&data_row_major, 7, 4)?;
-    println!("params: {:?}", model.parameters());
-    println!("std_errors: {:?}", model.se());
-    println!("p_values: {:?}", model.p_values());
-    println!("r_squared: {}", model.rsquared());
-    println!("r_squared_adj: {}", model.rsquared_adj());
+    // let data_row_major: Vec<f64> = vec![
+    //     1., 0.0, 1., 7.,
+    //     3., 0.0, 2., 6.,
+    //     4., 0.0, 3., 5.,
+    //     5., 0.0, 4., 4.,
+    //     2., 0.0, 5., 3.,
+    //     3., 0.0, 6., 2.,
+    //     4., 0.0, 7., 1.,
+    // ];
+    //
+    // let model = fit_low_level_regression_model(&data_row_major, 7, 4)?;
+    // println!("params: {:?}", model.parameters());
+    // println!("std_errors: {:?}", model.se());
+    // println!("p_values: {:?}", model.p_values());
+    // println!("r_squared: {}", model.rsquared());
+    // println!("r_squared_adj: {}", model.rsquared_adj());
     // let params = [
     //     0.09523809523809518f64,
     //     0.5059523809523807,
     //     0.2559523809523811,
     // ];
-
 
     // #[derive(Debug, Default)]
     // struct Data {
@@ -76,48 +81,70 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let _header = csv.next().unwrap();
     let records: Vec<_> = csv.collect();
-    let rows = records.len();
-    let cols = 4; // response + regressors (incl. intercept)
-    let mut data = Matrix::allocate(rows, cols);
-    for (row, record) in records.into_iter().enumerate() {
+    let mut data = Matrix::allocate(records.len(), Factor::COUNT);
+    for (record_index, record) in records.into_iter().enumerate() {
         let record = record?;
-        let mut cols = (0..cols).into_iter();
-        data[(row, cols.next().unwrap())] = record[Factor::Weight1].parse::<f64>()?;
-        data[(row, cols.next().unwrap())] = 0.;
-        data[(row, cols.next().unwrap())] = record[Factor::Weight0].parse::<f64>()?;
-        data[(row, cols.next().unwrap())] = record[Factor::Weight2].parse::<f64>()?;
+        for factor in Factor::iter() {
+            let value = record[factor.ordinal()].parse::<f64>()?;
+            data[(record_index, factor.ordinal())] = value;
+        }
     }
 
-    let model = fit_low_level_regression_model(data.flatten(), rows, cols)?;
-    println!("params: {:?}", model.parameters());
-    println!("std_errors: {:?}", model.se());
-    println!("p_values: {:?}", model.p_values());
-    println!("r_squared: {}", model.rsquared());
-    println!("r_squared_adj: {}", model.rsquared_adj());
+    let regressors = vec![
+        Ordinal(Weight0),
+        Exponent(Box::new(Ordinal(Weight0)), 2),
+        Exponent(Box::new(Ordinal(Weight0)), 3),
+        Ordinal(ActiveRunners),
+        Exponent(Box::new(Ordinal(ActiveRunners)), 2),
+        Exponent(Box::new(Ordinal(ActiveRunners)), 3),
+        NilIntercept
+    ];
+    let model = regression::fit(Factor::Weight1, regressors, &data)?;
+    info!("model:\n{:#?}", model);
 
-    let mut ssr = 0.;
-    for row in 0..rows {
-        let weight_1 = data[(row, 0)];
-        let weight_0 = data[(row, 2)];
-        let weight_2 = data[(row, 3)];
-        let predicted = weight_0 * 0.3716956118305484 + weight_2 * 0.652003535928119;
-        let residual = predicted - weight_1;
-        ssr += residual.powi(2);
-    }
-    let mut sum = 0.;
-    for row in 0..rows {
-        let weight_1 = data[(row, 0)];
-        sum += weight_1;
-    }
-    let mean = sum / rows as f64;
-    let mut sst = 0.;
-    for row in 0..rows {
-        let weight_1 = data[(row, 0)];
-        let residual = weight_1 - mean;
-        sst += residual.powi(2);
-    }
-    let r_squared = 1. - ssr / sst;
-    println!("r_squared (alternative): {r_squared}");
+    // let records: Vec<_> = csv.collect();
+    // let rows = records.len();
+    // let cols = 4; // response + regressors (incl. intercept)
+    // let mut data = Matrix::allocate(rows, cols);
+    // for (row, record) in records.into_iter().enumerate() {
+    //     let record = record?;
+    //     let mut cols = (0..cols).into_iter();
+    //     data[(row, cols.next().unwrap())] = record[Factor::Weight1].parse::<f64>()?;
+    //     data[(row, cols.next().unwrap())] = 0.;
+    //     data[(row, cols.next().unwrap())] = record[Factor::Weight0].parse::<f64>()?;
+    //     data[(row, cols.next().unwrap())] = record[Factor::Weight2].parse::<f64>()?;
+    // }
+    //
+    // let model = fit_low_level_regression_model(data.flatten(), rows, cols)?;
+    // println!("params: {:?}", model.parameters());
+    // println!("std_errors: {:?}", model.se());
+    // println!("p_values: {:?}", model.p_values());
+    // println!("r_squared: {}", model.rsquared());
+    // println!("r_squared_adj: {}", model.rsquared_adj());
+    //
+    // let mut ssr = 0.;
+    // for row in 0..rows {
+    //     let weight_1 = data[(row, 0)];
+    //     let weight_0 = data[(row, 2)];
+    //     let weight_2 = data[(row, 3)];
+    //     let predicted = weight_0 * 0.3716956118305484 + weight_2 * 0.652003535928119;
+    //     let residual = predicted - weight_1;
+    //     ssr += residual.powi(2);
+    // }
+    // let mut sum = 0.;
+    // for row in 0..rows {
+    //     let weight_1 = data[(row, 0)];
+    //     sum += weight_1;
+    // }
+    // let mean = sum / rows as f64;
+    // let mut sst = 0.;
+    // for row in 0..rows {
+    //     let weight_1 = data[(row, 0)];
+    //     let residual = weight_1 - mean;
+    //     sst += residual.powi(2);
+    // }
+    // let r_squared = 1. - ssr / sst;
+    // println!("r_squared (alternative): {r_squared}");
 
     // for record in csv {
     //     let record = record?;
@@ -168,7 +195,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("p_values: {p_values:?}");
     // println!("standard_errors: {standard_errors:?}");
     // println!("r_sq: {}", model.rsquared());
-
 
     // println!("residuals: {:?}", model.residuals());
 

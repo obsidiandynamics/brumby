@@ -10,6 +10,7 @@ use strum_macros::{Display, EnumCount, EnumIter};
 use tracing::trace;
 
 use crate::linear::matrix::Matrix;
+use crate::linear::regression::AsIndex;
 
 const PODIUM: usize = 4;
 
@@ -153,7 +154,7 @@ pub async fn download_by_id(id: u64) -> anyhow::Result<EventDetail> {
     Ok(event_detail)
 }
 
-#[derive(Ordinal, EnumCount, EnumIter, Display)]
+#[derive(Debug, Ordinal, EnumCount, EnumIter, Display)]
 pub enum Factor {
     RaceId,
     RunnerIndex,
@@ -169,5 +170,11 @@ pub enum Factor {
 impl From<Factor> for usize {
     fn from(factor: Factor) -> Self {
         factor.ordinal()
+    }
+}
+
+impl AsIndex for Factor {
+    fn as_index(&self) -> usize {
+        self.ordinal()
     }
 }

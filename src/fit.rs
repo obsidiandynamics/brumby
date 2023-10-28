@@ -1,5 +1,6 @@
 use std::ops::{Deref, Range, RangeInclusive};
 use std::time::Duration;
+use strum::EnumCount;
 
 use tokio::time::Instant;
 use tracing::trace;
@@ -13,6 +14,7 @@ use crate::mc::DilatedProbs;
 use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
 use crate::{mc, selection};
+use crate::data::Factor;
 
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
@@ -79,6 +81,7 @@ pub fn fit_place(
 ) -> PlaceFitOutcome {
     let podium_places = dilatives.len();
     let num_runners = win_market.probs.len();
+    let active_runners = win_market.probs.iter().filter(|&&prob| prob != 0.).count() as f64;
     let mut weighted_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&win_market.probs))
         .with_dilatives(Capture::Borrowed(dilatives))
@@ -253,26 +256,34 @@ pub fn fit_place(
     //     stdev_cubed: 0.0,
     // };
 
-    fn linear_sum(cf: &Coefficients, win_prob: f64, num_runners: f64, stdev: f64) -> f64 {
+    fn linear_sum(cf: &Coefficients, win_prob: f64, active_runners: f64, stdev: f64) -> f64 {
         win_prob * cf.win
             + win_prob.powi(2) * cf.win_squared
             + win_prob.powi(3) * cf.win_cubed
-            + num_runners * cf.num_runners
-            + num_runners.powi(2) * cf.num_runners_squared
-            + num_runners.powi(3) * cf.num_runners_cubed
+            + active_runners * cf.num_runners
+            + active_runners.powi(2) * cf.num_runners_squared
+            + active_runners.powi(3) * cf.num_runners_cubed
             + stdev * cf.stdev
             + stdev.powi(2) * cf.stdev_squared
             + stdev.powi(3) * cf.stdev_cubed
     }
 
     let stdev = win_market.probs.stdev();
+    let places_paying = place_rank as f64 + 1.;
+    let mut input = [0.; Factor::COUNT];
     for runner in 0..num_runners {
-        let num_runners = num_runners as f64;
         let win_prob = win_market.probs[runner];
         if win_prob != 0.0 {
-            weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, num_runners, stdev);
-            weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, num_runners, stdev);
-            weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, num_runners, stdev);
+            input[Factor::RunnerIndex.ordinal()] = runner as f64;
+            input[Factor::ActiveRunners.ordinal()] = active_runners;
+            input[Factor::PlacesPaying.ordinal()] = places_paying;
+            input[Factor::Stdev.ordinal()] = stdev;
+            input[Factor::Weight0.ordinal()] = win_prob;
+
+            //TODO
+            weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, active_runners, stdev);
+            weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, active_runners, stdev);
+            weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, active_runners, stdev);
         }
     }
     for rank in 1..podium_places {
