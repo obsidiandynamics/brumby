@@ -89,7 +89,7 @@ mod tests {
     use Regressor::{Exponent, Ordinal, Product};
 
     use crate::linear::regression::Regressor::{Intercept, NilIntercept};
-    use crate::testing::assert_slice_f64_near;
+    use crate::testing::{assert_slice_f64_relative};
 
     use super::*;
 
@@ -181,35 +181,36 @@ mod tests {
             data
         }
         let data = sample_data();
+        const EPSILON: f64 = 1e-15;
         {
             // with intercept
             let model = fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data).unwrap();
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.coefficients,
                 &[0.28813559322033333, 0.7288135593220351],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.std_errors,
                 &[0.9024528482694316, 0.1761407600917501],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.p_values,
                 &[0.7797772260959455, 0.05374447650832757],
-                1,
+                EPSILON,
             );
-            assert_f64_near!(0.895399515738499, model.r_squared);
-            assert_f64_near!(0.8430992736077485, model.r_squared_adj);
+            assert_float_relative_eq!(0.895399515738499, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.8430992736077485, model.r_squared_adj, EPSILON);
         }
         {
             // without intercept
             let model = fit(Factor::Y, vec![NilIntercept, Ordinal(Factor::X)], &data).unwrap();
-            assert_slice_f64_near(&model.coefficients, &[0.0, 0.7809523809523811], 1);
-            assert_slice_f64_near(&model.std_errors, &[0.0, 0.05525998471596577], 1);
-            assert_slice_f64_near(&model.p_values, &[1.0, 0.0007674606469419348], 1);
-            assert_f64_near!(0.8900680272108843, model.r_squared);
-            assert_f64_near!(0.8900680272108843, model.r_squared_adj);
+            assert_slice_f64_relative(&model.coefficients, &[0.0, 0.7809523809523811], EPSILON);
+            assert_slice_f64_relative(&model.std_errors, &[0.0, 0.05525998471596577], EPSILON);
+            assert_slice_f64_relative(&model.p_values, &[1.0, 0.0007674606469419348], EPSILON);
+            assert_float_relative_eq!(0.8900680272108843, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.8900680272108843, model.r_squared_adj, EPSILON);
         }
         {
             // with square term
@@ -223,23 +224,23 @@ mod tests {
                 &data,
             )
             .unwrap();
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.coefficients,
                 &[2.6281407035175928, -0.5552763819095485, 0.14321608040201017],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.std_errors,
                 &[2.0551227965369234, 1.0499867426753304, 0.11579616705329593],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.p_values,
                 &[0.422492016413063, 0.6903140400788879, 0.43285536174646816],
-                1,
+                EPSILON,
             );
-            assert_f64_near!(0.9586503948312993, model.r_squared);
-            assert_f64_near!(0.875951184493898, model.r_squared_adj);
+            assert_float_relative_eq!(0.9586503948312993, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.875951184493898, model.r_squared_adj, EPSILON);
         }
         {
             // with multiple distinct regressors
@@ -249,23 +250,23 @@ mod tests {
                 &data,
             )
             .unwrap();
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.coefficients,
                 &[17.60526315789471, -0.631578947368419, -6.578947368421037],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.std_errors,
                 &[5.333802206998271, 0.4243293551736085, 2.0213541441759535],
-                1,
+                EPSILON,
             );
-            assert_slice_f64_near(
+            assert_slice_f64_relative(
                 &model.p_values,
                 &[0.18727824790649023, 0.37661521814453486, 0.1897706353451349],
-                1,
+                EPSILON,
             );
-            assert_f64_near!(0.9909774436090225, model.r_squared);
-            assert_f64_near!(0.9729323308270675, model.r_squared_adj);
+            assert_float_relative_eq!(0.9909774436090225, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.9729323308270675, model.r_squared_adj, EPSILON);
         }
         {
             // with interaction term and zero intercept
@@ -278,11 +279,11 @@ mod tests {
                 &data,
             )
             .unwrap();
-            assert_slice_f64_near(&model.coefficients, &[0.0, 0.5324128800416095], 1);
-            assert_slice_f64_near(&model.std_errors, &[0.0, 0.08921820060416732], 1);
-            assert_slice_f64_near(&model.p_values, &[1.0, 0.00941534405942245], 1);
-            assert_f64_near!(0.42282174773545533, model.r_squared);
-            assert_f64_near!(0.42282174773545533, model.r_squared_adj);
+            assert_slice_f64_relative(&model.coefficients, &[0.0, 0.5324128800416095], EPSILON);
+            assert_slice_f64_relative(&model.std_errors, &[0.0, 0.08921820060416732], EPSILON);
+            assert_slice_f64_relative(&model.p_values, &[1.0, 0.00941534405942245], EPSILON);
+            assert_float_relative_eq!(0.42282174773545533, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.42282174773545533, model.r_squared_adj, EPSILON);
         }
     }
 }
