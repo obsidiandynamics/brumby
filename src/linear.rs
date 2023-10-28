@@ -98,22 +98,6 @@ impl<T> Matrix<T> {
     }
 }
 
-// impl<T: Debug> Debug for Matrix<T> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         let alternate = f.alternate();
-//         let mut d = f.debug_struct("Matrix");
-//         d.field("rows", &self.rows);
-//         d.field("cols", &self.cols);
-//         if alternate {
-//             let pretty = format!("{}", self.verbose());
-//             d.field("data", &pretty);
-//         } else {
-//             d.field("data", &self.data);
-//         }
-//         d.finish()
-//     }
-// }
-
 impl<T> Display for Matrix<T> where T: Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.rows {
@@ -154,6 +138,20 @@ impl<T> IndexMut<(usize, usize)> for Matrix<T> {
         debug_assert!(self.validate_row_index(row));
         debug_assert!(self.validate_col_index(col));
         &mut self.data[row * self.cols + col]
+    }
+}
+
+impl<T> Index<usize> for Matrix<T> {
+    type Output = [T];
+
+    fn index(&self, row: usize) -> &Self::Output {
+        self.row_slice(row)
+    }
+}
+
+impl<T> IndexMut<usize> for Matrix<T> {
+    fn index_mut(&mut self, row: usize) -> &mut Self::Output {
+        self.row_slice_mut(row)
     }
 }
 
@@ -214,11 +212,11 @@ mod tests {
     fn row_slice() {
         let mut matrix = Matrix::allocate(3, 2);
         populate_with_test_data(&mut matrix);
-        assert_eq!(&[0.0, 10.0], matrix.row_slice(0));
+        assert_eq!(&[0.0, 10.0], &matrix[0]); // index access
         assert_eq!(&[20.0, 30.0], matrix.row_slice(1));
         assert_eq!(&[40.0, 50.0], matrix.row_slice(2));
 
-        matrix.row_slice_mut(1)[1] = 300.0;
+        matrix[1][1] = 300.0; // index access
         assert_eq!(&[20.0, 300.0], matrix.row_slice(1));
     }
 

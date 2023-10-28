@@ -19,6 +19,9 @@ pub trait SliceExt {
     fn mean(&self) -> f64;
     fn variance(&self) -> f64;
     fn stdev(&self) -> f64;
+
+    /// Total sum of squares.
+    fn sst(&self) -> f64;
 }
 impl SliceExt for [f64] {
     fn sum(&self) -> f64 {
@@ -139,6 +142,11 @@ impl SliceExt for [f64] {
     fn stdev(&self) -> f64 {
         self.variance().sqrt()
     }
+
+    fn sst(&self) -> f64 {
+        let mean = self.mean();
+        self.iter().map(|value| (mean - value).powi(2)).sum()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -245,5 +253,12 @@ mod tests {
         let mut data = [0.1, 0.2, 0.3, 0.4];
         data.dilate_power(-0.2);
         assert_slice_f64_relative(&[0.0812, 0.1866, 0.3035, 0.4287], &data, 0.0005);
+    }
+
+    #[test]
+    fn sst() {
+        let data = [0.1, 0.2, 0.3, 0.4];
+        // expect sst = (.1-.25)^2+(.2-.25)^2+(.3-.25)^2+(.4-.25)^2
+        assert_f64_near!(0.05, data.sst());
     }
 }

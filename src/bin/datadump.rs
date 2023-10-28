@@ -5,9 +5,11 @@ use std::time::Instant;
 use anyhow::anyhow;
 use clap::Parser;
 use racing_scraper::models::EventType;
+use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 use bentobox::{data, fit};
-use bentobox::data::{CsvFile, EventDetailExt, PredicateClosures};
+use bentobox::csv::{CsvWriter, Record};
+use bentobox::data::{EventDetailExt, Factor, PredicateClosures};
 use bentobox::fit::FitOptions;
 use bentobox::market::{Market, OverroundMethod};
 use bentobox::probs::SliceExt;
@@ -50,8 +52,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     debug!("args: {args:?}");
 
     let start_time = Instant::now();
-    let mut csv = CsvFile::create(args.out.unwrap())?;
-    csv.append(vec!["race_id", "runner_index", "runners", "places_paying", "stdev", "weight_0", "weight_1", "weight_2", "weight_3"])?;
+    let mut csv = CsvWriter::create(args.out.unwrap())?;
+    csv.append(Record::with_values(Factor::iter()))?;
 
     let mut predicates = vec![];
     predicates.push(data::Predicate::Type { race_type: EventType::Thoroughbred });
@@ -73,18 +75,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         debug!("individual fitting complete: stats: {:?}, probs: \n{}", fit_outcome.stats, fit_outcome.fitted_probs.verbose());
 
         let num_runners = markets[0].probs.len();
+        let active_runners = markets[0].probs.iter().filter(|&&prob| prob != 0.).count();
         let stdev = markets[0].probs.stdev();
         for runner in 0..num_runners {
             if markets[0].probs[runner] != 0.0 {
-                let mut record = vec![];
-                record.push(race.id.to_string());
-                record.push(runner.to_string());
-                record.push(num_runners.to_string());
-                record.push(race.places_paying.to_string());
-                record.push(stdev.to_string());
-                for rank in 0..podium_places {
-                    record.push(fit_outcome.fitted_probs[(rank, runner)].to_string());
-                }
+                let mut record = Record::with_capacity(Factor::COUNT);
+                record.set(Factor::RaceId, race.id);
+                record.set(Factor::RunnerIndex, runner);
+                record.set(Factor::ActiveRunners, active_runners);
+                record.set(Factor::PlacesPaying, race.places_paying);
+                record.set(Factor::Stdev, stdev);
+                record.set(Factor::Weight0, fit_outcome.fitted_probs[(0, runner)]);
+                record.set(Factor::Weight1, fit_outcome.fitted_probs[(1, runner)]);
+                record.set(Factor::Weight2, fit_outcome.fitted_probs[(2, runner)]);
+                record.set(Factor::Weight3, fit_outcome.fitted_probs[(3, runner)]);
                 debug!("{record:?}");
                 csv.append(record)?;
                 csv.flush()?;

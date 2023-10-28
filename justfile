@@ -5,9 +5,13 @@ _help:
 prices *ARGS:
     cargo run --release --bin prices -- {{ARGS}}
 
-# dump a dataset containing fitted weights to a CSV file
-dump *ARGS:
-    cargo run --release --bin dump -- {{ARGS}}
+# dump a dataset containing the fitted weights and various race parameters to a CSV file
+datadump *ARGS:
+    cargo run --release --bin datadump -- {{ARGS}}
+
+# backfit a linear regression model from a given dataset
+backfit *ARGS:
+    cargo run --release --bin backfit -- {{ARGS}}
 
 # run the multi example
 multi:
