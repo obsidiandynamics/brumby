@@ -3,7 +3,7 @@ use stanza::renderer::Renderer;
 
 use brumby::{market, mc};
 use brumby::display::DisplaySlice;
-use brumby::matrix::Matrix;
+use brumby::linear::matrix::Matrix;
 use brumby::mc::DilatedProbs;
 use brumby::print::{DerivedPrice, tabulate_derived_prices};
 use brumby::probs::SliceExt;

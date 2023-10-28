@@ -28,6 +28,7 @@ linregress = "0.5.3"
 ordinalizer = "0.1.0"
 strum = "0.25.0"
 strum_macros = "0.25.3"
+serde = { version = "1.0.189", features = ["derive"] }
 
 [dev-dependencies]
 assert_float_eq = "1.1.3"

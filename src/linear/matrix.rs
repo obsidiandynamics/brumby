@@ -1,4 +1,4 @@
-//! Support for linear algebra.
+//! Matrix data structure.
 
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
@@ -155,13 +155,35 @@ impl<T> IndexMut<usize> for Matrix<T> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Regressor<O> {
-    Ordinal(O),
-    Exponent(Box<Regressor<O>>, i32),
-    Product(Vec<Regressor<O>>),
-    Intercept,
-    NilIntercept
+impl<'a, T> IntoIterator for &'a Matrix<T> {
+    type Item = &'a [T];
+    type IntoIter = MatrixIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            matrix: self,
+            row: 0,
+        }
+    }
+}
+
+pub struct MatrixIter<'a, T> {
+    matrix: &'a Matrix<T>,
+    row: usize,
+}
+
+impl<'a, T> Iterator for MatrixIter<'a, T> {
+    type Item = &'a [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.row < self.matrix.rows {
+            let next = Some(&self.matrix[self.row]);
+            self.row += 1;
+            next
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -179,7 +201,8 @@ pub(crate) mod matrix_fixtures {
 
 #[cfg(test)]
 mod tests {
-    use crate::matrix::matrix_fixtures::populate_with_test_data;
+    use crate::linear::matrix::matrix_fixtures::populate_with_test_data;
+
     use super::*;
 
     #[test]
@@ -281,5 +304,16 @@ mod tests {
         let flattened = matrix.flatten_mut();
         flattened[3] = 400.0;
         assert_eq!(400.0, matrix[(1, 1)]);
+    }
+
+    #[test]
+    fn iterator() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        let mut iter = matrix.into_iter();
+        assert_eq!(Some(&matrix[0]), iter.next());
+        assert_eq!(Some(&matrix[1]), iter.next());
+        assert_eq!(Some(&matrix[2]), iter.next());
+        assert_eq!(None, iter.next());
     }
 }

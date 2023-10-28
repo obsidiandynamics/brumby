@@ -9,7 +9,7 @@ use tracing::debug;
 
 use brumby::csv::CsvReader;
 use brumby::data::Factor;
-use brumby::matrix::Matrix;
+use brumby::linear::matrix::Matrix;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -36,18 +36,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     debug!("args: {args:?}");
 
-    // let data_row_major: Vec<f64> = vec![
-    //     1., 1.0, 1., 7.,
-    //     3., 1.0, 2., 6.,
-    //     4., 1.0, 3., 5.,
-    //     5., 1.0, 4., 4.,
-    //     2., 1.0, 5., 3.,
-    //     3., 1.0, 6., 2.,
-    //     4., 1.0, 7., 1.,
-    // ];
-    //
-    // let model = fit_low_level_regression_model(&data_row_major, 7, 4)?;
-    // println!("ll params: {:?}", model.parameters());
+    let data_row_major: Vec<f64> = vec![
+        1., 0.0, 1., 7.,
+        3., 0.0, 2., 6.,
+        4., 0.0, 3., 5.,
+        5., 0.0, 4., 4.,
+        2., 0.0, 5., 3.,
+        3., 0.0, 6., 2.,
+        4., 0.0, 7., 1.,
+    ];
+
+    let model = fit_low_level_regression_model(&data_row_major, 7, 4)?;
+    println!("params: {:?}", model.parameters());
+    println!("std_errors: {:?}", model.se());
+    println!("p_values: {:?}", model.p_values());
+    println!("r_squared: {}", model.rsquared());
+    println!("r_squared_adj: {}", model.rsquared_adj());
     // let params = [
     //     0.09523809523809518f64,
     //     0.5059523809523807,

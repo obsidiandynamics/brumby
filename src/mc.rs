@@ -1,7 +1,7 @@
 //! The core of the Monte Carlo simulator.
 
 use crate::capture::{Capture, CaptureMut};
-use crate::matrix::Matrix;
+use crate::linear::matrix::Matrix;
 use crate::probs::{Fraction, SliceExt};
 use crate::selection::{Selection, Selections};
 use std::ops::DerefMut;
