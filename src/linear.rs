@@ -155,6 +155,15 @@ impl<T> IndexMut<usize> for Matrix<T> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Regressor<O> {
+    Ordinal(O),
+    Exponent(Box<Regressor<O>>, i32),
+    Product(Vec<Regressor<O>>),
+    Intercept,
+    NilIntercept
+}
+
 #[cfg(test)]
 pub(crate) mod matrix_fixtures {
     use super::*;

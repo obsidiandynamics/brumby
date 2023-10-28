@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let _header = csv.next().unwrap();
     let records: Vec<_> = csv.collect();
     let rows = records.len();
-    let cols = 4; // predicted + predictors (incl. intercept)
+    let cols = 4; // response + regressors (incl. intercept)
     let mut data = Matrix::allocate(rows, cols);
     for (row, record) in records.into_iter().enumerate() {
         let record = record?;
