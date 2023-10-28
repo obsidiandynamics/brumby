@@ -84,160 +84,200 @@ pub fn fit_place(
         .with_dilatives(Capture::Borrowed(dilatives))
         .into();
 
-    // if place_rank == 2 {
-        struct Coefficients {
-            win: f64,
-            win_squared: f64,
-            win_cubed: f64,
-            num_runners: f64,
-            num_runners_squared: f64,
-            num_runners_cubed: f64,
-            stdev: f64,
-            stdev_squared: f64,
-            stdev_cubed: f64,
-        }
-        // let cf_1 = Coefficients {
-        //     win: 1.594e+00,
-        //     win_squared: -3.831e+00,
-        //     win_cubed: 3.821e+00,
-        //     num_runners: 3.829e-04,
-        //     stdev: -1.048e+00,
-        //     stdev_squared: 1.404e+01,
-        //     stdev_cubed: -4.393e+01,
-        // };
-        // let cf_1 = Coefficients {
-        //     win: 1.342647,
-        //     win_squared: -2.567398,
-        //     win_cubed: 2.221628,
-        //     num_runners: 0.0,
-        //     stdev: 0.040785,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        // let cf_1 = Coefficients {
-        //     win: 1.42531,
-        //     win_squared: -3.03113,
-        //     win_cubed: 2.92645,
-        //     num_runners: 0.0,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        let cf_1 = Coefficients {
-            win: 1.490e+00,
-            win_squared: -3.358e+00,
-            win_cubed: 3.394e+00,
-            num_runners: -2.079e-04,
-            num_runners_squared: 0.0,
-            num_runners_cubed: 0.0,
-            stdev: 0.0,
-            stdev_squared: 0.0,
-            stdev_cubed: 0.0,
-        };
-        // let cf_2 = Coefficients {
-        //     win: 1.377e+00,
-        //     win_squared: -3.988e+00,
-        //     win_cubed: 4.381e+00,
-        //     num_runners: 1.081e-03,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        // let cf_2 = Coefficients {
-        //     win: 1.71677,
-        //     win_squared: -5.88577,
-        //     win_cubed: 7.20190,
-        //     num_runners: 0.0,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        // let cf_2 = Coefficients {
-        //     win: 1.406e+00,
-        //     win_squared: -4.080e+00,
-        //     win_cubed: 4.506e+00,
-        //     num_runners: 9.996e-04,
-        //     num_runners_squared: 0.0,
-        //     num_runners_cubed: 0.0,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        let cf_2 = Coefficients {
-            win: 1.273e+00,
-            win_squared: -3.425e+00,
-            win_cubed: 3.621e+00,
-            num_runners: 8.103e-03,
-            num_runners_squared: -8.194e-04,
-            num_runners_cubed: 2.372e-05,
-            stdev: 0.0,
-            stdev_squared: 0.0,
-            stdev_cubed: 0.0,
-        };
-        // let cf_3 = Coefficients {
-        //     win: 1.3689085,
-        //     win_squared: -4.5581003,
-        //     win_cubed: 4.9730957,
-        //     num_runners: -0.0004909,
-        //     stdev: 0.2647938,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 8.0392854,
-        // };
-        // let cf_3 = Coefficients {
-        //     win: 1.89903,
-        //     win_squared: -7.58522,
-        //     win_cubed: 9.70426,
-        //     num_runners: 0.0,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        // let cf_3 = Coefficients {
-        //     win: 1.448e+00,
-        //     win_squared: -4.982e+00,
-        //     win_cubed: 5.813e+00,
-        //     num_runners: 1.459e-03,
-        //     num_runners_squared: 0.0,
-        //     num_runners_cubed: 0.0,
-        //     stdev: 0.0,
-        //     stdev_squared: 0.0,
-        //     stdev_cubed: 0.0,
-        // };
-        let cf_3 = Coefficients {
-            win: 1.254e+00,
-            win_squared: -4.023e+00,
-            win_cubed: 4.514e+00,
-            num_runners: 1.145e-02,
-            num_runners_squared: -1.139e-03,
-            num_runners_cubed: 3.254e-05,
-            stdev: 0.0,
-            stdev_squared: 0.0,
-            stdev_cubed: 0.0,
-        };
+    struct Coefficients {
+        win: f64,
+        win_squared: f64,
+        win_cubed: f64,
+        num_runners: f64,
+        num_runners_squared: f64,
+        num_runners_cubed: f64,
+        stdev: f64,
+        stdev_squared: f64,
+        stdev_cubed: f64,
+    }
+    // let cf_1 = Coefficients {
+    //     win: 1.594e+00,
+    //     win_squared: -3.831e+00,
+    //     win_cubed: 3.821e+00,
+    //     num_runners: 3.829e-04,
+    //     stdev: -1.048e+00,
+    //     stdev_squared: 1.404e+01,
+    //     stdev_cubed: -4.393e+01,
+    // };
+    // let cf_1 = Coefficients {
+    //     win: 1.342647,
+    //     win_squared: -2.567398,
+    //     win_cubed: 2.221628,
+    //     num_runners: 0.0,
+    //     stdev: 0.040785,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_1 = Coefficients {
+    //     win: 1.42531,
+    //     win_squared: -3.03113,
+    //     win_cubed: 2.92645,
+    //     num_runners: 0.0,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    let cf_1 = Coefficients {
+        win: 1.490e+00,
+        win_squared: -3.358e+00,
+        win_cubed: 3.394e+00,
+        num_runners: -2.079e-04,
+        num_runners_squared: 0.0,
+        num_runners_cubed: 0.0,
+        stdev: 0.0,
+        stdev_squared: 0.0,
+        stdev_cubed: 0.0,
+    };
+    // let cf_1 = Coefficients {
+    //     win: 1.529e+00,
+    //     win_squared: -3.706e+00,
+    //     win_cubed: 3.645e+00,
+    //     num_runners: 3.723e-03,
+    //     num_runners_squared: -5.394e-04,
+    //     num_runners_cubed: 1.864e-05,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_2 = Coefficients {
+    //     win: 1.377e+00,
+    //     win_squared: -3.988e+00,
+    //     win_cubed: 4.381e+00,
+    //     num_runners: 1.081e-03,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_2 = Coefficients {
+    //     win: 1.7140,
+    //     win_squared: -5.8031,
+    //     win_cubed: 7.0702,
+    //     num_runners: 0.0,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_2 = Coefficients {
+    //     win: 1.406e+00,
+    //     win_squared: -4.080e+00,
+    //     win_cubed: 4.506e+00,
+    //     num_runners: 9.996e-04,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    let cf_2 = Coefficients {
+        win: 1.273e+00,
+        win_squared: -3.425e+00,
+        win_cubed: 3.621e+00,
+        num_runners: 8.103e-03,
+        num_runners_squared: -8.194e-04,
+        num_runners_cubed: 2.372e-05,
+        stdev: 0.0,
+        stdev_squared: 0.0,
+        stdev_cubed: 0.0,
+    };
+    // let cf_2 = Coefficients {
+    //     win: 1.258e+00,
+    //     win_squared: -3.455e+00,
+    //     win_cubed: 3.630e+00,
+    //     num_runners: 1.355e-02,
+    //     num_runners_squared: -1.529e-03,
+    //     num_runners_cubed: 4.703e-05,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_3 = Coefficients {
+    //     win: 1.3689085,
+    //     win_squared: -4.5581003,
+    //     win_cubed: 4.9730957,
+    //     num_runners: -0.0004909,
+    //     stdev: 0.2647938,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 8.0392854,
+    // };
+    // let cf_3 = Coefficients {
+    //     win: 1.89903,
+    //     win_squared: -7.58522,
+    //     win_cubed: 9.70426,
+    //     num_runners: 0.0,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    // let cf_3 = Coefficients {
+    //     win: 1.448e+00,
+    //     win_squared: -4.982e+00,
+    //     win_cubed: 5.813e+00,
+    //     num_runners: 1.459e-03,
+    //     num_runners_squared: 0.0,
+    //     num_runners_cubed: 0.0,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
+    let cf_3 = Coefficients {
+        win: 1.254e+00,
+        win_squared: -4.023e+00,
+        win_cubed: 4.514e+00,
+        num_runners: 1.145e-02,
+        num_runners_squared: -1.139e-03,
+        num_runners_cubed: 3.254e-05,
+        stdev: 0.0,
+        stdev_squared: 0.0,
+        stdev_cubed: 0.0,
+    };
+    // let cf_3 = Coefficients {
+    //     win: 1.205e+00,
+    //     win_squared: -3.889e+00 ,
+    //     win_cubed: 4.346e+00,
+    //     num_runners: 1.840e-02,
+    //     num_runners_squared: -2.037e-03,
+    //     num_runners_cubed: 6.192e-05,
+    //     stdev: 0.0,
+    //     stdev_squared: 0.0,
+    //     stdev_cubed: 0.0,
+    // };
 
-        fn linear_sum(cf: &Coefficients, win_prob: f64, num_runners: f64, stdev: f64) -> f64 {
-            win_prob * cf.win
-                + win_prob.powi(2) * cf.win_squared
-                + win_prob.powi(3) * cf.win_cubed
-                + num_runners * cf.num_runners
-                + num_runners.powi(2) * cf.num_runners_squared
-                + num_runners.powi(3) * cf.num_runners_cubed
-                + stdev * cf.stdev
-                + stdev.powi(2) * cf.stdev_squared
-                + stdev.powi(3) * cf.stdev_cubed
-        }
+    fn linear_sum(cf: &Coefficients, win_prob: f64, num_runners: f64, stdev: f64) -> f64 {
+        win_prob * cf.win
+            + win_prob.powi(2) * cf.win_squared
+            + win_prob.powi(3) * cf.win_cubed
+            + num_runners * cf.num_runners
+            + num_runners.powi(2) * cf.num_runners_squared
+            + num_runners.powi(3) * cf.num_runners_cubed
+            + stdev * cf.stdev
+            + stdev.powi(2) * cf.stdev_squared
+            + stdev.powi(3) * cf.stdev_cubed
+    }
 
-        let stdev = win_market.probs.stdev();
-        for runner in 0..num_runners {
-            let num_runners = num_runners as f64;
-            let win_prob = win_market.probs[runner];
-            if win_prob != 0.0 {
-                weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, num_runners, stdev);
-                weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, num_runners, stdev);
-                weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, num_runners, stdev);
-            }
+    let stdev = win_market.probs.stdev();
+    for runner in 0..num_runners {
+        let num_runners = num_runners as f64;
+        let win_prob = win_market.probs[runner];
+        if win_prob != 0.0 {
+            weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, num_runners, stdev);
+            weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, num_runners, stdev);
+            weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, num_runners, stdev);
         }
-    // }
+    }
+    for rank in 1..podium_places {
+        weighted_probs.row_slice_mut(rank).normalise(1.0);
+    }
 
     let scenarios = selection::top_n_matrix(podium_places, num_runners);
     let outcome = fit_individual(

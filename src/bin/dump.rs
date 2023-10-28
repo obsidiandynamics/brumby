@@ -1,6 +1,7 @@
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
+use std::time::Instant;
 use anyhow::anyhow;
 use clap::Parser;
 use racing_scraper::models::EventType;
@@ -48,8 +49,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     debug!("args: {args:?}");
 
+    let start_time = Instant::now();
     let mut csv = CsvFile::create(args.out.unwrap())?;
-    csv.append(vec!["race_id", "runner_index", "num_runners", "places_paying", "stdev", "weight_0", "weight_1", "weight_2", "weight_3"])?;
+    csv.append(vec!["race_id", "runner_index", "runners", "places_paying", "stdev", "weight_0", "weight_1", "weight_2", "weight_3"])?;
 
     let mut predicates = vec![];
     predicates.push(data::Predicate::Type { race_type: EventType::Thoroughbred });
@@ -74,7 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let stdev = markets[0].probs.stdev();
         for runner in 0..num_runners {
             if markets[0].probs[runner] != 0.0 {
-                let mut record: Vec<String> = vec![];
+                let mut record = vec![];
                 record.push(race.id.to_string());
                 record.push(runner.to_string());
                 record.push(num_runners.to_string());
@@ -89,7 +91,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    info!("fitted {} races", races.len());
+    let elapsed_time = start_time.elapsed();
+    info!("fitted {} races in {}s", races.len(), elapsed_time.as_millis() as f64 / 1_000.);
 
     Ok(())
 }

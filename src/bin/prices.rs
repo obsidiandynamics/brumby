@@ -89,8 +89,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // };
     let outcome = GradientDescentOutcome {
         iterations: 0,
-        optimal_residual: 0.0,
-        optimal_value: 0.0,
+        optimal_residual: 0.,
+        optimal_value: 0.,
     };
     // println!(
     //     "gradient descent outcome: {outcome:?}, RMSRE: {}",
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // );
 
     let dilatives = vec![
-        0.0,
+        0.,
         outcome.optimal_value,
         outcome.optimal_value,
         outcome.optimal_value,
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
         let prices = race.prices.row_slice(rank).to_vec();
-        Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
+        Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
     }).collect();
 
     let fit_outcome = fit::fit_place(FitOptions {
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fit_outcome.stats.optimal_msre,
         fit_outcome.stats.optimal_msre.sqrt(),
         fit_outcome.stats.steps,
-        fit_outcome.stats.time.as_millis() as f64 / 1_000.00
+        fit_outcome.stats.time.as_millis() as f64 / 1_000.
     );
     // let fit_outcome = fit::fit_all(FitOptions {
     //     mc_iterations: MC_ITERATIONS_TRAIN,
@@ -222,7 +222,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(selections) = args.selections {
         let start_time = Instant::now();
         // let overround = win_overround.powi(selections.len() as i32);
-        let mut overround = 1.0;
+        let mut overround = 1.;
         for selection in &*selections {
             let (runner, rank) = match selection {
                 Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
@@ -243,7 +243,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 overround
             )
         );
-        debug!("price generation took {:.3}s", elapsed_time.as_millis() as f64 / 1_000.00);
+        debug!("price generation took {:.3}s", elapsed_time.as_millis() as f64 / 1_000.);
     }
     Ok(())
 }
