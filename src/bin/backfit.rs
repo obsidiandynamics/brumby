@@ -1,17 +1,16 @@
-use std::borrow::Cow;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
+
 use anyhow::anyhow;
 use clap::Parser;
-use linregress::{fit_low_level_regression_model, FormulaRegressionBuilder, RegressionDataBuilder};
-use strum::{EnumCount, IntoEnumIterator};
+use linregress::fit_low_level_regression_model;
+use strum::IntoEnumIterator;
 use tracing::debug;
+
 use bentobox::csv::CsvReader;
 use bentobox::data::Factor;
-use bentobox::data::Factor::Weight0;
 use bentobox::linear::Matrix;
-use bentobox::probs::SliceExt;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -80,10 +79,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (row, record) in records.into_iter().enumerate() {
         let record = record?;
         let mut cols = (0..cols).into_iter();
-        data[(row, cols.next().unwrap())] = record[Factor::Weight1.ordinal()].parse::<f64>()?;
+        data[(row, cols.next().unwrap())] = record[Factor::Weight1].parse::<f64>()?;
         data[(row, cols.next().unwrap())] = 0.;
-        data[(row, cols.next().unwrap())] = record[Factor::Weight0.ordinal()].parse::<f64>()?;
-        data[(row, cols.next().unwrap())] = record[Factor::Weight2.ordinal()].parse::<f64>()?;
+        data[(row, cols.next().unwrap())] = record[Factor::Weight0].parse::<f64>()?;
+        data[(row, cols.next().unwrap())] = record[Factor::Weight2].parse::<f64>()?;
     }
 
     let model = fit_low_level_regression_model(data.flatten(), rows, cols)?;

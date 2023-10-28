@@ -51,15 +51,19 @@ impl CsvReader {
         Ok(Self { lines })
     }
 
-    pub fn read(&mut self) -> Option<Result<Vec<String>, io::Error>> {
+    pub fn read(&mut self) -> Option<Result<Record, io::Error>> {
         self.lines
             .next()
-            .map(|line| line.map(|line| line.split(',').map(ToString::to_string).collect()))
+            .map(|line| {
+                line.map(|line| {
+                    Record::with_values(line.split(',').collect::<Vec<_>>())
+                })
+            })
     }
 }
 
 impl Iterator for CsvReader {
-    type Item = Result<Vec<String>, io::Error>;
+    type Item = Result<Record, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.read()
@@ -91,6 +95,10 @@ impl Record {
 
     pub fn set(&mut self, ordinal: impl Into<usize>, value: impl ToString) {
         self.items[ordinal.into()] = Cow::Owned(value.to_string())
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
     }
 }
 
