@@ -32,10 +32,10 @@ pub struct Market {
     pub overround: Overround
 }
 impl Market {
-    pub fn fit(method: OverroundMethod, prices: Vec<f64>, norm_sum: f64) -> Self {
+    pub fn fit(method: OverroundMethod, prices: Vec<f64>, fair_sum: f64) -> Self {
         match method {
-            OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, norm_sum),
-            OverroundMethod::Power => Self::fit_power(prices, norm_sum),
+            OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, fair_sum),
+            OverroundMethod::Power => Self::fit_power(prices, fair_sum),
         }
     }
 
@@ -46,9 +46,9 @@ impl Market {
         }
     }
 
-    fn fit_multiplicative(prices: Vec<f64>, norm_sum: f64) -> Self {
+    fn fit_multiplicative(prices: Vec<f64>, fair_sum: f64) -> Self {
         let mut probs: Vec<_> = prices.invert().collect();
-        let overround  = probs.normalise(norm_sum) / norm_sum;
+        let overround  = probs.normalise(fair_sum) / fair_sum;
         Self {
             probs,
             prices,
@@ -59,13 +59,12 @@ impl Market {
         }
     }
 
-    fn fit_power(prices: Vec<f64>, norm_sum: f64) -> Market {
+    fn fit_power(prices: Vec<f64>, fair_sum: f64) -> Market {
         let prob_sum = prices.sum();
-        let rtp = 1.0 / norm_sum / prob_sum;
+        let rtp = 1.0 / fair_sum / prob_sum;
         let initial_k = 1.0 + f64::ln(rtp) / f64::ln(prices.len() as f64);
         todo!()
     }
-
 
     fn frame_multiplicative(probs: Vec<f64>, overround: f64) -> Self {
         let prices: Vec<_> = probs.iter().map(|prob| apply_with_cap(1.0 / prob, overround)).collect();
@@ -81,6 +80,7 @@ impl Market {
 
     fn frame_power(probs: Vec<f64>, overround: f64) -> Market {
         let rtp = 1.0 / overround;
+        let fair_sum = probs.sum();
         let initial_k = 1.0 + f64::ln(rtp) / f64::ln(probs.len() as f64);
         let outcome = opt::gd(GradientDescentConfig {
             init_value: initial_k,
@@ -91,14 +91,14 @@ impl Market {
         }, |exponent| {
             let mut sum = 0.0;
             for &prob in &probs {
-                let price = prob.powf(-exponent);
+                let price = (prob / fair_sum).powf(-exponent);
                 sum += 1.0 / price;
             }
 
             (sum - overround).powi(2)
         });
         println!("gd outcome: {outcome:?}");
-        let prices: Vec<_> = probs.iter().map(|prob| prob.powf(-outcome.optimal_value)).collect();
+        let prices: Vec<_> = probs.iter().map(|prob| (prob / fair_sum).powf(-outcome.optimal_value) / fair_sum).collect();
         Self {
             probs,
             prices,
@@ -170,11 +170,12 @@ mod tests {
             println!("market: {:?}", market);
             assert_slice_f64_relative(&[8.4319, 4.4381, 3.0489, 2.3359], &market.prices, 0.001);
         }
-        // {
-        //     let probs = vec![0.2, 0.4, 0.6, 0.8];
-        //     let market = Market::frame(OverroundMethod::Multiplicative, probs, 1.1);
-        //     assert_slice_f64_relative(&[4.5454, 2.2727, 1.5152, 1.1364], &market.prices, 0.001);
-        // }
+        {
+            let probs = vec![0.2, 0.4, 0.6, 0.8];
+            let market = Market::frame(OverroundMethod::Power, probs, 1.1);
+            println!("market: {:?}", market);
+            assert_slice_f64_relative(&[4.2159, 2.219, 1.5244, 1.168], &market.prices, 0.001);
+        }
     }
 }
 
