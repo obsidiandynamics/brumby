@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::ops::RangeInclusive;
 
 pub struct DisplaySlice<'a, D: Display> {
     items: &'a [D]
@@ -21,6 +22,22 @@ impl<'a, D: Display> Display for DisplaySlice<'a, D> where D: Display {
 impl<'a, D: Display> From<&'a [D]> for DisplaySlice<'a, D> {
     fn from(items: &'a [D]) -> Self {
         DisplaySlice { items }
+    }
+}
+
+pub struct DisplayRangeInclusive<'a, D: Display> {
+    range: &'a RangeInclusive<D>
+}
+
+impl<'a, D: Display> From<&'a RangeInclusive<D>> for DisplayRangeInclusive<'a, D> {
+    fn from(range: &'a RangeInclusive<D>) -> Self {
+        DisplayRangeInclusive { range }
+    }
+}
+
+impl<'a, D: Display> Display for DisplayRangeInclusive<'a, D> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.range.start(), self.range.end())
     }
 }
 

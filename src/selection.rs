@@ -8,12 +8,19 @@ use std::str::FromStr;
 use anyhow::{bail, Context};
 
 use crate::capture::Capture;
+use crate::display::{DisplayRangeInclusive, DisplaySlice};
 use crate::linear::matrix::Matrix;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Selection {
-    Span { runner: Runner, ranks: RangeInclusive<Rank> },
-    Exact { runner: Runner, rank: Rank },
+    Span {
+        runner: Runner,
+        ranks: RangeInclusive<Rank>,
+    },
+    Exact {
+        runner: Runner,
+        rank: Rank,
+    },
 }
 impl Selection {
     #[inline(always)]
@@ -27,13 +34,17 @@ impl Selection {
                 podium[start..=end]
                     .iter()
                     .any(|ranked_runner| ranked_runner == runner)
-            },
+            }
             Selection::Exact { runner, rank } => podium[rank.as_index()] == runner.as_index(),
         }
     }
 
-    pub fn validate(&self, allowed_ranks: RangeInclusive<usize>, probs: &[f64]) -> Result<(), anyhow::Error> {
-        let validate_runner = |runner : &Runner| {
+    pub fn validate(
+        &self,
+        allowed_ranks: RangeInclusive<usize>,
+        probs: &[f64],
+    ) -> Result<(), anyhow::Error> {
+        let validate_runner = |runner: &Runner| {
             let runners = probs.len();
             let runner_index = runner.as_index();
             if runner_index > runners - 1 {
@@ -46,10 +57,15 @@ impl Selection {
         };
 
         match self {
-            Selection::Span { runner, ranks} => {
+            Selection::Span { runner, ranks } => {
                 validate_runner(runner)?;
-                if ranks.start().as_index() < *allowed_ranks.start() || ranks.end().as_index() > *allowed_ranks.end() {
-                    bail!("invalid finishing ranks {}", ranks.display());
+                if ranks.start().as_index() < *allowed_ranks.start()
+                    || ranks.end().as_index() > *allowed_ranks.end()
+                {
+                    bail!(
+                        "invalid finishing ranks {}",
+                        DisplayRangeInclusive::from(ranks)
+                    );
                 }
             }
             Selection::Exact { runner, rank } => {
@@ -67,31 +83,12 @@ impl Display for Selection {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Selection::Span { runner, ranks } => {
-                write!(f, "{runner} in {}~{}", ranks.start(), ranks.end())
+                write!(f, "{runner} in {}", DisplayRangeInclusive::from(ranks))
             }
             Selection::Exact { runner, rank } => {
                 write!(f, "{runner} in {rank}")
             }
         }
-    }
-}
-
-pub trait RangeInclusiveExt<T: Display> {
-    fn display(&self) -> RangeInclusiveDisplay<T>;
-}
-impl<T: Display> RangeInclusiveExt<T> for RangeInclusive<T> {
-    fn display(&self) -> RangeInclusiveDisplay<T> {
-        RangeInclusiveDisplay { range: self }
-    }
-}
-
-pub struct RangeInclusiveDisplay<'a, T: Display> {
-    range: &'a RangeInclusive<T>
-}
-
-impl<'a, T: Display> Display for RangeInclusiveDisplay<'a, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}", self.range.start(), self.range.end())
     }
 }
 
@@ -226,6 +223,72 @@ pub fn top_n_matrix(podium_places: usize, num_runners: usize) -> Matrix<Selectio
     scenarios
 }
 
+pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), anyhow::Error> {
+    if selections.is_empty() {
+        bail!("empty selections");
+    }
+    let podium = selections
+        .iter()
+        .map(|selection| match selection {
+            Selection::Span { ranks, .. } => ranks.end().as_number(),
+            Selection::Exact { rank, .. } => rank.as_number(),
+        })
+        .max()
+        .unwrap();
+
+    //TODO validate unique runners
+
+    let mut placings = Matrix::allocate(selections.len(), podium);
+    for (selection_index, selection) in selections.iter().enumerate() {
+        match selection {
+            Selection::Span { ranks, .. } => {
+                placings[(selection_index, ranks.start().as_index())] = true;
+            }
+            Selection::Exact { rank, .. } => {
+                placings[(selection_index, rank.as_index())] = true;
+            }
+        }
+    }
+
+    for rank in 0..podium {
+        loop {
+            let mut runners_in_rank = 0;
+            let mut most_slack = 0;
+            let mut selection_with_most_slack = 0;
+            for (selection_index, selection) in selections.iter().enumerate() {
+                if placings[(selection_index, rank)] {
+                    runners_in_rank += 1;
+                    match selection {
+                        Selection::Span { ranks, .. } => {
+                            let slack = ranks.end().as_index() - rank;
+                            if slack > most_slack {
+                                most_slack = slack;
+                                selection_with_most_slack = selection_index;
+                            }
+                        }
+                        Selection::Exact { .. } => {} // can't move exact selections
+                    }
+                }
+            }
+
+            if runners_in_rank <= 1 {
+                break;
+            } else if most_slack > 0 {
+                placings[(selection_with_most_slack, rank)] = false;
+                placings[(selection_with_most_slack, rank + 1)] = true;
+            } else {
+                bail!(
+                    "cannot accommodate rank {} in {}",
+                    Rank::index(rank),
+                    DisplaySlice::from(selections)
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -258,9 +321,21 @@ mod tests {
 
     #[test]
     fn exact() {
-        assert!(Selection::Exact { runner: Runner::index(5), rank: Rank::index(0) }.matches(&vec![5, 6, 7, 8]));
-        assert!(Selection::Exact { runner: Runner::index(6), rank: Rank::index(1) }.matches(&vec![5, 6, 7, 8]));
-        assert!(!Selection::Exact { runner: Runner::index(7), rank: Rank::index(0) }.matches(&vec![5, 6, 7, 8]));
+        assert!(Selection::Exact {
+            runner: Runner::index(5),
+            rank: Rank::index(0)
+        }
+        .matches(&vec![5, 6, 7, 8]));
+        assert!(Selection::Exact {
+            runner: Runner::index(6),
+            rank: Rank::index(1)
+        }
+        .matches(&vec![5, 6, 7, 8]));
+        assert!(!Selection::Exact {
+            runner: Runner::index(7),
+            rank: Rank::index(0)
+        }
+        .matches(&vec![5, 6, 7, 8]));
     }
 
     #[test]
@@ -358,21 +433,277 @@ mod tests {
 
     #[test]
     fn validate_selection_exact() {
-        let sel = Selection::Exact { runner: Runner::index(3), rank: Rank::index(2)};
+        let sel = Selection::Exact {
+            runner: Runner::index(3),
+            rank: Rank::index(2),
+        };
         assert!(sel.validate(0..=2, &[0.1, 0.2, 0.3, 0.4]).is_ok());
-        assert_eq!("invalid finishing rank @3", sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
-        assert_eq!("invalid finishing rank @3", sel.validate(3..=4, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
-        assert_eq!("invalid runner r4", sel.validate(2..=2, &[0.1, 0.2, 0.3]).err().unwrap().to_string());
-        assert_eq!("r4 has a zero finishing probability", sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0]).err().unwrap().to_string());
+        assert_eq!(
+            "invalid finishing rank @3",
+            sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid finishing rank @3",
+            sel.validate(3..=4, &[0.1, 0.2, 0.3, 0.4])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid runner r4",
+            sel.validate(2..=2, &[0.1, 0.2, 0.3])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "r4 has a zero finishing probability",
+            sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0])
+                .err()
+                .unwrap()
+                .to_string()
+        );
     }
 
     #[test]
     fn validate_selection_span() {
-        let sel = Selection::Span { runner: Runner::index(3), ranks: Rank::index(2)..=Rank::index(3)};
+        let sel = Selection::Span {
+            runner: Runner::index(3),
+            ranks: Rank::index(2)..=Rank::index(3),
+        };
         assert!(sel.validate(0..=3, &[0.1, 0.2, 0.3, 0.4]).is_ok());
-        assert_eq!("invalid finishing ranks @3-@4", sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
-        assert_eq!("invalid finishing ranks @3-@4", sel.validate(4..=5, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
-        assert_eq!("invalid runner r4", sel.validate(2..=2, &[0.1, 0.2, 0.3]).err().unwrap().to_string());
-        assert_eq!("r4 has a zero finishing probability", sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0]).err().unwrap().to_string());
+        assert_eq!(
+            "invalid finishing ranks @3-@4",
+            sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid finishing ranks @3-@4",
+            sel.validate(4..=5, &[0.1, 0.2, 0.3, 0.4])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid runner r4",
+            sel.validate(2..=2, &[0.1, 0.2, 0.3])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "r4 has a zero finishing probability",
+            sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0])
+                .err()
+                .unwrap()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn plausible_selections() {
+        {
+            let selections = vec![];
+            assert_eq!(
+                "empty selections",
+                validate_plausible_selections(&selections)
+                    .err()
+                    .unwrap()
+                    .to_string()
+            );
+        }
+        {
+            let selections = vec![Runner::number(1).top(Rank::number(1))];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(2)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(2)),
+                Runner::number(3).top(Rank::number(3)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(2)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(2)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(2)),
+                Runner::number(2).top(Rank::number(2)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(2)),
+                Runner::number(2).top(Rank::number(2)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(2)),
+                Runner::number(2).top(Rank::number(2)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(3)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(3)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(4)),
+                Runner::number(2).top(Rank::number(4)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(3)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(3).top(Rank::number(3)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(3).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(4)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(2)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(2)),
+                Runner::number(2).top(Rank::number(4)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(3)),
+                Runner::number(2).top(Rank::number(4)),
+                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
+            ];
+            assert!(validate_plausible_selections(&selections).is_ok());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(1)),
+            ];
+            assert_eq!("cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1]", validate_plausible_selections(&selections).err().unwrap().to_string());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(1)),
+                Runner::number(2).top(Rank::number(1)),
+                Runner::number(3).top(Rank::number(3)),
+            ];
+            assert_eq!("cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1, r3 in @1-@3]", validate_plausible_selections(&selections).err().unwrap().to_string());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(3)),
+                Runner::number(2).top(Rank::number(3)),
+                Runner::number(3).top(Rank::number(3)),
+                Runner::number(4).top(Rank::number(3)),
+            ];
+            assert_eq!("cannot accommodate rank @3 in [r1 in @1-@3, r2 in @1-@3, r3 in @1-@3, r4 in @1-@3]", validate_plausible_selections(&selections).err().unwrap().to_string());
+        }
     }
 }

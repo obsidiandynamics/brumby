@@ -12,7 +12,7 @@ use crate::market::{Market, Overround};
 use crate::model::cf::Coefficients;
 use crate::model::fit::{FitOptions, PlaceFitOutcome};
 use crate::print::DerivedPrice;
-use crate::selection::Selection;
+use crate::selection::{Selection, validate_plausible_selections};
 
 pub mod cf;
 pub mod error;
@@ -209,6 +209,7 @@ pub struct Model {
 }
 impl Model {
     pub fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error> {
+        validate_plausible_selections(selections)?;
         // let runners = self.fit_outcome.fitted_probs.cols();
         // let check_runner_active = |runner : &Runner| {
         //     let runner_index = runner.as_index();
