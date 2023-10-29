@@ -183,7 +183,7 @@ pub fn compute_msre<P: MarketPrice>(
 pub struct OptimiserStats {
     pub optimal_msre: f64,
     pub steps: u64,
-    pub time: Duration,
+    pub elapsed: Duration,
 }
 
 #[derive(Debug)]
@@ -257,12 +257,12 @@ fn fit_individual(
         engine.set_probs(current_probs.into());
     }
 
-    let time = start_time.elapsed();
+    let elapsed = start_time.elapsed();
     IndividualFitOutcome {
         stats: OptimiserStats {
             optimal_msre,
             steps: step,
-            time,
+            elapsed,
         },
         optimal_probs,
     }

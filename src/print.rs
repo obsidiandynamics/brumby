@@ -4,7 +4,7 @@ use crate::linear::matrix::Matrix;
 use crate::market::MarketPrice;
 use crate::selection::{Rank, Runner};
 
-#[derive(Debug, Default)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DerivedPrice {
     pub probability: f64,
     pub price: f64,
@@ -16,6 +16,15 @@ impl DerivedPrice {
 
     pub fn overround(&self) -> f64 {
         1.0 / self.probability / self.price
+    }
+}
+
+impl Default for DerivedPrice {
+    fn default() -> Self {
+        Self {
+            probability: 0.,
+            price: f64::INFINITY
+        }
     }
 }
 

@@ -1,11 +1,13 @@
 //! A [Selection] is a predicate applied to a podium slice. It is used to determine whether a given
 //! runner has finished in a specific rank or among the top-_N_ placings.
 
-use crate::capture::Capture;
-use anyhow::{bail, Context};
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
 use std::str::FromStr;
+
+use anyhow::{bail, Context};
+
+use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -29,6 +31,36 @@ impl Selection {
             Selection::Exact { runner, rank } => podium[rank.as_index()] == runner.as_index(),
         }
     }
+
+    pub fn validate(&self, allowed_ranks: RangeInclusive<usize>, probs: &[f64]) -> Result<(), anyhow::Error> {
+        let validate_runner = |runner : &Runner| {
+            let runners = probs.len();
+            let runner_index = runner.as_index();
+            if runner_index > runners - 1 {
+                bail!("invalid runner {runner}");
+            }
+            if probs[runner_index] == 0. {
+                bail!("{runner} has a zero finishing probability");
+            }
+            Ok(())
+        };
+
+        match self {
+            Selection::Span { runner, ranks} => {
+                validate_runner(runner)?;
+                if ranks.start().as_index() < *allowed_ranks.start() || ranks.end().as_index() > *allowed_ranks.end() {
+                    bail!("invalid finishing ranks {}", ranks.display());
+                }
+            }
+            Selection::Exact { runner, rank } => {
+                validate_runner(runner)?;
+                if !allowed_ranks.contains(&rank.as_index()) {
+                    bail!("invalid finishing rank {rank}");
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Display for Selection {
@@ -41,6 +73,25 @@ impl Display for Selection {
                 write!(f, "{runner} in {rank}")
             }
         }
+    }
+}
+
+pub trait RangeInclusiveExt<T: Display> {
+    fn display(&self) -> RangeInclusiveDisplay<T>;
+}
+impl<T: Display> RangeInclusiveExt<T> for RangeInclusive<T> {
+    fn display(&self) -> RangeInclusiveDisplay<T> {
+        RangeInclusiveDisplay { range: self }
+    }
+}
+
+pub struct RangeInclusiveDisplay<'a, T: Display> {
+    range: &'a RangeInclusive<T>
+}
+
+impl<'a, T: Display> Display for RangeInclusiveDisplay<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.range.start(), self.range.end())
     }
 }
 
@@ -177,8 +228,9 @@ pub fn top_n_matrix(podium_places: usize, num_runners: usize) -> Matrix<Selectio
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn top() {
@@ -302,5 +354,25 @@ mod tests {
             Selections::Owned(vec![Runner::number(7).top(Rank::number(3))]),
             selections.clone()
         );
+    }
+
+    #[test]
+    fn validate_selection_exact() {
+        let sel = Selection::Exact { runner: Runner::index(3), rank: Rank::index(2)};
+        assert!(sel.validate(0..=2, &[0.1, 0.2, 0.3, 0.4]).is_ok());
+        assert_eq!("invalid finishing rank @3", sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
+        assert_eq!("invalid finishing rank @3", sel.validate(3..=4, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
+        assert_eq!("invalid runner r4", sel.validate(2..=2, &[0.1, 0.2, 0.3]).err().unwrap().to_string());
+        assert_eq!("r4 has a zero finishing probability", sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0]).err().unwrap().to_string());
+    }
+
+    #[test]
+    fn validate_selection_span() {
+        let sel = Selection::Span { runner: Runner::index(3), ranks: Rank::index(2)..=Rank::index(3)};
+        assert!(sel.validate(0..=3, &[0.1, 0.2, 0.3, 0.4]).is_ok());
+        assert_eq!("invalid finishing ranks @3-@4", sel.validate(0..=1, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
+        assert_eq!("invalid finishing ranks @3-@4", sel.validate(4..=5, &[0.1, 0.2, 0.3, 0.4]).err().unwrap().to_string());
+        assert_eq!("invalid runner r4", sel.validate(2..=2, &[0.1, 0.2, 0.3]).err().unwrap().to_string());
+        assert_eq!("r4 has a zero finishing probability", sel.validate(2..=2, &[0.1, 0.2, 0.3, 0.0]).err().unwrap().to_string());
     }
 }
