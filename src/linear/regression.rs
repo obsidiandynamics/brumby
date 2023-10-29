@@ -13,6 +13,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumCount, EnumIter};
 
 use crate::linear::matrix::Matrix;
+use crate::model::cf::Regressors;
 
 pub trait AsIndex {
     fn as_index(&self) -> usize;
@@ -70,6 +71,14 @@ pub struct Predictor<O: AsIndex> {
     pub coefficients: Vec<f64>,
 }
 impl<O: AsIndex> Predictor<O> {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        validate_regressors(&self.regressors)?;
+        if self.regressors.len() != self.coefficients.len() {
+            bail!("exactly one coefficient must be specified for each regressor");
+        }
+        Ok(())
+    }
+
     pub fn predict(&self, input: &[f64]) -> f64 {
         self.regressors
             .iter()
@@ -111,6 +120,24 @@ impl<O: AsIndex> Predictor<O> {
     }
 }
 
+pub(crate) fn validate_regressors<O: AsIndex>(regressors: &[Regressor<O>]) -> Result<(), anyhow::Error> {
+    if regressors.len() < 2 {
+        bail!("at least two regressors must be present");
+    }
+    let constants = regressors
+        .iter()
+        .filter(|regressor| regressor.is_constant())
+        .count();
+    if constants != 1 {
+        bail!(
+                "must specify exactly one {} or {} regressor",
+                Regressor::<DummyOrdinal>::Intercept.to_string(),
+                Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
+            );
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RegressionModel<O: AsIndex> {
     pub response: O,
@@ -129,20 +156,7 @@ impl<O: AsIndex> RegressionModel<O> {
         if data.cols() < 2 {
             bail!("insufficient number of columns in the data");
         }
-        if regressors.len() < 2 {
-            bail!("insufficient number of regressors");
-        }
-        let constants = regressors
-            .iter()
-            .filter(|regressor| regressor.is_constant())
-            .count();
-        if constants != 1 {
-            bail!(
-                "must specify exactly one {} or {} regressor",
-                Regressor::<DummyOrdinal>::Intercept.to_string(),
-                Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
-            );
-        }
+        validate_regressors(&regressors)?;
 
         let mut subset: Matrix<f64> = Matrix::allocate(data.rows(), 1 + regressors.len());
         for (row_index, row_data) in data.into_iter().enumerate() {

@@ -57,6 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .regressors
         .unwrap_or_else(|| PathBuf::from("../../config/greyhound.r.json"));
     let regressors = Regressors::read_json_file(regressors_file)?;
+    regressors.validate()?;
     debug!("regressors:\n{regressors:#?}");
 
     let mut csv = CsvReader::open(args.input.unwrap())?;

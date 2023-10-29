@@ -26,13 +26,11 @@ use brumby::print::{
     tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values, DerivedPrice,
 };
 use brumby::selection::{Selection, Selections};
-use brumby::{market, mc, selection};
+use brumby::{market, mc, model, selection};
 
-const MC_ITERATIONS_TRAIN: u64 = 100_000;
 const MC_ITERATIONS_EVAL: u64 = 1_000_000;
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
-const TARGET_MSRE: f64 = 1e-6;
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -87,6 +85,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     debug!("loading coefficients from {coefficients_file:?}");
     let coefficients = Coefficients::read_json_file(coefficients_file)?;
+    coefficients.validate()?;
     // let mut win_probs: Vec<_> = race
     //     .prices
     //     .row_slice(0)
@@ -127,7 +126,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //     .with_dilatives(Capture::Borrowed(&dilatives))
     //     .into();
 
-    let podium_places = 4;
+    let podium_places = model::PODIUM;
     let num_runners = race.prices.row_slice(0).len();
     let scenarios = selection::top_n_matrix(podium_places, num_runners);
 
@@ -137,17 +136,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
         })
         .collect();
+    for market in &markets {
+        market.validate()?;
+    }
 
     let fit_outcome = fit::fit_place(
-        coefficients,
-        FitOptions {
-            mc_iterations: MC_ITERATIONS_TRAIN,
-            individual_target_msre: TARGET_MSRE,
-        },
+        &coefficients,
+        &FitOptions::default(),
         &markets[0],
         &markets[place_rank],
         place_rank,
-    );
+    )?;
     debug!(
         "individual fitting complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
         fit_outcome.stats.optimal_msre,

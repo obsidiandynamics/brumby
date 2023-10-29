@@ -1,6 +1,7 @@
 use ordinalizer::Ordinal;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumCount, EnumIter};
+use crate::linear::regression;
 
 use crate::linear::regression::{AsIndex, Predictor, Regressor};
 
@@ -10,12 +11,28 @@ pub struct Coefficients {
     pub w2: Predictor<Factor>,
     pub w3: Predictor<Factor>,
 }
+impl Coefficients {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        self.w1.validate()?;
+        self.w2.validate()?;
+        self.w3.validate()?;
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Regressors {
     pub w1: Vec<Regressor<Factor>>,
     pub w2: Vec<Regressor<Factor>>,
     pub w3: Vec<Regressor<Factor>>,
+}
+impl Regressors {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        regression::validate_regressors(&self.w1)?;
+        regression::validate_regressors(&self.w2)?;
+        regression::validate_regressors(&self.w3)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Ordinal, EnumCount, EnumIter, Display, Serialize, Deserialize)]

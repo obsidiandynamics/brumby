@@ -16,8 +16,6 @@ use brumby::model::fit;
 use brumby::model::fit::FitOptions;
 use brumby::probs::SliceExt;
 
-const MC_ITERATIONS_TRAIN: u64 = 100_000;
-const TARGET_MSRE: f64 = 1e-6;
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -77,10 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let prices = race.prices.row_slice(rank).to_vec();
             Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
         }).collect();
-        let fit_outcome = fit::fit_all(FitOptions {
-            mc_iterations: MC_ITERATIONS_TRAIN,
-            individual_target_msre: TARGET_MSRE,
-        }, &markets);
+        let fit_outcome = fit::fit_all(FitOptions::default(), &markets)?;
         debug!("individual fitting complete: stats: {:?}, probs: \n{}", fit_outcome.stats, fit_outcome.fitted_probs.verbose());
 
         let num_runners = markets[0].probs.len();
