@@ -1,16 +1,12 @@
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
-use ordinalizer::Ordinal;
 use racing_scraper::get_racing_data;
 use racing_scraper::models::{EventDetail, EventType};
-use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumCount, EnumIter};
 
 use crate::file;
 use crate::file::ReadJsonFile;
 use crate::linear::matrix::Matrix;
-use crate::linear::regression::AsIndex;
 
 const PODIUM: usize = 4;
 
@@ -65,10 +61,6 @@ pub struct RaceSummary {
     pub prices: Matrix<f64>,
 }
 
-// pub fn read_from_file(path: impl AsRef<Path>) -> Result<EventDetail, io::Error> {
-//     file::read_json(path)
-// }
-
 #[derive(Debug)]
 pub enum Predicate {
     Type { race_type: EventType },
@@ -121,7 +113,6 @@ pub fn read_from_dir(
     closurelike: impl Into<PredicateClosure>,
 ) -> anyhow::Result<Vec<EventDetail>> {
     let mut files = vec![];
-    // recurse_dir(path.as_ref().into(), &mut files)?;
     file::recurse_dir(path.as_ref().into(), &mut files, &mut |ext| ext == "json")?;
     let mut races = Vec::with_capacity(files.len());
     let mut closure = closurelike.into();
@@ -134,45 +125,7 @@ pub fn read_from_dir(
     Ok(races)
 }
 
-// fn recurse_dir(path: PathBuf, files: &mut Vec<PathBuf>) -> anyhow::Result<()> {
-//     let md = fs::metadata(&path)?;
-//     if md.is_dir() {
-//         let entries = fs::read_dir(path)?;
-//         for entry in entries {
-//             recurse_dir(entry?.path(), files)?;
-//         }
-//     } else if path.extension().unwrap_or_default() == "json" {
-//         files.push(path);
-//     }
-//     Ok(())
-// }
-
 pub async fn download_by_id(id: u64) -> anyhow::Result<EventDetail> {
     let event_detail = get_racing_data(&id).await?;
     Ok(event_detail)
-}
-
-#[derive(Debug, Clone, PartialEq, Ordinal, EnumCount, EnumIter, Display, Serialize, Deserialize)]
-pub enum Factor {
-    RaceId,
-    RunnerIndex,
-    ActiveRunners,
-    PlacesPaying,
-    Stdev,
-    Weight0,
-    Weight1,
-    Weight2,
-    Weight3,
-}
-
-impl From<Factor> for usize {
-    fn from(factor: Factor) -> Self {
-        factor.ordinal()
-    }
-}
-
-impl AsIndex for Factor {
-    fn as_index(&self) -> usize {
-        self.ordinal()
-    }
 }

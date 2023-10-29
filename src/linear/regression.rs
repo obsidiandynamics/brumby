@@ -18,6 +18,7 @@ pub trait AsIndex {
     fn as_index(&self) -> usize;
 }
 
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Display)]
 pub enum Regressor<O: AsIndex> {
     Ordinal(O),

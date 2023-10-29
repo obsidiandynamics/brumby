@@ -10,11 +10,10 @@ use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
 use brumby::csv::CsvReader;
-use brumby::data::Factor;
 use brumby::file::{ReadJsonFile, WriteJsonFile};
 use brumby::linear::matrix::Matrix;
 use brumby::linear::regression::{RegressionModel, Regressor};
-use brumby::model::cf::{Coefficients, Regressors};
+use brumby::model::cf::{Coefficients, Factor, Regressors};
 
 /// Fits a linear regression model to the given dataset
 #[derive(Debug, clap::Parser, Clone)]

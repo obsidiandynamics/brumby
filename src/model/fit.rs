@@ -14,8 +14,7 @@ use crate::mc::DilatedProbs;
 use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
 use crate::{mc, selection};
-use crate::data::Factor;
-use crate::model::cf::Coefficients;
+use crate::model::cf::{Coefficients, Factor};
 
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
@@ -281,11 +280,6 @@ pub fn fit_place(
             weighted_probs[(1, runner)] = coefficients.w1.predict(&input);
             weighted_probs[(2, runner)] = coefficients.w2.predict(&input);
             weighted_probs[(3, runner)] = coefficients.w3.predict(&input);
-
-            //TODO
-            // weighted_probs[(1, runner)] = linear_sum(&cf_1, win_prob, active_runners, stdev);
-            // weighted_probs[(2, runner)] = linear_sum(&cf_2, win_prob, active_runners, stdev);
-            // weighted_probs[(3, runner)] = linear_sum(&cf_3, win_prob, active_runners, stdev);
         }
     }
     for rank in 1..PODIUM {
