@@ -90,10 +90,10 @@ impl Market {
         }
     }
 
-    pub fn frame(method: &OverroundMethod, probs: Vec<f64>, overround: f64) -> Self {
-        match method {
-            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround),
-            OverroundMethod::Power => Self::frame_power(probs, overround),
+    pub fn frame(overround: &Overround, probs: Vec<f64>) -> Self {
+        match overround.method {
+            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround.value),
+            OverroundMethod::Power => Self::frame_power(probs, overround.value),
         }
     }
 
@@ -305,17 +305,17 @@ mod tests {
     fn frame_multiplicative() {
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4];
-            let market = Market::frame(&OverroundMethod::Multiplicative, probs, 1.0);
+            let market = Market::frame(&Overround { method: OverroundMethod::Multiplicative, value: 1.0 }, probs);
             assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
         }
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4];
-            let market = Market::frame(&OverroundMethod::Multiplicative, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Multiplicative, value: 1.1 }, probs);
             assert_slice_f64_relative(&[9.0909, 4.5454, 3.0303, 2.273], &market.prices, 0.001);
         }
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4, 0.0];
-            let market = Market::frame(&OverroundMethod::Multiplicative, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Multiplicative, value: 1.1 }, probs);
             assert_slice_f64_relative(
                 &[9.0909, 4.5454, 3.0303, 2.273, f64::INFINITY],
                 &market.prices,
@@ -324,7 +324,7 @@ mod tests {
         }
         {
             let probs = vec![0.2, 0.4, 0.6, 0.8];
-            let market = Market::frame(&OverroundMethod::Multiplicative, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Multiplicative, value: 1.1 }, probs);
             assert_slice_f64_relative(&[4.5454, 2.2727, 1.5152, 1.1364], &market.prices, 0.001);
         }
     }
@@ -333,19 +333,19 @@ mod tests {
     fn frame_power() {
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4];
-            let market = Market::frame(&OverroundMethod::Power, probs, 1.0);
+            let market = Market::frame(&Overround { method: OverroundMethod::Power, value: 1.0 }, probs);
             println!("market: {:?}", market);
             assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
         }
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4];
-            let market = Market::frame(&OverroundMethod::Power, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Power, value: 1.1 }, probs);
             println!("market: {:?}", market);
             assert_slice_f64_relative(&[8.4319, 4.4381, 3.0489, 2.3359], &market.prices, 0.001);
         }
         {
             let probs = vec![0.1, 0.2, 0.3, 0.4, 0.0];
-            let market = Market::frame(&OverroundMethod::Power, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Power, value: 1.1 }, probs);
             println!("market: {:?}", market);
             assert_slice_f64_relative(
                 &[8.4319, 4.4381, 3.0489, 2.3359, f64::INFINITY],
@@ -355,7 +355,7 @@ mod tests {
         }
         {
             let probs = vec![0.2, 0.4, 0.6, 0.8];
-            let market = Market::frame(&OverroundMethod::Power, probs, 1.1);
+            let market = Market::frame(&Overround { method: OverroundMethod::Power, value: 1.1 }, probs);
             println!("market: {:?}", market);
             assert_slice_f64_relative(&[4.2159, 2.219, 1.5244, 1.168], &market.prices, 0.001);
         }

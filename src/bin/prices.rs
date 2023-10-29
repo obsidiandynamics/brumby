@@ -193,11 +193,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut derived_prices = Matrix::allocate(podium_places, num_runners);
     for rank in 0..podium_places {
         let probs = derived_probs.row_slice(rank);
-        let framed = Market::frame(
-            &OVERROUND_METHOD,
-            probs.into(),
-            markets[rank].overround.value,
-        );
+        let framed = Market::frame(&markets[rank].overround, probs.into());
         for runner in 0..num_runners {
             let probability = framed.probs[runner];
             let price = framed.prices[runner];

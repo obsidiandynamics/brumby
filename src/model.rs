@@ -1,19 +1,20 @@
-use crate::capture::Capture;
-use crate::linear::matrix::Matrix;
-use crate::market::{Market, Overround, OverroundMethod};
-use crate::model::cf::Coefficients;
-use crate::model::fit::{FitOptions, PlaceFitOutcome};
-use crate::{mc, selection};
+use std::ops::RangeInclusive;
+
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
-use std::ops::RangeInclusive;
 use tracing::debug;
+
+use crate::{mc, selection};
+use crate::capture::Capture;
+use crate::linear::matrix::Matrix;
+use crate::market::{Market, Overround};
+use crate::model::cf::Coefficients;
+use crate::model::fit::{FitOptions, PlaceFitOutcome};
 
 pub mod cf;
 pub mod error;
 pub mod fit;
 
-// pub const DEFAULT_OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 pub const PODIUM: usize = 4;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,14 +34,48 @@ impl WinPlaceMarkets {
         }
         Ok(())
     }
+
+    pub fn extrapolate_overrounds(&self) -> [Overround; PODIUM] {
+        let overround_step = (self.win.overround.value - self.place.overround.value) / (self.places_paying - 1) as f64;
+        let overround_method = &self.win.overround.method;
+        const MIN_OVERROUND: f64 = 1.01;
+        match self.places_paying {
+            2 => [ self.win.overround.clone(),
+                self.place.overround.clone(),
+                Overround {
+                    method: overround_method.clone(),
+                    value: f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
+                },
+                Overround {
+                    method: overround_method.clone(),
+                    value:  f64::max(MIN_OVERROUND, self.place.overround.value - 2. * overround_step),
+                },
+            ],
+            3 => [ self.win.overround.clone(),
+                Overround {
+                    method: overround_method.clone(),
+                    value: f64::max(MIN_OVERROUND, self.win.overround.value - overround_step),
+                },
+                self.place.overround.clone(),
+                Overround {
+                    method: overround_method.clone(),
+                    value:  f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
+                },
+            ],
+            _ => unimplemented!()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Top4Markets {
-    pub markets: [Market; PODIUM],
+pub struct TopNMarkets {
+    pub markets: Vec<Market>,
 }
-impl Top4Markets {
+impl TopNMarkets {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
+        if self.markets.is_empty() {
+            bail!("markets cannot be empty");
+        }
         for market in &self.markets {
             market.validate()?;
         }
@@ -79,7 +114,6 @@ where
 pub struct Config {
     pub coefficients: Coefficients,
     pub fit_options: FitOptions,
-    // pub overround_method: OverroundMethod
 }
 impl Config {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
@@ -133,7 +167,7 @@ pub struct Model {
     fit_outcome: PlaceFitOutcome,
 }
 impl Model {
-    pub fn generate_top_4(&self, overrounds: &[Overround]) -> Result<Top4Markets, anyhow::Error> {
+    pub fn generate_top_4(&self, overrounds: &[Overround]) -> Result<TopNMarkets, anyhow::Error> {
         if overrounds.len() != PODIUM {
             bail!("exactly {PODIUM} overrounds must be specified");
         }
@@ -157,10 +191,9 @@ impl Model {
         let markets: Vec<_> = derived_probs.into_iter().enumerate().map(|(rank, probs)| {
             let overround = &overrounds[rank];
             let probs = probs.to_vec();
-            Market::frame(&overround.method, probs, overround.value)
+            Market::frame(&overround, probs)
         }).collect();
-        let markets: [Market; 4] = markets.try_into().unwrap();
-        Ok(Top4Markets {
+        Ok(TopNMarkets {
             markets
         })
     }

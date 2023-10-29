@@ -1,22 +1,22 @@
 use std::ops::{Deref, Range, RangeInclusive};
 use std::time::Duration;
+
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use strum::EnumCount;
-
 use tokio::time::Instant;
 use tracing::trace;
 
 use mc::MonteCarloEngine;
 
+use crate::{mc, model, selection};
 use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
-use crate::market::{Market, MarketPrice, OverroundMethod};
+use crate::market::{Market, MarketPrice, Overround};
 use crate::mc::DilatedProbs;
+use crate::model::cf::{Coefficients, Factor};
 use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
-use crate::{mc, model, selection};
-use crate::model::cf::{Coefficients, Factor};
 
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
@@ -85,8 +85,7 @@ pub fn fit_all(options: FitOptions, markets: &[Market]) -> Result<AllFitOutcome,
                 options.max_individual_steps,
                 rank,
                 rank..=rank,
-                market.overround.value,
-                &market.overround.method,
+                &market.overround,
                 &market.prices,
             );
             weighted_probs = outcome.optimal_probs.clone();
@@ -153,8 +152,7 @@ pub fn fit_place(
         place_rank,
         // place_rank..=place_rank,//1..=3, //todo
         1..=model::PODIUM - 1,
-        place_market.overround.value,
-        &place_market.overround.method,
+        &place_market.overround,
         &place_market.prices,
     );
     Ok(PlaceFitOutcome {
@@ -202,8 +200,7 @@ fn fit_individual(
     max_individual_steps: u64,
     rank: usize,
     adj_ranks: RangeInclusive<usize>,
-    overround: f64,
-    overround_method: &OverroundMethod,
+    overround: &Overround,
     sample_prices: &[f64],
 ) -> IndividualFitOutcome {
     let start_time = Instant::now();
@@ -229,7 +226,7 @@ fn fit_individual(
             .iter()
             .map(|&count| count as f64 / engine.iterations() as f64)
             .collect();
-        let market = Market::frame(overround_method, fitted_probs, overround);
+        let market = Market::frame(overround, fitted_probs);
         trace!("fitted prices:  {:?}", market.prices);
         trace!("sample prices: {sample_prices:?}");
         let msre = compute_msre(sample_prices, &market.prices, &FITTED_PRICE_RANGES[rank]);

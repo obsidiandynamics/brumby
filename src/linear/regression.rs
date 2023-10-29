@@ -13,12 +13,10 @@ use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumCount, EnumIter};
 
 use crate::linear::matrix::Matrix;
-use crate::model::cf::Regressors;
 
 pub trait AsIndex {
     fn as_index(&self) -> usize;
 }
-
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Display)]
 pub enum Regressor<O: AsIndex> {
