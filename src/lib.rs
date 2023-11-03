@@ -17,6 +17,7 @@ pub mod opt;
 pub mod print;
 pub mod probs;
 pub mod selection;
+pub mod timed;
 
 #[cfg(test)]
 pub(crate) mod testing;

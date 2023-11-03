@@ -1,9 +1,8 @@
 use std::ops::RangeInclusive;
-use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::{mc, selection};
 use crate::capture::Capture;
@@ -13,6 +12,7 @@ use crate::model::cf::Coefficients;
 use crate::model::fit::{FitOptions, PlaceFitOutcome};
 use crate::print::DerivedPrice;
 use crate::selection::{Selection, validate_plausible_selections};
+use crate::timed::Timed;
 
 pub mod cf;
 pub mod error;
@@ -38,12 +38,15 @@ impl WinPlace {
         Ok(())
     }
 
-    pub fn extrapolate_overrounds(&self) -> [Overround; PODIUM] {
-        let overround_step = (self.win.overround.value - self.place.overround.value) / (self.places_paying - 1) as f64;
+    pub fn extrapolate_overrounds(&self) -> Result<[Overround; PODIUM], anyhow::Error> {
+        self.validate()?;
+        let overround_step = (self.win.overround.value - self.place.overround.value)
+            / (self.places_paying - 1) as f64;
         let overround_method = &self.win.overround.method;
         const MIN_OVERROUND: f64 = 1.01;
-        match self.places_paying {
-            2 => [ self.win.overround.clone(),
+        let overrounds = match self.places_paying {
+            2 => [
+                self.win.overround.clone(),
                 self.place.overround.clone(),
                 Overround {
                     method: overround_method.clone(),
@@ -51,10 +54,14 @@ impl WinPlace {
                 },
                 Overround {
                     method: overround_method.clone(),
-                    value:  f64::max(MIN_OVERROUND, self.place.overround.value - 2. * overround_step),
+                    value: f64::max(
+                        MIN_OVERROUND,
+                        self.place.overround.value - 2. * overround_step,
+                    ),
                 },
             ],
-            3 => [ self.win.overround.clone(),
+            3 => [
+                self.win.overround.clone(),
                 Overround {
                     method: overround_method.clone(),
                     value: f64::max(MIN_OVERROUND, self.win.overround.value - overround_step),
@@ -62,11 +69,14 @@ impl WinPlace {
                 self.place.overround.clone(),
                 Overround {
                     method: overround_method.clone(),
-                    value:  f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
+                    value: f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
                 },
             ],
-            _ => unimplemented!()
-        }
+            other@ _ => {
+                bail!("unsupported number of places paying {other}");
+            }
+        };
+        Ok(overrounds)
     }
 }
 
@@ -84,6 +94,16 @@ impl TopN {
         }
         validate_correlated_markets(self.markets.iter())?;
         Ok(())
+    }
+
+    pub fn overrounds(&self) -> Result<Vec<Overround>, anyhow::Error> {
+        self.validate()?;
+        let overrounds: Vec<_> = self
+            .markets
+            .iter()
+            .map(|market| market.overround.clone())
+            .collect();
+        Ok(overrounds)
     }
 }
 
@@ -131,36 +151,50 @@ pub struct Calibrator {
     config: Config,
 }
 impl Calibrator {
-    pub fn calibrate(&self, wp: WinPlace, overrounds: &[Overround]) -> Result<Model, anyhow::Error> {
-        wp.validate()?;
-        let active_runners = wp.win.prices.iter().filter(|&&price| price > 0.).count();
-        if active_runners < PODIUM {
-            bail!("at least {PODIUM} active runners required");
-        }
+    pub fn fit(
+        &self,
+        wp: WinPlace,
+        overrounds: &[Overround],
+    ) -> Result<Timed<Model>, anyhow::Error> {
+        Timed::result(|| {
+            wp.validate()?;
+            let active_runners = wp.win.prices.iter().filter(|&&price| price > 0.).count();
+            if active_runners < PODIUM {
+                bail!("at least {PODIUM} active runners required");
+            }
 
-        let fit_outcome = fit::fit_place(
-            &self.config.coefficients,
-            &FitOptions::default(),
-            &wp.win,
-            &wp.place,
-            wp.places_paying - 1,
-        )?;
-        debug!(
-            "calibration complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
-            fit_outcome.stats.optimal_msre,
-            fit_outcome.stats.optimal_msre.sqrt(),
-            fit_outcome.stats.steps,
-            fit_outcome.stats.elapsed.as_millis() as f64 / 1_000.
-        );
-        let top_n = Self::derive_prices(self.config.fit_options.mc_iterations, &fit_outcome, overrounds)?;
-        Ok(Model {
-            mc_iterations: self.config.fit_options.mc_iterations,
-            fit_outcome,
-            top_n,
+            let fit_outcome = fit::fit_place(
+                &self.config.coefficients,
+                &FitOptions::default(),
+                &wp.win,
+                &wp.place,
+                wp.places_paying - 1,
+            )?;
+            debug!(
+                "calibration complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
+                fit_outcome.stats.optimal_msre,
+                fit_outcome.stats.optimal_msre.sqrt(),
+                fit_outcome.stats.steps,
+                fit_outcome.stats.elapsed.as_millis() as f64 / 1_000.
+            );
+            let top_n = Self::derive_prices(
+                self.config.fit_options.mc_iterations,
+                &fit_outcome,
+                overrounds,
+            )?;
+            Ok(Model {
+                mc_iterations: self.config.fit_options.mc_iterations,
+                fit_outcome,
+                top_n,
+            })
         })
     }
 
-    fn derive_prices(mc_iterations: u64, fit_outcome: &PlaceFitOutcome, overrounds: &[Overround]) -> Result<TopN, anyhow::Error> {
+    fn derive_prices(
+        mc_iterations: u64,
+        fit_outcome: &PlaceFitOutcome,
+        overrounds: &[Overround],
+    ) -> Result<TopN, anyhow::Error> {
         if overrounds.len() != PODIUM {
             bail!("exactly {PODIUM} overrounds must be specified");
         }
@@ -181,14 +215,16 @@ impl Calibrator {
                 derived_probs[(rank, runner)] = probability;
             }
         }
-        let markets: Vec<_> = derived_probs.into_iter().enumerate().map(|(rank, probs)| {
-            let overround = &overrounds[rank];
-            let probs = probs.to_vec();
-            Market::frame(overround, probs)
-        }).collect();
-        Ok(TopN {
-            markets
-        })
+        let markets: Vec<_> = derived_probs
+            .into_iter()
+            .enumerate()
+            .map(|(rank, probs)| {
+                let overround = &overrounds[rank];
+                let probs = probs.to_vec();
+                Market::frame(overround, probs)
+            })
+            .collect();
+        Ok(TopN { markets })
     }
 }
 
@@ -208,50 +244,82 @@ pub struct Model {
     top_n: TopN,
 }
 impl Model {
-    pub fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error> {
-        validate_plausible_selections(selections)?;
-        let start_time = Instant::now();
-        let mut overround = 1.;
-        let win_probs = &self.fit_outcome.fitted_probs[0];
-        for selection in selections {
-            selection.validate(0..=PODIUM - 1, win_probs)?;
-            let (runner, rank) = match selection {
-                Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
-                Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
-            };
-            let market = &self.top_n.markets[rank];
-            let prob = market.probs[runner];
-            if prob == 0. {
-                bail!("cannot price a runner with zero probability");
+    pub fn derive_multi(
+        &self,
+        selections: &[Selection],
+    ) -> Result<Timed<DerivedPrice>, anyhow::Error> {
+        Timed::result(|| {
+            validate_plausible_selections(selections)?;
+            // let start_time = Instant::now();
+            let mut overround = 1.;
+            let win_probs = &self.fit_outcome.fitted_probs[0];
+            for selection in selections {
+                selection.validate(0..=PODIUM - 1, win_probs)?;
+                let (runner, rank) = match selection {
+                    Selection::Span { runner, ranks } => {
+                        (runner.as_index(), ranks.end().as_index())
+                    }
+                    Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
+                };
+                let market = &self.top_n.markets[rank];
+                let prob = market.probs[runner];
+                if prob == 0. {
+                    bail!("cannot price a runner with zero probability");
+                }
+                let price = market.prices[runner];
+
+                overround *= 1. / prob / price;
             }
-            let price = market.prices[runner];
-
-            overround *= 1. / prob / price;
-        }
-        let mut engine = mc::MonteCarloEngine::default()
-            .with_iterations(self.mc_iterations)
-            .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
-        let frac = engine.simulate(selections);
-        let probability = frac.quotient();
-        let price = 1. / probability / overround;
-        let elapsed = start_time.elapsed();
-        trace!(
-            "price generation for {selections:?} took {:.3}s",
-            elapsed.as_millis() as f64 / 1_000.
-        );
-        let derived_price = DerivedPrice {
-            probability,
-            price,
-        };
-        Ok(Timed {
-            value: derived_price,
-            elapsed,
+            let mut engine = mc::MonteCarloEngine::default()
+                .with_iterations(self.mc_iterations)
+                .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
+            let frac = engine.simulate(selections);
+            let probability = frac.quotient();
+            let price = 1. / probability / overround;
+            // let elapsed = start_time.elapsed();
+            // trace!(
+            //     "price generation for {selections:?} took {:.3}s",
+            //     elapsed.as_millis() as f64 / 1_000.
+            // );
+            Ok(DerivedPrice { probability, price })
         })
+        // validate_plausible_selections(selections)?;
+        // let start_time = Instant::now();
+        // let mut overround = 1.;
+        // let win_probs = &self.fit_outcome.fitted_probs[0];
+        // for selection in selections {
+        //     selection.validate(0..=PODIUM - 1, win_probs)?;
+        //     let (runner, rank) = match selection {
+        //         Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
+        //         Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
+        //     };
+        //     let market = &self.top_n.markets[rank];
+        //     let prob = market.probs[runner];
+        //     if prob == 0. {
+        //         bail!("cannot price a runner with zero probability");
+        //     }
+        //     let price = market.prices[runner];
+        //
+        //     overround *= 1. / prob / price;
+        // }
+        // let mut engine = mc::MonteCarloEngine::default()
+        //     .with_iterations(self.mc_iterations)
+        //     .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
+        // let frac = engine.simulate(selections);
+        // let probability = frac.quotient();
+        // let price = 1. / probability / overround;
+        // let elapsed = start_time.elapsed();
+        // trace!(
+        //     "price generation for {selections:?} took {:.3}s",
+        //     elapsed.as_millis() as f64 / 1_000.
+        // );
+        // let derived_price = DerivedPrice {
+        //     probability,
+        //     price,
+        // };
+        // Ok(Timed {
+        //     value: derived_price,
+        //     elapsed,
+        // })
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Timed<T> {
-    pub value: T,
-    pub elapsed: Duration,
 }
