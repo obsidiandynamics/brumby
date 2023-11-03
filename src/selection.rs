@@ -227,6 +227,7 @@ pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), any
     if selections.is_empty() {
         bail!("empty selections");
     }
+
     let podium = selections
         .iter()
         .map(|selection| match selection {
@@ -236,18 +237,35 @@ pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), any
         .max()
         .unwrap();
 
-    //TODO validate unique runners
+    let runners = selections
+        .iter()
+        .map(|selection| match selection {
+            Selection::Span { runner, .. } => runner.as_number(),
+            Selection::Exact { runner, .. } => runner.as_number(),
+        })
+        .max()
+        .unwrap();
 
+    let mut runner_index_seen = vec![false; runners];
     let mut placings = Matrix::allocate(selections.len(), podium);
     for (selection_index, selection) in selections.iter().enumerate() {
-        match selection {
-            Selection::Span { ranks, .. } => {
+        let runner = match selection {
+            Selection::Span { runner, ranks } => {
                 placings[(selection_index, ranks.start().as_index())] = true;
+                runner
             }
-            Selection::Exact { rank, .. } => {
+            Selection::Exact { runner, rank } => {
                 placings[(selection_index, rank.as_index())] = true;
+                runner
             }
+        };
+        if runner_index_seen[runner.as_index()] {
+            bail!(
+                "duplicate runner {runner} in {}",
+                DisplaySlice::from(selections)
+            );
         }
+        runner_index_seen[runner.as_index()] = true;
     }
 
     for rank in 0..podium {
@@ -285,6 +303,8 @@ pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), any
             }
         }
     }
+
+    // println!("selections: {}:\n{}", DisplaySlice::from(selections), placings.verbose());
 
     Ok(())
 }
@@ -626,7 +646,7 @@ mod tests {
                 Runner::number(1).top(Rank::number(1)),
                 Runner::number(2).top(Rank::number(3)),
                 Runner::number(3).top(Rank::number(3)),
-                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
             ];
             assert!(validate_plausible_selections(&selections).is_ok());
         }
@@ -634,7 +654,7 @@ mod tests {
             let selections = vec![
                 Runner::number(1).top(Rank::number(1)),
                 Runner::number(3).top(Rank::number(3)),
-                Runner::number(3).top(Rank::number(4)),
+                Runner::number(4).top(Rank::number(4)),
             ];
             assert!(validate_plausible_selections(&selections).is_ok());
         }
@@ -686,7 +706,13 @@ mod tests {
                 Runner::number(1).top(Rank::number(1)),
                 Runner::number(2).top(Rank::number(1)),
             ];
-            assert_eq!("cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1]", validate_plausible_selections(&selections).err().unwrap().to_string());
+            assert_eq!(
+                "cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1]",
+                validate_plausible_selections(&selections)
+                    .err()
+                    .unwrap()
+                    .to_string()
+            );
         }
         {
             let selections = vec![
@@ -694,7 +720,13 @@ mod tests {
                 Runner::number(2).top(Rank::number(1)),
                 Runner::number(3).top(Rank::number(3)),
             ];
-            assert_eq!("cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1, r3 in @1-@3]", validate_plausible_selections(&selections).err().unwrap().to_string());
+            assert_eq!(
+                "cannot accommodate rank @1 in [r1 in @1-@1, r2 in @1-@1, r3 in @1-@3]",
+                validate_plausible_selections(&selections)
+                    .err()
+                    .unwrap()
+                    .to_string()
+            );
         }
         {
             let selections = vec![
@@ -704,6 +736,13 @@ mod tests {
                 Runner::number(4).top(Rank::number(3)),
             ];
             assert_eq!("cannot accommodate rank @3 in [r1 in @1-@3, r2 in @1-@3, r3 in @1-@3, r4 in @1-@3]", validate_plausible_selections(&selections).err().unwrap().to_string());
+        }
+        {
+            let selections = vec![
+                Runner::number(1).top(Rank::number(3)),
+                Runner::number(1).top(Rank::number(4)),
+            ];
+            assert_eq!("duplicate runner r1 in [r1 in @1-@3, r1 in @1-@4]", validate_plausible_selections(&selections).err().unwrap().to_string());
         }
     }
 }

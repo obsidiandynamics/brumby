@@ -210,34 +210,6 @@ pub struct Model {
 impl Model {
     pub fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error> {
         validate_plausible_selections(selections)?;
-        // let runners = self.fit_outcome.fitted_probs.cols();
-        // let check_runner_active = |runner : &Runner| {
-        //     let runner_index = runner.as_index();
-        //     if runner_index > runners - 1 {
-        //         bail!("invalid runner {runner}");
-        //     }
-        //     if self.fit_outcome.fitted_probs[(0, runner_index)] == 0. {
-        //         bail!("runner has a zero finishing probability");
-        //     }
-        //     Ok(())
-        // };
-        // for selection in selections {
-        //     match selection {
-        //         Selection::Span { runner, ranks} => {
-        //             check_runner_active(runner)?;
-        //             if ranks.end().as_index() > PODIUM - 1 {
-        //                 bail!("invalid finishing rank {}", ranks.end());
-        //             }
-        //         }
-        //         Selection::Exact { runner, rank } => {
-        //             check_runner_active(runner)?;
-        //             if rank.as_index() > PODIUM - 1 {
-        //                 bail!("invalid finishing rank {rank}");
-        //             }
-        //         }
-        //     }
-        // }
-
         let start_time = Instant::now();
         let mut overround = 1.;
         let win_probs = &self.fit_outcome.fitted_probs[0];
