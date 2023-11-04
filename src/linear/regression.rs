@@ -47,14 +47,14 @@ impl<O: AsIndex> Regressor<O> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RSquared {
-    pub sum_sq_regression: f64,
+    pub sum_sq_residual: f64,
     pub sum_sq_total: f64,
     pub independent_variables: usize,
     pub samples: usize,
 }
 impl RSquared {
     pub fn unadjusted(&self) -> f64 {
-        1. - self.sum_sq_regression / self.sum_sq_total
+        1. - self.sum_sq_residual / self.sum_sq_total
     }
 
     pub fn adjusted(&self) -> f64 {
@@ -90,12 +90,12 @@ impl<O: AsIndex> Predictor<O> {
 
     pub fn r_squared(&self, response: &O, data: &Matrix<f64>) -> RSquared {
         let response_index = response.as_index();
-        let (mut sum_sq_regression, mut sum_sq_total) = (0., 0.);
+        let (mut sum_sq_residual, mut sum_sq_total) = (0., 0.);
         let mut sum = 0.;
         for row in data {
             let response = row[response_index];
             let predicted = self.predict(row);
-            sum_sq_regression += (response - predicted).powi(2);
+            sum_sq_residual += (response - predicted).powi(2);
             sum += response;
         }
         let samples = data.rows();
@@ -112,7 +112,7 @@ impl<O: AsIndex> Predictor<O> {
         // independent_variables: subtract 1 from number of regressors if intercept
         // present or 2 if no intercept
         RSquared {
-            sum_sq_regression,
+            sum_sq_residual,
             sum_sq_total,
             independent_variables: (self.regressors.len() - 1 - zero_intercepts),
             samples,
