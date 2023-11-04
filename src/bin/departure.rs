@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -6,7 +5,7 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 use clap::Parser;
-use racing_scraper::models::EventType;
+use racing_scraper::models::{EventDetail, EventType};
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, Header, MinWidth, Styles};
@@ -14,13 +13,8 @@ use stanza::table::{Cell, Col, Row, Table};
 use tracing::{debug, info};
 
 use brumby::data;
-use brumby::data::{EventDetailExt, PredicateClosures, RaceSummary};
-use brumby::file::ReadJsonFile;
-use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Calibrator, Config, fit, TopN, WinPlace};
-use brumby::model::cf::Coefficients;
+use brumby::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures};
 
-const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 const TOP_SUBSET: usize = 25;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -68,82 +62,45 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
 
-    let mut configs: HashMap<EventType, Config> = HashMap::new();
-    for race_type in [EventType::Thoroughbred, EventType::Greyhound] {
-        let filename = match race_type {
-            EventType::Thoroughbred => "config/thoroughbred.cf.json",
-            EventType::Greyhound => "config/greyhound.cf.json",
-            EventType::Harness => unimplemented!(),
-        };
-        debug!("loading {race_type} config from {filename}");
-        let config = Config {
-            coefficients: Coefficients::read_json_file(filename)?,
-            fit_options: Default::default(),
-        };
-        configs.insert(race_type, config);
-    }
-
-    let mut evaluations = Vec::with_capacity(races.len());
+    let mut assessments = Vec::with_capacity(races.len());
     let num_races = races.len();
     for (index, race_file) in races.into_iter().enumerate() {
         info!(
-            "fitting race: {} ({}) ({} of {num_races})",
+            "assessing race: {} ({}) ({} of {num_races})",
             race_file.race.race_name,
             race_file.file.to_str().unwrap(),
             index + 1
         );
-        let race = race_file.race.summarise();
-        let calibrator = Calibrator::try_from(configs[&race.race_type].clone())?;
-        let sample_top_n = TopN {
-            markets: (0..race.prices.rows())
-                .map(|rank| {
-                    let prices = race.prices.row_slice(rank).to_vec();
-                    Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
-                })
-                .collect(),
-        };
-        let sample_wp = WinPlace {
-            win: sample_top_n.markets[0].clone(),
-            place: sample_top_n.markets[race.places_paying - 1].clone(),
-            places_paying: race.places_paying,
-        };
-        let sample_overrounds = sample_top_n.overrounds()?;
-        let model = calibrator.fit(sample_wp, &sample_overrounds)?.value;
-        let derived_prices = model.top_n.as_price_matrix();
-        let errors: Vec<_> = (0..derived_prices.rows())
-            .map(|rank| {
-                fit::compute_msre(
-                    &race.prices[rank],
-                    &derived_prices[rank],
-                    &fit::FITTED_PRICE_RANGES[rank],
-                )
-                .sqrt()
-            })
-            .collect();
-        let worst_rmsre = *errors.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
-        debug!("worst_rmsre: {worst_rmsre}");
-        evaluations.push(Evaluation {
+        let departure = race_file.race.place_price_departure();
+        assessments.push(Assessment {
             file: race_file.file,
-            race,
-            worst_rmsre,
+            race: race_file.race,
+            departure
         });
     }
-    let mean_worst_rmsre = {
-        let sum_rmsre: f64 = evaluations
+    let mean_worst_departure = {
+        let sum_worst_departure: f64 = assessments
             .iter()
-            .map(|evaluation| evaluation.worst_rmsre)
+            .map(|assessment| assessment.departure.worst)
             .sum();
-        sum_rmsre / num_races as f64
+        sum_worst_departure / num_races as f64
+    };
+    let mean_rms_departure = {
+        let sum_rms_departure: f64 = assessments
+            .iter()
+            .map(|assessment| assessment.departure.root_mean_sq)
+            .sum();
+        sum_rms_departure / num_races as f64
     };
     let elapsed = start_time.elapsed();
     info!(
-        "fitted {num_races} races in {}s; mean worst RMSRE: {mean_worst_rmsre:.6}",
+        "fitted {num_races} races in {}s; mean worst departure: {mean_worst_departure:.6}, mean RMS departure: {mean_rms_departure:.6}",
         elapsed.as_millis() as f64 / 1_000.
     );
 
-    evaluations.sort_by(|a, b| a.worst_rmsre.total_cmp(&b.worst_rmsre));
+    assessments.sort_by(|a, b| a.departure.worst.total_cmp(&b.departure.worst));
     let quantiles = find_quantiles(
-        &evaluations,
+        &assessments,
         &[0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0],
     );
     let quantiles_table = tabulate_quantiles(&quantiles);
@@ -152,32 +109,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         Console::default().render(&quantiles_table)
     );
 
-    let best_subset = &evaluations[..usize::min(TOP_SUBSET, evaluations.len())];
+    let best_subset = &assessments[..usize::min(TOP_SUBSET, assessments.len())];
     let best_table = tabulate_subset(best_subset, 0);
     info!("best races:\n{}", Console::default().render(&best_table));
 
-    let start_index = evaluations.len().saturating_sub(TOP_SUBSET);
-    let worst_subset = &evaluations[start_index..];
+    let start_index = assessments.len().saturating_sub(TOP_SUBSET);
+    let worst_subset = &assessments[start_index..];
     let worst_table = tabulate_subset(worst_subset, start_index);
     info!("worst races:\n{}", Console::default().render(&worst_table));
 
     Ok(())
 }
 
-fn find_quantiles(evaluations: &[Evaluation], quantiles: &[f64]) -> Vec<(f64, f64)> {
+fn find_quantiles(assessments: &[Assessment], quantiles: &[f64]) -> Vec<(f64, f64)> {
     let mut quantile_values = Vec::with_capacity(quantiles.len());
     for quantile in quantiles {
-        let index = f64::ceil(quantile * evaluations.len() as f64 - 1.) as usize;
-        quantile_values.push((*quantile, evaluations[index].worst_rmsre));
+        let index = f64::ceil(quantile * assessments.len() as f64 - 1.) as usize;
+        quantile_values.push((*quantile, assessments[index].departure.worst));
     }
     quantile_values
 }
 
-fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
+fn tabulate_subset(assessments: &[Assessment], start_index: usize) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
             Col::new(Styles::default().with(MinWidth(6))),
             Col::new(Styles::default().with(MinWidth(12))),
+            Col::new(Styles::default().with(MinWidth(10))),
             Col::new(Styles::default().with(MinWidth(40))),
             Col::new(Styles::default().with(MinWidth(14))),
             Col::new(Styles::default().with(MinWidth(14))),
@@ -186,13 +144,14 @@ fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
             Styles::default().with(Header(true)),
             vec![
                 "Rank".into(),
-                "Worst RMSRE".into(),
+                "Worst departure".into(),
+                "RMS departure".into(),
                 "File".into(),
                 "Race type".into(),
                 "Places paying".into(),
             ],
         ));
-    table.push_rows(evaluations.iter().enumerate().map(|(index, evaluation)| {
+    table.push_rows(assessments.iter().enumerate().map(|(index, assessment)| {
         Row::new(
             Styles::default(),
             vec![
@@ -202,19 +161,23 @@ fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
                 ),
                 Cell::new(
                     Styles::default().with(HAlign::Right),
-                    format!("{:.6}", evaluation.worst_rmsre).into(),
-                ),
-                Cell::new(
-                    Styles::default(),
-                    evaluation.file.to_str().unwrap().to_string().into(),
-                ),
-                Cell::new(
-                    Styles::default(),
-                    format!("{}", evaluation.race.race_type).into(),
+                    format!("{:.6}", assessment.departure.worst).into(),
                 ),
                 Cell::new(
                     Styles::default().with(HAlign::Right),
-                    format!("{:.6}", evaluation.race.places_paying).into(),
+                    format!("{:.6}", assessment.departure.root_mean_sq).into(),
+                ),
+                Cell::new(
+                    Styles::default(),
+                    assessment.file.to_str().unwrap().to_string().into(),
+                ),
+                Cell::new(
+                    Styles::default(),
+                    format!("{}", assessment.race.race_type).into(),
+                ),
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{:.6}", assessment.race.places_paying).into(),
                 ),
             ],
         )
@@ -227,18 +190,18 @@ fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
             Col::new(Styles::default().with(MinWidth(12))),
-            Col::new(Styles::default().with(MinWidth(12))),
+            Col::new(Styles::default().with(MinWidth(14))),
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
-            vec!["Quantile".into(), "Worst RMSRE".into()],
+            vec!["Quantile".into(), "Worst departure".into()],
         ));
-    table.push_rows(quantiles.iter().map(|(quantile, rmsre)| {
+    table.push_rows(quantiles.iter().map(|(quantile, worst_departure)| {
         Row::new(
             Styles::default().with(HAlign::Right),
             vec![
                 format!("{quantile:.3}").into(),
-                format!("{rmsre:.6}").into(),
+                format!("{worst_departure:.6}").into(),
             ],
         )
     }));
@@ -246,8 +209,8 @@ fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
 }
 
 #[derive(Debug)]
-struct Evaluation {
+struct Assessment {
     file: PathBuf,
-    race: RaceSummary,
-    worst_rmsre: f64,
+    race: EventDetail,
+    departure: PlacePriceDeparture,
 }

@@ -102,7 +102,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|price| 1. / price)
         .collect();
     let fractional_markets: Vec<_> = (0..PODIUM)
-        .into_iter()
         .map(|rank| {
             Market::frame(
                 &Overround {
@@ -215,6 +214,5 @@ async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
             unreachable!()
         }
     };
-    //event_detail.validate_place_price_equivalence()?;
-    return Ok(event_detail.summarise());
+    Ok(event_detail.summarise())
 }

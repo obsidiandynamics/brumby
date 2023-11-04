@@ -21,6 +21,10 @@ backfit *ARGS:
 evaluate *ARGS:
     cargo run --release --bin evaluate -- {{ARGS}}
 
+# measures the Place/Top-N price departure in the given dataset
+departure *ARGS:
+    cargo run --release --bin departure -- {{ARGS}}
+
 # run the multi example
 multi:
     cargo run --example multi --release

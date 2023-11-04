@@ -1,4 +1,3 @@
-use anyhow::bail;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -11,9 +10,15 @@ use crate::linear::matrix::Matrix;
 
 const PODIUM: usize = 4;
 
+#[derive(Debug)]
+pub struct PlacePriceDeparture {
+    pub root_mean_sq: f64,
+    pub worst: f64,
+}
+
 pub trait EventDetailExt {
     fn summarise(self) -> RaceSummary;
-    fn validate_place_price_equivalence(&self) -> Result<(), anyhow::Error>;
+    fn place_price_departure(&self) -> PlacePriceDeparture;
 }
 impl EventDetailExt for EventDetail {
     fn summarise(self) -> RaceSummary {
@@ -26,6 +31,8 @@ impl EventDetailExt for EventDetail {
                     Some(prices) => {
                         let price = match rank {
                             0 => prices.win,
+                            // 1 => if self.places_paying == 2 { f32::min(prices.top2, prices.place) } else { prices.top2},
+                            // 2 => if self.places_paying == 3 { f32::min(prices.top3, prices.place) } else { prices.top3},
                             1 => prices.top2,
                             2 => prices.top3,
                             3 => prices.top4,
@@ -49,27 +56,39 @@ impl EventDetailExt for EventDetail {
         }
     }
 
-    fn validate_place_price_equivalence(&self) -> Result<(), anyhow::Error> {
+    fn place_price_departure(&self) -> PlacePriceDeparture {
+        let mut sum_sq = 0.;
+        let mut worst_sq = 0.;
+        let mut active_runners = 0;
+
+        fn relative_delta(a: f64, b: f64) -> f64 {
+            (a - b) / f64::max(a, b)
+        }
         for runner in &self.runners {
             if let Some(prices) = &runner.prices {
+                active_runners += 1;
                 let corresponding_top_price = match self.places_paying {
-                    1 => prices.top2,
-                    2 => prices.top3,
-                    3 => prices.top4,
-                    other => bail!("unsupported number of places paying {other}"),
+                    2 => prices.top2,
+                    3 => prices.top3,
+                    4 => prices.top4,
+                    other => unimplemented!("unsupported number of places paying {other}"),
                 };
-                if prices.place != corresponding_top_price {
-                    bail!(
-                        "place and top-{} prices do not match for runner r{}: {} vs {}",
-                        self.places_paying,
-                        runner.runner_number,
-                        prices.place,
-                        corresponding_top_price
-                    );
+                let departure_sq =
+                    relative_delta(corresponding_top_price as f64, prices.place as f64).powi(2);
+                sum_sq += departure_sq;
+                if departure_sq > worst_sq {
+                    worst_sq = departure_sq;
                 }
             }
         }
-        Ok(())
+        assert!(active_runners > 0, "no active runners");
+
+        let root_mean_sq = (sum_sq / active_runners as f64).sqrt();
+        let worst = worst_sq.sqrt();
+        PlacePriceDeparture {
+            root_mean_sq,
+            worst,
+        }
     }
 }
 

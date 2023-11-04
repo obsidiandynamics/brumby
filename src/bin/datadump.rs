@@ -75,7 +75,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             race_file.file.to_str().unwrap(),
             index + 1,
         );
-        //race_file.race.validate_place_price_equivalence()?;
         let race = race_file.race.summarise();
         let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
             let prices = race.prices.row_slice(rank).to_vec();

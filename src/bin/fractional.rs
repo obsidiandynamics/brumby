@@ -75,7 +75,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     let fitted_top_n = TopN {
         markets: (0..PODIUM)
-            .into_iter()
             .map(|rank| {
                 Market::frame(
                     &Overround {
