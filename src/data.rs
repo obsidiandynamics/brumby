@@ -108,6 +108,7 @@ pub struct RaceSummary {
 #[derive(Debug)]
 pub enum Predicate {
     Type { race_type: EventType },
+    Departure { cutoff_worst: f64 },
 }
 impl Predicate {
     pub fn closure(self) -> impl FnMut(&EventDetail) -> bool {
@@ -115,6 +116,9 @@ impl Predicate {
             Predicate::Type {
                 race_type: event_type,
             } => &event.race_type == event_type,
+            Predicate::Departure { cutoff_worst } => {
+                event.place_price_departure().worst <= *cutoff_worst
+            }
         }
     }
 }

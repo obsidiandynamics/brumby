@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -17,8 +17,8 @@ use brumby::data;
 use brumby::data::{EventDetailExt, PredicateClosures, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Calibrator, Config, fit, TopN, WinPlace};
 use brumby::model::cf::Coefficients;
+use brumby::model::{fit, Calibrator, Config, TopN, WinPlace};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 const TOP_SUBSET: usize = 25;
@@ -31,6 +31,10 @@ struct Args {
     /// race type
     #[clap(short = 'r', long, value_parser = parse_race_type)]
     race_type: Option<EventType>,
+
+    /// cutoff place price departure
+    #[clap(short = 'd', long)]
+    departure: Option<f64>,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -66,9 +70,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(race_type) = args.race_type {
         predicates.push(data::Predicate::Type { race_type });
     }
+    if let Some(cutoff_worst) = args.departure {
+        predicates.push(data::Predicate::Departure { cutoff_worst })
+    }
     let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
 
-    let mut configs: HashMap<EventType, Config> = HashMap::new();
+    let mut configs = HashMap::new();
     for race_type in [EventType::Thoroughbred, EventType::Greyhound] {
         let filename = match race_type {
             EventType::Thoroughbred => "config/thoroughbred.cf.json",
@@ -84,10 +91,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut evaluations = Vec::with_capacity(races.len());
-    let num_races = races.len();
+    let total_num_races = races.len();
+    let mut unique_races = HashSet::new();
+    let mut duplicate_races = 0;
     for (index, race_file) in races.into_iter().enumerate() {
+        if !unique_races.insert(race_file.race.id) {
+            info!("skipping duplicate race {}", race_file.race.id);
+            duplicate_races += 1;
+            continue;
+        }
         info!(
-            "fitting race: {} ({}) ({} of {num_races})",
+            "fitting race: {} ({}) ({} of {total_num_races})",
             race_file.race.race_name,
             race_file.file.to_str().unwrap(),
             index + 1
@@ -133,11 +147,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .map(|evaluation| evaluation.worst_rmsre)
             .sum();
-        sum_rmsre / num_races as f64
+        sum_rmsre / (total_num_races - duplicate_races) as f64
     };
     let elapsed = start_time.elapsed();
     info!(
-        "fitted {num_races} races in {}s; mean worst RMSRE: {mean_worst_rmsre:.6}",
+        "fitted {} races in {}s; mean worst RMSRE: {mean_worst_rmsre:.6}; {duplicate_races} duplicates ignored",
+        total_num_races - duplicate_races,
         elapsed.as_millis() as f64 / 1_000.
     );
 
@@ -226,7 +241,7 @@ fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
 fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
-            Col::new(Styles::default().with(MinWidth(12))),
+            Col::new(Styles::default().with(MinWidth(10))),
             Col::new(Styles::default().with(MinWidth(12))),
         ])
         .with_row(Row::new(
@@ -237,7 +252,7 @@ fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
         Row::new(
             Styles::default().with(HAlign::Right),
             vec![
-                format!("{quantile:.3}").into(),
+                format!("{quantile:.2}").into(),
                 format!("{rmsre:.6}").into(),
             ],
         )

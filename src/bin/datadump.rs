@@ -1,20 +1,21 @@
-use std::env;
-use std::error::Error;
-use std::path::PathBuf;
-use std::time::Instant;
 use anyhow::anyhow;
-use clap::Parser;
-use racing_scraper::models::EventType;
-use strum::{EnumCount, IntoEnumIterator};
-use tracing::{debug, info};
-use brumby::{data};
 use brumby::csv::{CsvWriter, Record};
+use brumby::data;
 use brumby::data::{EventDetailExt, PredicateClosures};
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::cf::Factor;
 use brumby::model::fit;
 use brumby::model::fit::FitOptions;
 use brumby::probs::SliceExt;
+use clap::Parser;
+use racing_scraper::models::EventType;
+use std::collections::HashSet;
+use std::env;
+use std::error::Error;
+use std::path::PathBuf;
+use std::time::Instant;
+use strum::{EnumCount, IntoEnumIterator};
+use tracing::{debug, info};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
@@ -27,13 +28,21 @@ struct Args {
     #[clap(short = 'r', long, value_parser = parse_race_type)]
     race_type: Option<EventType>,
 
+    /// cutoff place price departure
+    #[clap(short = 'd', long)]
+    departure: Option<f64>,
+
     /// where to write the CSV to
     out: Option<PathBuf>,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
-        self.dir.as_ref().ok_or(anyhow!("data directory must be specified"))?;
-        self.out.as_ref().ok_or(anyhow!("output file must be specified"))?;
+        self.dir
+            .as_ref()
+            .ok_or(anyhow!("data directory must be specified"))?;
+        self.out
+            .as_ref()
+            .ok_or(anyhow!("output file must be specified"))?;
         Ok(())
     }
 }
@@ -66,22 +75,38 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(race_type) = args.race_type {
         predicates.push(data::Predicate::Type { race_type });
     }
+    if let Some(cutoff_worst) = args.departure {
+        predicates.push(data::Predicate::Departure { cutoff_worst })
+    }
     let race_files = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
-    let num_races = race_files.len();
+    let total_num_races = race_files.len();
+    let mut unique_races = HashSet::new();
+    let mut duplicate_races = 0;
     for (index, race_file) in race_files.into_iter().enumerate() {
+        if !unique_races.insert(race_file.race.id) {
+            info!("skipping duplicate race {}", race_file.race.id);
+            duplicate_races += 1;
+            continue;
+        }
         info!(
-            "fitting race: {} ({}) ({} of {num_races})",
+            "fitting race: {} ({}) ({} of {total_num_races})",
             race_file.race.race_name,
             race_file.file.to_str().unwrap(),
             index + 1,
         );
         let race = race_file.race.summarise();
-        let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
-            let prices = race.prices.row_slice(rank).to_vec();
-            Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
-        }).collect();
+        let markets: Vec<_> = (0..race.prices.rows())
+            .map(|rank| {
+                let prices = race.prices.row_slice(rank).to_vec();
+                Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
+            })
+            .collect();
         let fit_outcome = fit::fit_all(FitOptions::default(), &markets)?;
-        debug!("individual fitting complete: stats: {:?}, probs: \n{}", fit_outcome.stats, fit_outcome.fitted_probs.verbose());
+        debug!(
+            "individual fitting complete: stats: {:?}, probs: \n{}",
+            fit_outcome.stats,
+            fit_outcome.fitted_probs.verbose()
+        );
 
         let num_runners = markets[0].probs.len();
         let active_runners = markets[0].probs.iter().filter(|&&prob| prob != 0.).count();
@@ -105,7 +130,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let elapsed = start_time.elapsed();
-    info!("fitted {} races in {}s", num_races, elapsed.as_millis() as f64 / 1_000.);
+    info!(
+        "fitted {} races in {}s; {duplicate_races} duplicates ignored",
+        total_num_races - duplicate_races,
+        elapsed.as_millis() as f64 / 1_000.
+    );
 
     Ok(())
 }

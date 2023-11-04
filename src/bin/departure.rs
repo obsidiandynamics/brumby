@@ -189,7 +189,7 @@ fn tabulate_subset(assessments: &[Assessment], start_index: usize) -> Table {
 fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
-            Col::new(Styles::default().with(MinWidth(12))),
+            Col::new(Styles::default().with(MinWidth(10))),
             Col::new(Styles::default().with(MinWidth(14))),
         ])
         .with_row(Row::new(
@@ -200,7 +200,7 @@ fn tabulate_quantiles(quantiles: &[(f64, f64)]) -> Table {
         Row::new(
             Styles::default().with(HAlign::Right),
             vec![
-                format!("{quantile:.3}").into(),
+                format!("{quantile:.2}").into(),
                 format!("{worst_departure:.6}").into(),
             ],
         )
