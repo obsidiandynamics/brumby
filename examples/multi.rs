@@ -1,145 +1,78 @@
+use brumby::display::DisplaySlice;
+use brumby::file::ReadJsonFile;
+use brumby::market::{Market, OverroundMethod};
+use brumby::model::cf::Coefficients;
+use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::print;
+use brumby::selection::{Rank, Runner};
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
+use std::error::Error;
+use std::path::PathBuf;
 
-use brumby::{market, mc};
-use brumby::display::DisplaySlice;
-use brumby::linear::matrix::Matrix;
-use brumby::mc::DilatedProbs;
-use brumby::print::{DerivedPrice, tabulate_derived_prices};
-use brumby::probs::SliceExt;
-use brumby::selection::{Rank, Runner};
-
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // probs taken from a popular website
-    // let mut probs = vec![
-    //     1.0 / 11.0,
-    //     1.0 / 41.0,
-    //     1.0 / 18.0,
-    //     1.0 / 12.0,
-    //     1.0 / 91.0,
-    //     1.0 / 101.0,
-    //     1.0 / 4.8,
-    //     1.0 / 14.0,
-    //     1.0 / 2.9,
-    //     1.0 / 91.0,
-    //     1.0 / 9.0,
-    //     1.0 / 91.0,
-    //     1.0 / 5.0,
-    //     1.0 / 21.0,
-    // ];
-    // let mut probs = vec![
-    //     1.0 / 2.0,
-    //     1.0 / 12.0,
-    //     1.0 / 3.0,
-    //     1.0 / 9.50,
-    //     1.0 / 7.50,
-    //     1.0 / 126.0,
-    //     1.0 / 23.0,
-    //     1.0 / 14.0,
-    // ];
-    // let mut probs = vec![
-    //     1.0 / 3.7,
-    //     1.0 / 14.0,
-    //     1.0 / 5.50,
-    //     1.0 / 9.50,
-    //     1.0 / 1.90,
-    //     1.0 / 13.0,
-    // ];
-    let mut win_probs = vec![
-        1.0 / 1.55,
-        1.0 / 12.0,
-        1.0 / 6.50,
-        1.0 / 9.00,
-        1.0 / 9.00,
-        1.0 / 61.0,
-        1.0 / 7.5,
-        1.0 / 81.0,
+    let win_prices = vec![
+        1.65,
+        7.0,
+        15.0,
+        9.5,
+        f64::INFINITY, // a scratched runner
+        9.0,
+        7.0,
+        11.0,
+        151.0,
+    ];
+    let place_prices = vec![
+        1.12,
+        1.94,
+        3.2,
+        2.3,
+        f64::INFINITY, // a scratched runner
+        2.25,
+        1.95,
+        2.55,
+        28.0,
     ];
 
-    // force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-    let win_overround = win_probs.normalise(1.0);
+    // load coefficients from a file and create a calibrator
+    let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
+    let config = Config {
+        coefficients,
+        fit_options: Default::default(),
+    };
+    let calibrator = Calibrator::try_from(config)?;
 
-    //fav-longshot bias removal
-    // let favlong_dilate = -0.0;
-    // win_probs.dilate_power(favlong_dilate);
+    // fit Win and Place probabilities from the supplied prices, undoing the effect of the overrounds
+    let wp_markets = WinPlace {
+        win: Market::fit(&OverroundMethod::Multiplicative, win_prices, 1.),
+        place: Market::fit(&OverroundMethod::Multiplicative, place_prices, 3.),
+        places_paying: 3,
+    };
 
-    // let dilatives = [0.0, 0.20, 0.35, 0.5];
-    // let dilatives = vec![0.0, 0.0, 0.0, 0.0];
-    let dilatives = vec![0.0, 0.268, 0.067, 0.0];
-    let podium_places = dilatives.len();
-    let num_runners = win_probs.len();
+    // we have overrounds for Win and Place; extrapolate for Top-2 and Top-4 markets
+    let overrounds = wp_markets.extrapolate_overrounds()?;
 
-    let ranked_overrounds = [win_overround, 1.239, 1.169, 1.12];
+    // fit a model using the Win/Place prices and extrapolated overrounds
+    let model = calibrator.fit(wp_markets, &overrounds)?.value;
 
-    println!("win probs: {win_probs:?}");
-    println!("dilatives: {dilatives:?}");
-    println!("overround: {win_overround:.3}");
+    // nicely format the derived prices
+    let table = print::tabulate_derived_prices(&model.top_n.as_price_matrix());
+    println!("\n{}", Console::default().render(&table));
 
-    let dilated_probs: Matrix<_> = DilatedProbs::default()
-        .with_win_probs(win_probs.into())
-        .with_dilatives(dilatives.into())
-        .into();
-
-    println!("rank-runner probabilities: \n{}", dilated_probs.verbose());
-
-    // simulate top-N rankings for all runners
-    // NOTE: rankings and runner numbers are zero-based
-    let mut scenarios =
-        Matrix::allocate(podium_places, num_runners);
-    for runner in 0..num_runners {
-        for rank in 0..podium_places {
-            scenarios[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))]
-            .into();
-        }
-    }
-
-    // create an MC engine for reuse
-    const ITERATIONS: u64 = 1_000_000;
-    let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(ITERATIONS)
-        .with_probs(dilated_probs.into());
-    let mut counts = Matrix::allocate(podium_places, num_runners);
-    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-
-    let mut derived = Matrix::allocate(podium_places, num_runners);
-    for runner in 0..num_runners {
-        for rank in 0..podium_places {
-            let probability = counts[(rank, runner)] as f64 / ITERATIONS as f64;
-            let fair_price = 1.0 / probability;
-            let price = market::multiply_capped(fair_price, ranked_overrounds[rank]);
-            let price = DerivedPrice {
-                probability,
-                price,
-            };
-            derived[(rank, runner)] = price;
-        }
-    }
-
-    // for row in 0..derived.rows() {
-    //     println!("sum for row {row}: {}", derived.row_slice(row).sum());
-    //     // derived.row_slice_mut(row).normalise(row as f64 + 1.0);
-    // }
-
-    //fav-longshot bias addition
-    // derived
-    //     .row_slice_mut(0)
-    //     .dilate_power(1.0 / (1.0 + favlong_dilate) - 1.0);
-
-    let table = tabulate_derived_prices(&derived);
-    println!("{}", Console::default().render(&table));
-
-    // simulate a same-race multi for a chosen selection vector
+    // simulate a same-race multi for a chosen selection vector using the previously fitted model
     let selections = vec![
-        Runner::number(1).top(Rank::number(1)),
-        Runner::number(2).top(Rank::number(2)),
-        Runner::number(3).top(Rank::number(3)),
+        Runner::number(6).top(Rank::number(1)),
+        Runner::number(7).top(Rank::number(2)),
+        Runner::number(8).top(Rank::number(3)),
     ];
-    let frac = engine.simulate(&selections);
+    let multi_price = model.derive_multi(&selections)?.value;
     println!(
-        "probability of {}: {}, fair price: {:.3}, market odds: {:.3}",
+        "{} with probability {:.6} is priced at {:.2}",
         DisplaySlice::from(&*selections),
-        frac.quotient(),
-        1.0 / frac.quotient(),
-        market::multiply_capped(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        multi_price.probability,
+        multi_price.price
     );
+
+    Ok(())
 }

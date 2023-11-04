@@ -10,78 +10,85 @@ A fast, allocation-free Monte Carlo model of a top-_N_ podium finish in racing e
 Circa 15M simulations/sec of a top-4 podium over 14 runners using the [tinyrand](https://github.com/obsidiandynamics/tinyrand) RNG. (Per thread, benchmarked on Apple M2 Pro.) Roughly 70% of time is spent in the RNG routine.
 
 # Example
-Sourced from `examples/multi.rs`.
+Sourced from `examples/multi.rs`. To try this example, run `just multi` on the command line. You'll need [just](https://github.com/casey/just) installed.
 
 ```rust
-/*
-use brumby::capture::{Capture, CaptureMut};
-use brumby::mc;
-use brumby::probs::SliceExt;
-use brumby::selection::Selection;
+use brumby::display::DisplaySlice;
+use brumby::file::ReadJsonFile;
+use brumby::market::{Market, OverroundMethod};
+use brumby::model::cf::Coefficients;
+use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::print;
+use brumby::selection::{Rank, Runner};
+use stanza::renderer::console::Console;
+use stanza::renderer::Renderer;
+use std::error::Error;
+use std::path::PathBuf;
 
-// probs taken from a popular website
-let mut probs = vec![
-    1.0 / 2.0,
-    1.0 / 12.0,
-    1.0 / 3.0,
-    1.0 / 9.50,
-    1.0 / 7.50,
-    1.0 / 126.0,
-    1.0 / 23.0,
-    1.0 / 14.0,
-];
+fn main() -> Result<(), Box<dyn Error>> {
+    // prices taken from a popular website
+    let win_prices = vec![
+        1.65,
+        7.0,
+        15.0,
+        9.5,
+        f64::INFINITY, // a scratched runner
+        9.0,
+        7.0,
+        11.0,
+        151.0,
+    ];
+    let place_prices = vec![
+        1.12,
+        1.94,
+        3.2,
+        2.3,
+        f64::INFINITY, // a scratched runner
+        2.25,
+        1.95,
+        2.55,
+        28.0,
+    ];
 
-// force probs to sum to 1 and extract the approximate overround used (multiplicative method assumed)
-let overround = probs.normalise(1.0);
+    // load coefficients from a file and create a calibrator
+    let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
+    let config = Config {
+        coefficients,
+        fit_options: Default::default(),
+    };
+    let calibrator = Calibrator::try_from(config)?;
 
-println!("fair probs: {probs:?}");
-println!("overround: {overround:.3}");
+    // fit Win and Place probabilities from the supplied prices, undoing the effect of the overrounds
+    let wp_markets = WinPlace {
+        win: Market::fit(&OverroundMethod::Multiplicative, win_prices, 1.),
+        place: Market::fit(&OverroundMethod::Multiplicative, place_prices, 3.),
+        places_paying: 3,
+    };
 
-// create an MC engine for reuse
-let mut engine = mc::MonteCarloEngine::default()
-    .with_iterations(10_000)
-    .with_win_probs(Capture::Borrowed(&probs))
-    .with_podium_places(4);
+    // we have overrounds for Win and Place; extrapolate for Top-2 and Top-4 markets
+    let overrounds = wp_markets.extrapolate_overrounds()?;
 
-// simulate top-N rankings for all runners
-// NOTE: rankings and runner numbers are zero-based
-for runner in 0..probs.len() {
-    println!("runner: {runner}");
-    for rank in 0..4 {
-        let frac = engine.simulate(&vec![Selection::Span {
-            runner,
-            ranks: 0..rank + 1,
-        }]);
-        println!(
-            "    rank: 0..={rank}, prob: {}, fair price: {:.3}, market odds: {:.3}",
-            frac.quotient(),
-            1.0 / frac.quotient(),
-            1.0 / frac.quotient() / overround
-        );
-    }
+    // fit a model using the Win/Place prices and extrapolated overrounds
+    let model = calibrator.fit(wp_markets, &overrounds)?.value;
+
+    // nicely format the derived prices
+    let table = print::tabulate_derived_prices(&model.top_n.as_price_matrix());
+    println!("\n{}", Console::default().render(&table));
+
+    // simulate a same-race multi for a chosen selection vector using the previously fitted model
+    let selections = vec![
+        Runner::number(6).top(Rank::number(1)),
+        Runner::number(7).top(Rank::number(2)),
+        Runner::number(8).top(Rank::number(3)),
+    ];
+    let multi_price = model.derive_multi(&selections)?.value;
+    println!(
+        "{} with probability {:.6} is priced at {:.2}",
+        DisplaySlice::from(&*selections),
+        multi_price.probability,
+        multi_price.price
+    );
+
+    Ok(())
 }
-
-// simulate a same-race multi for a chosen selection vector
-let selections = vec![
-    Selection::Span {
-        runner: 0,
-        ranks: 0..1,
-    },
-    Selection::Span {
-        runner: 1,
-        ranks: 0..2,
-    },
-    Selection::Span {
-        runner: 2,
-        ranks: 0..3,
-    },
-];
-let frac = engine.simulate(&selections);
-println!(
-    "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
-    frac.quotient(),
-    1.0 / frac.quotient(),
-    1.0 / frac.quotient() / overround.powi(selections.len() as i32)
-);
-*/
 ```

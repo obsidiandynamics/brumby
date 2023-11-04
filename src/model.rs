@@ -73,7 +73,7 @@ impl WinPlace {
                     value: f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
                 },
             ],
-            other @ _ => {
+            other => {
                 bail!("unsupported number of places paying {other}");
             }
         };
