@@ -123,10 +123,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             worst_rmsre,
         });
     }
+    let mean_worst_rmsre = {
+        let sum_rmsre: f64 = evaluations.iter().map(|evaluation| evaluation.worst_rmsre).sum();
+        sum_rmsre / num_races as f64
+    };
     let elapsed = start_time.elapsed();
     info!(
-        "fitted {} races in {}s",
-        num_races,
+        "fitted {num_races} races in {}s; mean worst RMSRE: {mean_worst_rmsre:.6}",
         elapsed.as_millis() as f64 / 1_000.
     );
 

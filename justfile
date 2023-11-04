@@ -1,9 +1,13 @@
 _help:
     @just --list
 
-# produce the prices for a race
+# produce the prices for a race (singles and multis)
 prices *ARGS:
     cargo run --release --bin prices -- {{ARGS}}
+
+# price singles using fractional overrounds
+fractional *ARGS:
+    cargo run --release --bin fractional -- {{ARGS}}
 
 # dump a dataset containing the fitted weights and various race parameters to a CSV file
 datadump *ARGS:

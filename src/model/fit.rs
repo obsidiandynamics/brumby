@@ -213,7 +213,7 @@ fn fit_individual(
 ) -> IndividualFitOutcome {
     let start_time = Instant::now();
     let podium_places = weighted_probs.rows();
-    let num_runners = weighted_probs.cols();
+    let runners = weighted_probs.cols();
     let mut engine = MonteCarloEngine::default()
         .with_iterations(mc_iterations)
         .with_probs(Capture::Borrowed(weighted_probs));
@@ -227,7 +227,7 @@ fn fit_individual(
             "individual fitting step {step} for rank {}",
             Rank::index(rank)
         );
-        let mut counts = Matrix::allocate(podium_places, num_runners);
+        let mut counts = Matrix::allocate(podium_places, runners);
         engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
         let fitted_probs: Vec<_> = counts
             .row_slice(rank)
@@ -274,6 +274,15 @@ fn fit_individual(
         },
         optimal_probs,
     }
+    // //TODO remove
+    // IndividualFitOutcome {
+    //     stats: OptimiserStats {
+    //         optimal_msre,
+    //         steps: step,
+    //         elapsed,
+    //     },
+    //     optimal_probs: weighted_probs.clone(),
+    // }
 }
 
 #[inline(always)]
@@ -281,6 +290,7 @@ fn scale_prob_capped(prob: &mut f64, adj: f64) {
     *prob = cap_probability(*prob * adj)
 }
 
+/// Smallest permissible probability used for capping values produced by the linear model.
 pub const PROBABILITY_EPSILON: f64 = 1e-6;
 
 /// Caps a probability in the interval \[0 + epsilon, 1 - epsilon], where `epsilon` is the smallest
