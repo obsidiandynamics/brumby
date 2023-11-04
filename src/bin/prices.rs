@@ -14,12 +14,11 @@ use tracing::{debug, info};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
-use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Calibrator, Config, fit, TopN, WinPlace};
+use brumby::market::{Market, Overround, OverroundMethod};
 use brumby::model::cf::Coefficients;
-use brumby::print::{
-    tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values,
-};
+use brumby::model::fit::compute_msre;
+use brumby::model::{fit, Calibrator, Config, TopN, WinPlace, PODIUM};
+use brumby::print::{tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
 use brumby::selection::Selections;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
@@ -95,6 +94,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
         places_paying: race.places_paying,
     };
     let sample_overrounds = sample_top_n.overrounds()?;
+
+    let implied_probs: Vec<_> = sample_wp
+        .win
+        .prices
+        .iter()
+        .map(|price| 1. / price)
+        .collect();
+    let fractional_markets: Vec<_> = (0..PODIUM)
+        .into_iter()
+        .map(|rank| {
+            Market::frame(
+                &Overround {
+                    method: OverroundMethod::Fractional,
+                    value: (rank + 1) as f64 * sample_overrounds[rank].value
+                        / sample_overrounds[0].value,
+                },
+                implied_probs.clone(),
+            )
+        })
+        .collect();
+    for (rank, fractional_market) in fractional_markets.iter().enumerate() {
+        let booksum: f64 = fractional_market.prices.iter().map(|price| 1. / price).sum();
+        let rmsre = compute_msre(
+            &sample_top_n.markets[rank].prices,
+            &fractional_market.prices,
+            &fit::FITTED_PRICE_RANGES[rank],
+        )
+        .sqrt();
+        debug!(
+            "fractional: {}, booksum: {:.6}, rmsre: {:.6}",
+            DisplaySlice::from(&*fractional_market.prices),
+            booksum,
+            rmsre,
+        );
+    }
+
     let model = calibrator.fit(sample_wp, &sample_overrounds)?;
     debug!("fitted {model:?}");
     let model = model.value;
@@ -108,7 +143,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let errors: Vec<_> = (0..derived_prices.rows())
         .map(|rank| {
-            fit::compute_msre(
+            compute_msre(
                 &race.prices[rank],
                 &derived_prices[rank],
                 &fit::FITTED_PRICE_RANGES[rank],
@@ -118,7 +153,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .collect();
 
     let errors_table = tabulate_values(&errors, "RMSRE");
-    let sample_overrounds: Vec<_> = sample_overrounds.iter().map(|overround| overround.value).collect();
+    let sample_overrounds: Vec<_> = sample_overrounds
+        .iter()
+        .map(|overround| overround.value)
+        .collect();
+
     let overrounds_table = tabulate_values(&sample_overrounds, "Overround");
     let sample_prices_table = tabulate_prices(&race.prices);
     let summary_table = Table::with_styles(Styles::default().with(HAlign::Centred))
