@@ -24,7 +24,7 @@ pub enum Regressor<O: AsIndex> {
     Exp(Box<Regressor<O>>, i32),
     Product(Vec<Regressor<O>>),
     Intercept,
-    ZeroIntercept,
+    Origin,
 }
 impl<O: AsIndex> Regressor<O> {
     pub fn resolve(&self, input: &[f64]) -> f64 {
@@ -36,12 +36,12 @@ impl<O: AsIndex> Regressor<O> {
                 .map(|regressor| regressor.resolve(input))
                 .product(),
             Regressor::Intercept => 1.,
-            Regressor::ZeroIntercept => 0.,
+            Regressor::Origin => 0.,
         }
     }
 
     pub fn is_constant(&self) -> bool {
-        matches!(self, Regressor::Intercept | Regressor::ZeroIntercept)
+        matches!(self, Regressor::Intercept | Regressor::Origin)
     }
 }
 
@@ -102,7 +102,7 @@ impl<O: AsIndex> Predictor<O> {
         let has_zero_intercept = self
             .regressors
             .iter()
-            .any(|regressor| matches!(regressor, Regressor::ZeroIntercept));
+            .any(|regressor| matches!(regressor, Regressor::Origin));
 
         let df_residual;
         let df_total;
@@ -150,7 +150,7 @@ pub(crate) fn validate_regressors<O: AsIndex>(
         bail!(
             "must specify exactly one {} or {} regressor",
             Regressor::<DummyOrdinal>::Intercept.to_string(),
-            Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
+            Regressor::<DummyOrdinal>::Origin.to_string()
         );
     }
     Ok(())

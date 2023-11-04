@@ -3,7 +3,7 @@ use ordinalizer::Ordinal;
 
 use Regressor::{Exp, Ordinal, Product};
 
-use crate::linear::regression::Regressor::{Intercept, ZeroIntercept};
+use crate::linear::regression::Regressor::{Intercept, Origin};
 use crate::testing::assert_slice_f64_relative;
 
 use super::*;
@@ -59,9 +59,9 @@ fn serde_json() {
         assert_eq!(r, rr);
     }
     {
-        let r = ZeroIntercept;
+        let r = Origin;
         let json = to_json(&r);
-        assert_eq!(r#""ZeroIntercept""#, json);
+        assert_eq!(r#""Origin""#, json);
         let rr = from_json(&json);
         assert_eq!(r, rr);
     }
@@ -129,7 +129,7 @@ fn regression_data_1() {
     }
     {
         // without intercept
-        let model = RegressionModel::fit(Factor::Y, vec![ZeroIntercept, Ordinal(Factor::X)], &data)
+        let model = RegressionModel::fit(Factor::Y, vec![Origin, Ordinal(Factor::X)], &data)
             .unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
@@ -231,7 +231,7 @@ fn regression_data_1() {
         // with multiple distinct regressors and no intercept
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![ZeroIntercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Origin, Ordinal(Factor::X), Ordinal(Factor::W)],
             &data,
         )
         .unwrap();
@@ -268,7 +268,7 @@ fn regression_data_1() {
         let model = RegressionModel::fit(
             Factor::Y,
             vec![
-                ZeroIntercept,
+                Origin,
                 Product(vec![Ordinal(Factor::X), Ordinal(Factor::W)]),
             ],
             &data,
@@ -361,7 +361,7 @@ fn regression_data_2() {
     }
     {
         // without intercept
-        let model = RegressionModel::fit(Factor::Y, vec![ZeroIntercept, Ordinal(Factor::X)], &data)
+        let model = RegressionModel::fit(Factor::Y, vec![Origin, Ordinal(Factor::X)], &data)
             .unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
@@ -423,7 +423,7 @@ fn regression_data_2() {
         // with multiple distinct regressors and no intercept
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![ZeroIntercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Origin, Ordinal(Factor::X), Ordinal(Factor::W)],
             &data,
         )
         .unwrap();

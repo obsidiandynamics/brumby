@@ -6,7 +6,7 @@
     { "Ordinal": "ActiveRunners" },
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
-    "ZeroIntercept"
+    "Origin"
   ],
   "w2": [
     { "Ordinal": "Weight0" },
@@ -15,7 +15,7 @@
     { "Ordinal": "ActiveRunners" },
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
-    "ZeroIntercept"
+    "Origin"
   ],
   "w3": [
     { "Ordinal": "Weight0" },
@@ -24,6 +24,6 @@
     { "Ordinal": "ActiveRunners" },
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 2]},
     { "Exp": [{ "Ordinal": "ActiveRunners" }, 3]},
-    "ZeroIntercept"
+    "Origin"
   ]
 }
