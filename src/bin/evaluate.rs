@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut evaluations = Vec::with_capacity(races.len());
     let num_races = races.len();
     for (index, race_file) in races.into_iter().enumerate() {
-        debug!("fitting race: {race_file:?} ({} of {num_races})", index + 1);
+        info!("fitting race: {} ({}) ({} of {num_races})", race_file.race.race_name, race_file.file.to_str().unwrap(), index + 1);
         let race = race_file.race.summarise();
         let calibrator = Calibrator::try_from(configs[&race.race_type].clone())?;
         let sample_top_n = TopN {

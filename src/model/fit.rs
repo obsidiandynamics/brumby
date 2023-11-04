@@ -141,9 +141,9 @@ pub fn fit_place(
             input[Factor::Stdev.ordinal()] = stdev;
             input[Factor::Weight0.ordinal()] = win_prob;
 
-            weighted_probs[(1, runner)] = cap(coefficients.w1.predict(&input));
-            weighted_probs[(2, runner)] = cap(coefficients.w2.predict(&input));
-            weighted_probs[(3, runner)] = cap(coefficients.w3.predict(&input));
+            weighted_probs[(1, runner)] = cap_probability(coefficients.w1.predict(&input));
+            weighted_probs[(2, runner)] = cap_probability(coefficients.w2.predict(&input));
+            weighted_probs[(3, runner)] = cap_probability(coefficients.w3.predict(&input));
         }
     }
     for rank in 1..model::PODIUM {
@@ -158,7 +158,7 @@ pub fn fit_place(
         options.individual_target_msre,
         options.max_individual_steps,
         place_rank,
-        // place_rank..=place_rank,//1..=3, //todo
+        // place_rank..=place_rank, //todo
         1..=model::PODIUM - 1,
         &place_market.overround,
         &place_market.prices,
@@ -278,12 +278,14 @@ fn fit_individual(
 
 #[inline(always)]
 fn scale_prob_capped(prob: &mut f64, adj: f64) {
-    *prob = cap(*prob * adj)
+    *prob = cap_probability(*prob * adj)
 }
 
+pub const PROBABILITY_EPSILON: f64 = 1e-6;
+
 /// Caps a probability in the interval \[0 + epsilon, 1 - epsilon], where `epsilon` is the smallest
-/// representable quantity.
+/// permissible probability, defined by [PROBABILITY_EPSILON].
 #[inline(always)]
-fn cap(value: f64) -> f64 {
-    f64::max(f64::MIN_POSITIVE, f64::min(value, 1.0 - f64::EPSILON))
+fn cap_probability(value: f64) -> f64 {
+    f64::max(PROBABILITY_EPSILON, f64::min(value, 1.0 - PROBABILITY_EPSILON))
 }

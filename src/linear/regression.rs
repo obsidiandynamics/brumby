@@ -90,35 +90,39 @@ impl<O: AsIndex> Predictor<O> {
 
     pub fn r_squared(&self, response: &O, data: &Matrix<f64>) -> RSquared {
         let response_index = response.as_index();
-        let (mut ssr, mut sst) = (0., 0.);
+        let (mut sum_sq_regression, mut sum_sq_total) = (0., 0.);
         let mut sum = 0.;
         for row in data {
             let response = row[response_index];
             let predicted = self.predict(row);
-            ssr += (response - predicted).powi(2);
+            sum_sq_regression += (response - predicted).powi(2);
             sum += response;
         }
         let samples = data.rows();
         let mean = sum / samples as f64;
         for row in data {
             let response = row[response_index];
-            sst += (response - mean).powi(2);
+            sum_sq_total += (response - mean).powi(2);
         }
         let has_zero_intercept = self
             .regressors
             .iter()
             .any(|regressor| matches!(regressor, Regressor::ZeroIntercept));
         let zero_intercepts = if has_zero_intercept { 1 } else { 0 };
+        // independent_variables: subtract 1 from number of regressors if intercept
+        // present or 2 if no intercept
         RSquared {
-            sum_sq_regression: ssr,
-            sum_sq_total: sst,
+            sum_sq_regression,
+            sum_sq_total,
             independent_variables: (self.regressors.len() - 1 - zero_intercepts),
             samples,
         }
     }
 }
 
-pub(crate) fn validate_regressors<O: AsIndex>(regressors: &[Regressor<O>]) -> Result<(), anyhow::Error> {
+pub(crate) fn validate_regressors<O: AsIndex>(
+    regressors: &[Regressor<O>],
+) -> Result<(), anyhow::Error> {
     if regressors.len() < 2 {
         bail!("at least two regressors must be present");
     }
@@ -128,10 +132,10 @@ pub(crate) fn validate_regressors<O: AsIndex>(regressors: &[Regressor<O>]) -> Re
         .count();
     if constants != 1 {
         bail!(
-                "must specify exactly one {} or {} regressor",
-                Regressor::<DummyOrdinal>::Intercept.to_string(),
-                Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
-            );
+            "must specify exactly one {} or {} regressor",
+            Regressor::<DummyOrdinal>::Intercept.to_string(),
+            Regressor::<DummyOrdinal>::ZeroIntercept.to_string()
+        );
     }
     Ok(())
 }
@@ -187,22 +191,24 @@ impl<O: AsIndex> RegressionModel<O> {
     where
         O: Debug,
     {
-        let mut table = Table::default().with_cols(vec![
-            Col::new(Styles::default()),
-            Col::new(Styles::default().with(MinWidth(12)).with(HAlign::Right)),
-            Col::new(Styles::default().with(MinWidth(11)).with(HAlign::Right)),
-            Col::new(Styles::default().with(MinWidth(9)).with(HAlign::Right)),
-            Col::new(Styles::default().with(MinWidth(5))),
-        ]).with_row(Row::new(
-            Styles::default().with(Header(true)),
-            vec![
-                "Regressor".into(),
-                "Coefficient".into(),
-                "Std. error".into(),
-                "P-value".into(),
-                "".into(),
-            ],
-        ));
+        let mut table = Table::default()
+            .with_cols(vec![
+                Col::new(Styles::default()),
+                Col::new(Styles::default().with(MinWidth(12)).with(HAlign::Right)),
+                Col::new(Styles::default().with(MinWidth(11)).with(HAlign::Right)),
+                Col::new(Styles::default().with(MinWidth(9)).with(HAlign::Right)),
+                Col::new(Styles::default().with(MinWidth(5))),
+            ])
+            .with_row(Row::new(
+                Styles::default().with(Header(true)),
+                vec![
+                    "Regressor".into(),
+                    "Coefficient".into(),
+                    "Std. error".into(),
+                    "P-value".into(),
+                    "".into(),
+                ],
+            ));
         for (regressor_index, regressor) in self.predictor.regressors.iter().enumerate() {
             table.push_row(Row::new(
                 Styles::default(),
@@ -494,6 +500,78 @@ mod tests {
             );
             assert_float_relative_eq!(0.9909774436090225, model.r_squared, EPSILON);
             assert_float_relative_eq!(0.9729323308270675, model.r_squared_adj, EPSILON);
+            assert_float_relative_eq!(
+                model.r_squared,
+                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
+                EPSILON
+            );
+            assert_float_relative_eq!(
+                model.r_squared_adj,
+                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
+                EPSILON
+            );
+        }
+        {
+            // with multiple distinct regressors
+            let model = RegressionModel::fit(
+                Factor::Y,
+                vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+                &data,
+            )
+            .unwrap();
+            assert_slice_f64_relative(
+                &model.predictor.coefficients,
+                &[17.60526315789471, -0.631578947368419, -6.578947368421037],
+                EPSILON,
+            );
+            assert_slice_f64_relative(
+                &model.std_errors,
+                &[5.333802206998271, 0.4243293551736085, 2.0213541441759535],
+                EPSILON,
+            );
+            assert_slice_f64_relative(
+                &model.p_values,
+                &[0.18727824790649023, 0.37661521814453486, 0.1897706353451349],
+                EPSILON,
+            );
+            assert_float_relative_eq!(0.9909774436090225, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.9729323308270675, model.r_squared_adj, EPSILON);
+            assert_float_relative_eq!(
+                model.r_squared,
+                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
+                EPSILON
+            );
+            assert_float_relative_eq!(
+                model.r_squared_adj,
+                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
+                EPSILON
+            );
+        }
+        {
+            // with multiple distinct regressors and no intercept
+            let model = RegressionModel::fit(
+                Factor::Y,
+                vec![ZeroIntercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+                &data,
+            )
+                .unwrap();
+            assert_slice_f64_relative(
+                &model.predictor.coefficients,
+                &[0.0, 0.760351500693751, 0.0764343613836096],
+                EPSILON,
+            );
+            assert_slice_f64_relative(
+                &model.std_errors,
+                &[0.0,  0.11484474436354505, 0.34641993071948335],
+                EPSILON,
+            );
+            assert_slice_f64_relative(
+                &model.p_values,
+                &[1.0, 0.022061436034720366, 0.8458482505584344],
+                EPSILON,
+            );
+            assert_float_relative_eq!(0.8926803145006207, model.r_squared, EPSILON);
+            assert_float_relative_eq!(0.8390204717509311, model.r_squared_adj, EPSILON);
             assert_float_relative_eq!(
                 model.r_squared,
                 model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
