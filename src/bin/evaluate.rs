@@ -86,7 +86,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut evaluations = Vec::with_capacity(races.len());
     let num_races = races.len();
     for (index, race_file) in races.into_iter().enumerate() {
-        info!("fitting race: {} ({}) ({} of {num_races})", race_file.race.race_name, race_file.file.to_str().unwrap(), index + 1);
+        info!(
+            "fitting race: {} ({}) ({} of {num_races})",
+            race_file.race.race_name,
+            race_file.file.to_str().unwrap(),
+            index + 1
+        );
+        //race_file.race.validate_place_price_equivalence()?;
         let race = race_file.race.summarise();
         let calibrator = Calibrator::try_from(configs[&race.race_type].clone())?;
         let sample_top_n = TopN {
@@ -124,7 +130,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     }
     let mean_worst_rmsre = {
-        let sum_rmsre: f64 = evaluations.iter().map(|evaluation| evaluation.worst_rmsre).sum();
+        let sum_rmsre: f64 = evaluations
+            .iter()
+            .map(|evaluation| evaluation.worst_rmsre)
+            .sum();
         sum_rmsre / num_races as f64
     };
     let elapsed = start_time.elapsed();
@@ -146,18 +155,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let best_subset = &evaluations[..usize::min(TOP_SUBSET, evaluations.len())];
     let best_table = tabulate_subset(best_subset, 0);
-    info!(
-        "best races:\n{}",
-        Console::default().render(&best_table)
-    );
+    info!("best races:\n{}", Console::default().render(&best_table));
 
     let start_index = evaluations.len().saturating_sub(TOP_SUBSET);
     let worst_subset = &evaluations[start_index..];
     let worst_table = tabulate_subset(worst_subset, start_index);
-    info!(
-        "worst races:\n{}",
-        Console::default().render(&worst_table)
-    );
+    info!("worst races:\n{}", Console::default().render(&worst_table));
 
     Ok(())
 }
@@ -182,17 +185,38 @@ fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
-            vec!["Rank".into(), "Worst RMSRE".into(), "File".into(), "Race type".into(), "Places paying".into()],
+            vec![
+                "Rank".into(),
+                "Worst RMSRE".into(),
+                "File".into(),
+                "Race type".into(),
+                "Places paying".into(),
+            ],
         ));
     table.push_rows(evaluations.iter().enumerate().map(|(index, evaluation)| {
         Row::new(
             Styles::default(),
             vec![
-                Cell::new(Styles::default().with(HAlign::Right), format!("{}", index + start_index + 1).into()),
-                Cell::new(Styles::default().with(HAlign::Right), format!("{:.6}", evaluation.worst_rmsre).into()),
-                Cell::new(Styles::default(), format!("{}", evaluation.file.to_str().unwrap()).into()),
-                Cell::new(Styles::default(), format!("{}", evaluation.race.race_type).into()),
-                Cell::new(Styles::default().with(HAlign::Right), format!("{:.6}", evaluation.race.places_paying).into())
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{}", index + start_index + 1).into(),
+                ),
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{:.6}", evaluation.worst_rmsre).into(),
+                ),
+                Cell::new(
+                    Styles::default(),
+                    format!("{}", evaluation.file.to_str().unwrap()).into(),
+                ),
+                Cell::new(
+                    Styles::default(),
+                    format!("{}", evaluation.race.race_type).into(),
+                ),
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{:.6}", evaluation.race.places_paying).into(),
+                ),
             ],
         )
     }));

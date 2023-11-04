@@ -67,10 +67,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         predicates.push(data::Predicate::Type { race_type });
     }
     let race_files = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
-    let races: Vec<_> = race_files.into_iter().map(|race_file| race_file.race).map(EventDetailExt::summarise).collect();
-
-    for (index, race) in races.iter().enumerate() {
-        debug!("fitting race: {} ({} of {})", race.race_name, index + 1, races.len());
+    let num_races = race_files.len();
+    for (index, race_file) in race_files.into_iter().enumerate() {
+        info!(
+            "fitting race: {} ({}) ({} of {num_races})",
+            race_file.race.race_name,
+            race_file.file.to_str().unwrap(),
+            index + 1,
+        );
+        //race_file.race.validate_place_price_equivalence()?;
+        let race = race_file.race.summarise();
         let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
             let prices = race.prices.row_slice(rank).to_vec();
             Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
@@ -100,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let elapsed = start_time.elapsed();
-    info!("fitted {} races in {}s", races.len(), elapsed.as_millis() as f64 / 1_000.);
+    info!("fitted {} races in {}s", num_races, elapsed.as_millis() as f64 / 1_000.);
 
     Ok(())
 }

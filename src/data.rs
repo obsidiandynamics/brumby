@@ -1,3 +1,4 @@
+use anyhow::bail;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -12,6 +13,7 @@ const PODIUM: usize = 4;
 
 pub trait EventDetailExt {
     fn summarise(self) -> RaceSummary;
+    fn validate_place_price_equivalence(&self) -> Result<(), anyhow::Error>;
 }
 impl EventDetailExt for EventDetail {
     fn summarise(self) -> RaceSummary {
@@ -19,7 +21,7 @@ impl EventDetailExt for EventDetail {
         for rank in 0..PODIUM {
             let row_slice = prices.row_slice_mut(rank);
             for (runner_index, runner_data) in self.runners.iter().enumerate() {
-                row_slice[runner_index] = match runner_data.prices.as_ref() {
+                row_slice[runner_index] = match &runner_data.prices {
                     None => f64::INFINITY,
                     Some(prices) => {
                         let price = match rank {
@@ -45,6 +47,29 @@ impl EventDetailExt for EventDetail {
             class_name: self.class_name,
             prices,
         }
+    }
+
+    fn validate_place_price_equivalence(&self) -> Result<(), anyhow::Error> {
+        for runner in &self.runners {
+            if let Some(prices) = &runner.prices {
+                let corresponding_top_price = match self.places_paying {
+                    1 => prices.top2,
+                    2 => prices.top3,
+                    3 => prices.top4,
+                    other => bail!("unsupported number of places paying {other}"),
+                };
+                if prices.place != corresponding_top_price {
+                    bail!(
+                        "place and top-{} prices do not match for runner r{}: {} vs {}",
+                        self.places_paying,
+                        runner.runner_number,
+                        prices.place,
+                        corresponding_top_price
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -125,10 +150,7 @@ pub fn read_from_dir(
     for file in files {
         let race = EventDetail::read_json_file(&file)?;
         if closure(&race) {
-            races.push(RaceFile {
-                race,
-                file
-            });
+            races.push(RaceFile { race, file });
         }
     }
     Ok(races)

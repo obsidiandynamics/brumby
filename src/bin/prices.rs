@@ -206,13 +206,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
-    if let Some(path) = args.file.as_ref() {
-        let event_detail = EventDetail::read_json_file(path)?;
-        return Ok(event_detail.summarise());
-    }
-    if let Some(&id) = args.download.as_ref() {
-        let event_detail = download_by_id(id).await?;
-        return Ok(event_detail.summarise());
-    }
-    unreachable!()
+    let event_detail = {
+        if let Some(path) = args.file.as_ref() {
+            EventDetail::read_json_file(path)?
+        } else if let Some(&id) = args.download.as_ref() {
+            download_by_id(id).await?
+        } else {
+            unreachable!()
+        }
+    };
+    //event_detail.validate_place_price_equivalence()?;
+    return Ok(event_detail.summarise());
 }
