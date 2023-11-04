@@ -4,21 +4,22 @@ use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::{mc, selection};
 use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
 use crate::market::{Market, Overround};
 use crate::model::cf::Coefficients;
 use crate::model::fit::{FitOptions, PlaceFitOutcome};
 use crate::print::DerivedPrice;
-use crate::selection::{Selection, validate_plausible_selections};
+use crate::selection::{validate_plausible_selections, Selection};
 use crate::timed::Timed;
+use crate::{market, mc, selection};
 
 pub mod cf;
 pub mod error;
 pub mod fit;
 
 pub const PODIUM: usize = 4;
+pub const LOWEST_PROBABILITY: f64 = 1e-6;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WinPlace {
@@ -72,7 +73,7 @@ impl WinPlace {
                     value: f64::max(MIN_OVERROUND, self.place.overround.value - overround_step),
                 },
             ],
-            other@ _ => {
+            other @ _ => {
                 bail!("unsupported number of places paying {other}");
             }
         };
@@ -104,6 +105,19 @@ impl TopN {
             .map(|market| market.overround.clone())
             .collect();
         Ok(overrounds)
+    }
+
+    pub fn as_price_matrix(&self) -> Matrix<DerivedPrice> {
+        let runners = self.markets[0].probs.len();
+        let ranks = self.markets.len();
+        let mut matrix = Matrix::allocate(ranks, runners);
+        for (rank, market) in self.markets.iter().enumerate() {
+            for runner in 0..runners {
+                let (probability, price) = (market.probs[runner], market.prices[runner]);
+                matrix[(rank, runner)] = DerivedPrice { probability, price };
+            }
+        }
+        matrix
     }
 }
 
@@ -239,9 +253,9 @@ impl TryFrom<Config> for Calibrator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    mc_iterations: u64,
-    fit_outcome: PlaceFitOutcome,
-    top_n: TopN,
+    pub mc_iterations: u64,
+    pub fit_outcome: PlaceFitOutcome,
+    pub top_n: TopN,
 }
 impl Model {
     pub fn derive_multi(
@@ -274,52 +288,9 @@ impl Model {
                 .with_iterations(self.mc_iterations)
                 .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
             let frac = engine.simulate(selections);
-            let probability = frac.quotient();
-            let price = 1. / probability / overround;
-            // let elapsed = start_time.elapsed();
-            // trace!(
-            //     "price generation for {selections:?} took {:.3}s",
-            //     elapsed.as_millis() as f64 / 1_000.
-            // );
+            let probability = f64::max(LOWEST_PROBABILITY, frac.quotient());
+            let price = market::multiply_capped(1.0 / probability, overround);
             Ok(DerivedPrice { probability, price })
         })
-        // validate_plausible_selections(selections)?;
-        // let start_time = Instant::now();
-        // let mut overround = 1.;
-        // let win_probs = &self.fit_outcome.fitted_probs[0];
-        // for selection in selections {
-        //     selection.validate(0..=PODIUM - 1, win_probs)?;
-        //     let (runner, rank) = match selection {
-        //         Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
-        //         Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
-        //     };
-        //     let market = &self.top_n.markets[rank];
-        //     let prob = market.probs[runner];
-        //     if prob == 0. {
-        //         bail!("cannot price a runner with zero probability");
-        //     }
-        //     let price = market.prices[runner];
-        //
-        //     overround *= 1. / prob / price;
-        // }
-        // let mut engine = mc::MonteCarloEngine::default()
-        //     .with_iterations(self.mc_iterations)
-        //     .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
-        // let frac = engine.simulate(selections);
-        // let probability = frac.quotient();
-        // let price = 1. / probability / overround;
-        // let elapsed = start_time.elapsed();
-        // trace!(
-        //     "price generation for {selections:?} took {:.3}s",
-        //     elapsed.as_millis() as f64 / 1_000.
-        // );
-        // let derived_price = DerivedPrice {
-        //     probability,
-        //     price,
-        // };
-        // Ok(Timed {
-        //     value: derived_price,
-        //     elapsed,
-        // })
     }
 }

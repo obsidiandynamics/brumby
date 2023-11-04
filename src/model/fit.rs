@@ -19,7 +19,7 @@ use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
 
 // const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
-const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
+pub const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FitOptions {

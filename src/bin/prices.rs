@@ -1,8 +1,6 @@
 use std::env;
 use std::error::Error;
-use std::ops::Range;
 use std::path::PathBuf;
-use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
@@ -16,21 +14,14 @@ use tracing::{debug, info};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
-use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, OverroundMethod};
+use brumby::model::{Calibrator, Config, fit, TopN, WinPlace};
 use brumby::model::cf::Coefficients;
-use brumby::model::fit;
-use brumby::model::fit::FitOptions;
-use brumby::opt::GradientDescentOutcome;
 use brumby::print::{
-    tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values, DerivedPrice,
+    tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values,
 };
-use brumby::selection::{Selection, Selections};
-use brumby::{market, mc, model, selection};
+use brumby::selection::Selections;
 
-const MC_ITERATIONS_EVAL: u64 = 1_000_000;
-// const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
-const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -76,7 +67,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "meeting: {}, race: {}, places_paying: {}, prices: {:?}",
         race.meeting_name, race.race_number, race.places_paying, race.prices,
     );
-    let place_rank = race.places_paying - 1;
 
     let coefficients_file = match race.race_type {
         EventType::Thoroughbred => PathBuf::from("config/thoroughbred.cf.json"),
@@ -85,149 +75,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     debug!("loading coefficients from {coefficients_file:?}");
     let coefficients = Coefficients::read_json_file(coefficients_file)?;
-    coefficients.validate()?;
-    // let mut win_probs: Vec<_> = race
-    //     .prices
-    //     .row_slice(0)
-    //     .invert()
-    //     .collect();
-    // let place_prices = race.prices.row_slice(2).to_vec();
-    //
-    // let win_overround = win_probs.normalise(1.0);
-    // let mut place_probs: Vec<_> = place_prices.invert().collect();
-    // let place_overround = place_probs.normalise(3.0) / 3.0;
-    // let outcome = fit_holistic(&win_probs, &place_prices);
-    //TODO skipping the holistic fit for now
-    // let outcome = GradientDescentOutcome {
-    //     iterations: 0,
-    //     optimal_residual: 0.008487581502095446,
-    //     optimal_value: 0.12547299468220757,
-    // };
-    let outcome = GradientDescentOutcome {
-        iterations: 0,
-        optimal_residual: 0.,
-        optimal_value: 0.,
+
+    let sample_top_n = TopN {
+        markets: (0..race.prices.rows())
+            .map(|rank| {
+                let prices = race.prices.row_slice(rank).to_vec();
+                Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
+            })
+            .collect(),
     };
-    // println!(
-    //     "gradient descent outcome: {outcome:?}, RMSRE: {}",
-    //     outcome.optimal_residual.sqrt()
-    // );
 
-    let dilatives = vec![
-        0.,
-        outcome.optimal_value,
-        outcome.optimal_value,
-        outcome.optimal_value,
-    ];
-    // let podium_places = dilatives.len();
-    // let num_runners = win_probs.len();
-    // let dilated_probs: Matrix<_> = DilatedProbs::default()
-    //     .with_win_probs(win_probs.into())
-    //     .with_dilatives(Capture::Borrowed(&dilatives))
-    //     .into();
+    let calibrator = Calibrator::try_from(Config {
+        coefficients,
+        fit_options: Default::default(),
+    })?;
+    let sample_wp = WinPlace {
+        win: sample_top_n.markets[0].clone(),
+        place: sample_top_n.markets[race.places_paying - 1].clone(),
+        places_paying: race.places_paying,
+    };
+    let sample_overrounds = sample_top_n.overrounds()?;
+    let model = calibrator.fit(sample_wp, &sample_overrounds)?;
+    debug!("fitted {model:?}");
+    let model = model.value;
 
-    let podium_places = model::PODIUM;
-    let num_runners = race.prices.row_slice(0).len();
-    let scenarios = selection::top_n_matrix(podium_places, num_runners);
-
-    let markets: Vec<_> = (0..race.prices.rows())
-        .map(|rank| {
-            let prices = race.prices.row_slice(rank).to_vec();
-            Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.)
-        })
-        .collect();
-    for market in &markets {
-        market.validate()?;
-    }
-
-    let fit_outcome = fit::fit_place(
-        &coefficients,
-        &FitOptions::default(),
-        &markets[0],
-        &markets[place_rank],
-        place_rank,
-    )?;
-    debug!(
-        "individual fitting complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
-        fit_outcome.stats.optimal_msre,
-        fit_outcome.stats.optimal_msre.sqrt(),
-        fit_outcome.stats.steps,
-        fit_outcome.stats.elapsed.as_millis() as f64 / 1_000.
-    );
-    // let fit_outcome = fit::fit_all(FitOptions {
-    //     mc_iterations: MC_ITERATIONS_TRAIN,
-    //     individual_target_msre: TARGET_MSRE,
-    // }, &markets, &dilatives);
-    // debug!("individual fitting complete: stats: {:?}", fit_outcome.stats);
-
-    let fitted_probs = fit_outcome.fitted_probs;
-    // if place_rank == 2 {
-    //     for runner in 0..num_runners {
-    //         let win_prob = markets[0].probs[runner];
-    //         if win_prob != 0.0 {
-    //             let place_prob = fitted_probs[(place_rank, runner)];
-    //             fitted_probs[(1, runner)] = win_prob * 0.3347010 + place_prob * 0.7379683 + num_runners as f64 * 0.0004262 + -0.0113370;
-    //             fitted_probs[(3, runner)] = win_prob * -1.819e-01 + place_prob * 1.141e+00 + num_runners as f64 * -2.370e-04 + 6.303e-03;
-    //         }
-    //     }
-    // }
-
-    let probs_table = tabulate_probs(&fitted_probs);
+    let probs_table = tabulate_probs(&model.fit_outcome.fitted_probs);
     println!("{}", Console::default().render(&probs_table));
 
-    let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(MC_ITERATIONS_EVAL)
-        .with_probs(fitted_probs.into());
-
-    let mut counts = Matrix::allocate(podium_places, num_runners);
-    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-
-    let mut derived_probs = Matrix::allocate(podium_places, num_runners);
-    for runner in 0..num_runners {
-        for rank in 0..podium_places {
-            let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-            derived_probs[(rank, runner)] = probability;
-        }
-    }
-
-    let mut derived_prices = Matrix::allocate(podium_places, num_runners);
-    for rank in 0..podium_places {
-        let probs = derived_probs.row_slice(rank);
-        let framed = Market::frame(&markets[rank].overround, probs.into());
-        for runner in 0..num_runners {
-            let probability = framed.probs[runner];
-            let price = framed.prices[runner];
-            let price = DerivedPrice { probability, price };
-            derived_prices[(rank, runner)] = price;
-        }
-    }
-
+    let derived_prices = model.top_n.as_price_matrix();
     let table = tabulate_derived_prices(&derived_prices);
     info!("\n{}", Console::default().render(&table));
 
-    let errors: Vec<_> = (0..podium_places)
+    let errors: Vec<_> = (0..derived_prices.rows())
         .map(|rank| {
             fit::compute_msre(
-                race.prices.row_slice(rank),
-                derived_prices.row_slice(rank),
-                &FITTED_PRICE_RANGES[rank],
+                &race.prices[rank],
+                &derived_prices[rank],
+                &fit::FITTED_PRICE_RANGES[rank],
             )
             .sqrt()
         })
         .collect();
 
-    let dilatives_table = tabulate_values(&dilatives, "Dilative");
     let errors_table = tabulate_values(&errors, "RMSRE");
-    let overrounds: Vec<_> = markets
-        .iter()
-        .map(|market| market.overround.value)
-        .collect();
-    let overrounds_table = tabulate_values(&overrounds, "Overround");
+    let sample_overrounds: Vec<_> = sample_overrounds.iter().map(|overround| overround.value).collect();
+    let overrounds_table = tabulate_values(&sample_overrounds, "Overround");
     let sample_prices_table = tabulate_prices(&race.prices);
     let summary_table = Table::with_styles(Styles::default().with(HAlign::Centred))
         .with_cols(vec![
-            Col::default(),
-            Col::new(Styles::default().with(Separator(true)).with(MinWidth(9))),
             Col::default(),
             Col::new(Styles::default().with(Separator(true)).with(MinWidth(9))),
             Col::default(),
@@ -235,8 +130,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Col::default(),
         ])
         .with_row(Row::from([
-            "Initial dilatives",
-            "",
             "Fitting errors",
             "",
             "Fitted overrounds",
@@ -246,8 +139,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_row(Row::new(
             Styles::default(),
             vec![
-                dilatives_table.into(),
-                "".into(),
                 errors_table.into(),
                 "".into(),
                 overrounds_table.into(),
@@ -258,32 +149,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("\n{}", Console::default().render(&summary_table));
 
     if let Some(selections) = args.selections {
-        let start_time = Instant::now();
-        // let overround = win_overround.powi(selections.len() as i32);
-        let mut overround = 1.;
-        for selection in &*selections {
-            let (runner, rank) = match selection {
-                Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
-                Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
-            };
-            // overround *= markets[rank].overround.value;
-            overround *= derived_prices[(rank, runner)].overround();
-        }
-        let frac = engine.simulate(&selections);
-        let elapsed_time = start_time.elapsed();
+        let price = model.derive_multi(&selections)?;
         info!(
-            "probability of {}: {}, fair price: {:.3}, overround: {overround:.3}, market odds: {:.3}",
+            "probability of {}: {}, fair price: {:.3}, overround: {:.3}, market odds: {:.3}",
             DisplaySlice::from(&*selections),
-            frac.quotient(),
-            1.0 / frac.quotient(),
-            market::multiply_capped(
-                1.0 / frac.quotient(),
-                overround
-            )
+            price.value.probability,
+            price.value.fair_price(),
+            price.value.fair_price() / price.value.price,
+            price.value.price
         );
         debug!(
             "price generation took {:.3}s",
-            elapsed_time.as_millis() as f64 / 1_000.
+            price.elapsed.as_millis() as f64 / 1_000.
         );
     }
     Ok(())
