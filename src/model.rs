@@ -15,7 +15,6 @@ use crate::timed::Timed;
 use crate::{market, mc, selection};
 
 pub mod cf;
-pub mod error;
 pub mod fit;
 
 pub const PODIUM: usize = 4;

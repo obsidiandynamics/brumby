@@ -25,6 +25,7 @@ pub struct FitOptions {
     pub mc_iterations: u64,
     pub individual_target_msre: f64,
     pub max_individual_steps: u64,
+    pub open_loop_exponent: f64,
 }
 
 impl FitOptions {
@@ -41,6 +42,9 @@ impl FitOptions {
         if self.max_individual_steps < MIN_MAX_INDIVIDUAL_STEPS {
             bail!("maximum number of individual fitting steps cannot be fewer than {MIN_MAX_INDIVIDUAL_STEPS}");
         }
+        if !(0.0..=1.0).contains(&self.open_loop_exponent) {
+            bail!("invalid open loop exponent");
+        }
         Ok(())
     }
 
@@ -50,6 +54,7 @@ impl FitOptions {
             mc_iterations: 1_000,
             individual_target_msre: 1e-3,
             max_individual_steps: 10,
+            open_loop_exponent: 1.0,
         }
     }
 }
@@ -60,6 +65,7 @@ impl Default for FitOptions {
             mc_iterations: 100_000,
             individual_target_msre: 1e-6,
             max_individual_steps: 100,
+            open_loop_exponent: 1.0,
         }
     }
 }
@@ -93,6 +99,7 @@ pub fn fit_all(options: FitOptions, markets: &[Market]) -> Result<AllFitOutcome,
                 options.max_individual_steps,
                 rank,
                 rank..=rank,
+                options.open_loop_exponent,
                 &market.overround,
                 &market.prices,
             );
@@ -158,8 +165,8 @@ pub fn fit_place(
         options.individual_target_msre,
         options.max_individual_steps,
         place_rank,
-        // place_rank..=place_rank, //todo
         1..=model::PODIUM - 1,
+        options.open_loop_exponent,
         &place_market.overround,
         &place_market.prices,
     );
@@ -208,6 +215,7 @@ fn fit_individual(
     max_individual_steps: u64,
     rank: usize,
     adj_ranks: RangeInclusive<usize>,
+    open_loop_exponent: f64,
     overround: &Overround,
     sample_prices: &[f64],
 ) -> IndividualFitOutcome {
@@ -252,8 +260,9 @@ fn fit_individual(
             if sample_price.is_finite() {
                 let fitted_price = market.prices[runner];
                 let adj = fitted_price / sample_price;
-                for rank in adj_ranks.clone() {
-                    scale_prob_capped(&mut current_probs[(rank, runner)], adj);
+                for adj_rank in adj_ranks.clone() {
+                    let exponent = if adj_rank == rank { 1.0 } else { open_loop_exponent };
+                    scale_prob_capped(&mut current_probs[(adj_rank, runner)], adj.powf(exponent));
                 }
             };
         }
@@ -274,15 +283,6 @@ fn fit_individual(
         },
         optimal_probs,
     }
-    // //TODO remove
-    // IndividualFitOutcome {
-    //     stats: OptimiserStats {
-    //         optimal_msre,
-    //         steps: step,
-    //         elapsed,
-    //     },
-    //     optimal_probs: weighted_probs.clone(),
-    // }
 }
 
 #[inline(always)]
