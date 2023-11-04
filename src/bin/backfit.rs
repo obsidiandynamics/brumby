@@ -97,8 +97,8 @@ fn fit_linear_model(
     info!(
         "fitted model:\n{}\nr_squared:     {:.6}\nr_squared_adj: {:.6}",
         Console::default().render(&table),
-        model.r_squared,
-        model.r_squared_adj
+        model.r_squared.unadjusted(),
+        model.r_squared.adjusted()
     );
     Ok(model)
 }

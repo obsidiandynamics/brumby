@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let races: Vec<_> = race_files.into_iter().map(|race_file| race_file.race).map(EventDetailExt::summarise).collect();
 
     for (index, race) in races.iter().enumerate() {
-        debug!("fitting race: {race:?} ({} of {})", index + 1, races.len());
+        debug!("fitting race: {} ({} of {})", race.race_name, index + 1, races.len());
         let markets: Vec<_> = (0..race.prices.rows()).map(|rank| {
             let prices = race.prices.row_slice(rank).to_vec();
             Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)

@@ -49,8 +49,8 @@ impl<O: AsIndex> Regressor<O> {
 pub struct RSquared {
     pub sum_sq_residual: f64,
     pub sum_sq_total: f64,
-    pub independent_variables: usize,
-    pub samples: usize,
+    pub df_residual: usize,
+    pub df_total: usize,
 }
 impl RSquared {
     pub fn unadjusted(&self) -> f64 {
@@ -58,8 +58,7 @@ impl RSquared {
     }
 
     pub fn adjusted(&self) -> f64 {
-        1. - (1. - self.unadjusted())
-            * ((self.samples - 1) as f64 / (self.samples - self.independent_variables - 1) as f64)
+        1. - self.sum_sq_residual / self.sum_sq_total * self.df_total as f64 / self.df_residual as f64
     }
 }
 
@@ -99,23 +98,40 @@ impl<O: AsIndex> Predictor<O> {
             sum += response;
         }
         let samples = data.rows();
-        let mean = sum / samples as f64;
-        for row in data {
-            let response = row[response_index];
-            sum_sq_total += (response - mean).powi(2);
-        }
+
         let has_zero_intercept = self
             .regressors
             .iter()
             .any(|regressor| matches!(regressor, Regressor::ZeroIntercept));
-        let zero_intercepts = if has_zero_intercept { 1 } else { 0 };
-        // independent_variables: subtract 1 from number of regressors if intercept
-        // present or 2 if no intercept
+
+        let df_residual;
+        let df_total;
+        if has_zero_intercept {
+            // emulates the behaviour of R for deriving both unadjusted and adjusted r-squared
+            // when the intercept is suppressed
+            for row in data {
+                let response = row[response_index];
+                sum_sq_total += response.powi(2);
+            }
+            df_residual = samples - self.regressors.len() + 1;
+            df_total = samples;
+        } else {
+            // standard derivation of unadjusted and adjusted r-squared when an intercept term
+            // is present
+            let mean = sum / samples as f64;
+            for row in data {
+                let response = row[response_index];
+                sum_sq_total += (response - mean).powi(2);
+            }
+            df_residual = samples - self.regressors.len();
+            df_total = samples - 1;
+        }
+
         RSquared {
             sum_sq_residual,
             sum_sq_total,
-            independent_variables: (self.regressors.len() - 1 - zero_intercepts),
-            samples,
+            df_residual,
+            df_total
         }
     }
 }
@@ -146,8 +162,7 @@ pub struct RegressionModel<O: AsIndex> {
     pub predictor: Predictor<O>,
     pub std_errors: Vec<f64>,
     pub p_values: Vec<f64>,
-    pub r_squared: f64,
-    pub r_squared_adj: f64,
+    pub r_squared: RSquared,
 }
 impl<O: AsIndex> RegressionModel<O> {
     pub fn fit(
@@ -172,18 +187,17 @@ impl<O: AsIndex> RegressionModel<O> {
         let coefficients = model.parameters().to_vec();
         let std_errors = model.se().to_vec();
         let p_values = model.p_values().to_vec();
-        let r_squared = model.rsquared();
-        let r_squared_adj = model.rsquared_adj();
+        let predictor = Predictor {
+            regressors,
+            coefficients,
+        };
+        let r_squared = predictor.r_squared(&response, data);
         Ok(RegressionModel {
             response,
-            predictor: Predictor {
-                regressors,
-                coefficients,
-            },
+            predictor,
             std_errors,
             p_values,
-            r_squared,
-            r_squared_adj,
+            r_squared
         })
     }
 
@@ -280,353 +294,4 @@ impl AsIndex for DummyOrdinal {
 }
 
 #[cfg(test)]
-mod tests {
-    use assert_float_eq::*;
-    use ordinalizer::Ordinal;
-
-    use Regressor::{Exp, Ordinal, Product};
-
-    use crate::linear::regression::Regressor::{Intercept, ZeroIntercept};
-    use crate::testing::assert_slice_f64_relative;
-
-    use super::*;
-
-    #[derive(Debug, PartialEq, ordinalizer::Ordinal, Display, Serialize, Deserialize)]
-    enum TestOrdinal {
-        A,
-        B,
-    }
-
-    impl AsIndex for TestOrdinal {
-        fn as_index(&self) -> usize {
-            self.ordinal()
-        }
-    }
-
-    #[test]
-    fn serde_json() {
-        fn to_json(r: &Regressor<TestOrdinal>) -> String {
-            serde_json::to_string(&r).unwrap()
-        }
-
-        fn from_json(json: &str) -> Regressor<TestOrdinal> {
-            serde_json::from_str(&json).unwrap()
-        }
-
-        {
-            let r = Ordinal(TestOrdinal::A);
-            let json = to_json(&r);
-            assert_eq!(r#"{"Ordinal":"A"}"#, json);
-            let rr = from_json(&json);
-            assert_eq!(r, rr);
-        }
-        {
-            let r = Exp(Ordinal(TestOrdinal::A).into(), 5);
-            let json = to_json(&r);
-            assert_eq!(r#"{"Exp":[{"Ordinal":"A"},5]}"#, json);
-            let rr = from_json(&json);
-            assert_eq!(r, rr);
-        }
-        {
-            let r = Product(vec![Ordinal(TestOrdinal::A), Ordinal(TestOrdinal::B)]);
-            let json = to_json(&r);
-            assert_eq!(r#"{"Product":[{"Ordinal":"A"},{"Ordinal":"B"}]}"#, json);
-            let rr = from_json(&json);
-            assert_eq!(r, rr);
-        }
-        {
-            let r = Intercept;
-            let json = to_json(&r);
-            assert_eq!(r#""Intercept""#, json);
-            let rr = from_json(&json);
-            assert_eq!(r, rr);
-        }
-        {
-            let r = ZeroIntercept;
-            let json = to_json(&r);
-            assert_eq!(r#""ZeroIntercept""#, json);
-            let rr = from_json(&json);
-            assert_eq!(r, rr);
-        }
-    }
-
-    #[test]
-    fn regression() {
-        #[derive(Ordinal)]
-        enum Factor {
-            Y,
-            X,
-            W,
-        }
-        impl AsIndex for Factor {
-            fn as_index(&self) -> usize {
-                self.ordinal()
-            }
-        }
-
-        #[rustfmt::skip]
-        fn sample_data() -> Matrix<f64> {
-            let mut data = Matrix::allocate(4, 3);
-            data.flatten_mut()
-                .clone_from_slice(&[
-                    2., 2., 2.2,
-                    3., 4., 1.8,
-                    4., 6., 1.5,
-                    6., 7., 1.1
-                ]);
-            data
-        }
-        let data = sample_data();
-        const EPSILON: f64 = 1e-13;
-        {
-            // with intercept
-            let model = RegressionModel::fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data)
-                .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[0.28813559322033333, 0.7288135593220351],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.std_errors,
-                &[0.9024528482694316, 0.1761407600917501],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.p_values,
-                &[0.7797772260959455, 0.05374447650832757],
-                EPSILON,
-            );
-            assert_float_relative_eq!(0.895399515738499, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.8430992736077485, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // without intercept
-            let model =
-                RegressionModel::fit(Factor::Y, vec![ZeroIntercept, Ordinal(Factor::X)], &data)
-                    .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[0.0, 0.7809523809523811],
-                EPSILON,
-            );
-            assert_slice_f64_relative(&model.std_errors, &[0.0, 0.05525998471596577], EPSILON);
-            assert_slice_f64_relative(&model.p_values, &[1.0, 0.0007674606469419348], EPSILON);
-            assert_float_relative_eq!(0.8900680272108843, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.8900680272108843, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // with square term
-            let model = RegressionModel::fit(
-                Factor::Y,
-                vec![
-                    Intercept,
-                    Ordinal(Factor::X),
-                    Exp(Ordinal(Factor::X).into(), 2),
-                ],
-                &data,
-            )
-            .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[2.6281407035175928, -0.5552763819095485, 0.14321608040201017],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.std_errors,
-                &[2.0551227965369234, 1.0499867426753304, 0.11579616705329593],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.p_values,
-                &[0.422492016413063, 0.6903140400788879, 0.43285536174646816],
-                EPSILON,
-            );
-            assert_float_relative_eq!(0.9586503948312993, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.875951184493898, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // with multiple distinct regressors
-            let model = RegressionModel::fit(
-                Factor::Y,
-                vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
-                &data,
-            )
-            .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[17.60526315789471, -0.631578947368419, -6.578947368421037],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.std_errors,
-                &[5.333802206998271, 0.4243293551736085, 2.0213541441759535],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.p_values,
-                &[0.18727824790649023, 0.37661521814453486, 0.1897706353451349],
-                EPSILON,
-            );
-            assert_float_relative_eq!(0.9909774436090225, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.9729323308270675, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // with multiple distinct regressors
-            let model = RegressionModel::fit(
-                Factor::Y,
-                vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
-                &data,
-            )
-            .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[17.60526315789471, -0.631578947368419, -6.578947368421037],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.std_errors,
-                &[5.333802206998271, 0.4243293551736085, 2.0213541441759535],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.p_values,
-                &[0.18727824790649023, 0.37661521814453486, 0.1897706353451349],
-                EPSILON,
-            );
-            assert_float_relative_eq!(0.9909774436090225, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.9729323308270675, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // with multiple distinct regressors and no intercept
-            let model = RegressionModel::fit(
-                Factor::Y,
-                vec![ZeroIntercept, Ordinal(Factor::X), Ordinal(Factor::W)],
-                &data,
-            )
-                .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[0.0, 0.760351500693751, 0.0764343613836096],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.std_errors,
-                &[0.0,  0.11484474436354505, 0.34641993071948335],
-                EPSILON,
-            );
-            assert_slice_f64_relative(
-                &model.p_values,
-                &[1.0, 0.022061436034720366, 0.8458482505584344],
-                EPSILON,
-            );
-            assert_float_relative_eq!(0.8926803145006207, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.8390204717509311, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-        {
-            // with interaction term and zero intercept
-            let model = RegressionModel::fit(
-                Factor::Y,
-                vec![
-                    ZeroIntercept,
-                    Product(vec![Ordinal(Factor::X), Ordinal(Factor::W)]),
-                ],
-                &data,
-            )
-            .unwrap();
-            assert_slice_f64_relative(
-                &model.predictor.coefficients,
-                &[0.0, 0.5324128800416095],
-                EPSILON,
-            );
-            assert_slice_f64_relative(&model.std_errors, &[0.0, 0.08921820060416732], EPSILON);
-            assert_slice_f64_relative(&model.p_values, &[1.0, 0.00941534405942245], EPSILON);
-            assert_float_relative_eq!(0.42282174773545533, model.r_squared, EPSILON);
-            assert_float_relative_eq!(0.42282174773545533, model.r_squared_adj, EPSILON);
-            assert_float_relative_eq!(
-                model.r_squared,
-                model.predictor.r_squared(&Factor::Y, &data).unadjusted(),
-                EPSILON
-            );
-            assert_float_relative_eq!(
-                model.r_squared_adj,
-                model.predictor.r_squared(&Factor::Y, &data).adjusted(),
-                EPSILON
-            );
-        }
-    }
-
-    #[test]
-    fn significance_resolve() {
-        assert_eq!(Significance::A, Significance::lookup(0.0));
-        assert_eq!(Significance::A, Significance::lookup(0.0009));
-        assert_eq!(Significance::B, Significance::lookup(0.001));
-        assert_eq!(Significance::B, Significance::lookup(0.009));
-        assert_eq!(Significance::C, Significance::lookup(0.01));
-        assert_eq!(Significance::C, Significance::lookup(0.049));
-        assert_eq!(Significance::D, Significance::lookup(0.05));
-        assert_eq!(Significance::D, Significance::lookup(0.09));
-        assert_eq!(Significance::E, Significance::lookup(0.1));
-        assert_eq!(Significance::E, Significance::lookup(1.0));
-    }
-}
+mod tests;
