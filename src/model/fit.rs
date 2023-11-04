@@ -18,7 +18,6 @@ use crate::model::cf::{Coefficients, Factor};
 use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
 
-// const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..50.0, 1.0..15.0, 1.0..10.0, 1.0..5.0];
 pub const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,6 +42,15 @@ impl FitOptions {
             bail!("maximum number of individual fitting steps cannot be fewer than {MIN_MAX_INDIVIDUAL_STEPS}");
         }
         Ok(())
+    }
+
+    /// Ultrafast presets when accuracy is unimportant (e.g., a demo).
+    pub fn fast() -> Self {
+        Self {
+            mc_iterations: 1_000,
+            individual_target_msre: 1e-3,
+            max_individual_steps: 10,
+        }
     }
 }
 
@@ -133,9 +141,9 @@ pub fn fit_place(
             input[Factor::Stdev.ordinal()] = stdev;
             input[Factor::Weight0.ordinal()] = win_prob;
 
-            weighted_probs[(1, runner)] = coefficients.w1.predict(&input);
-            weighted_probs[(2, runner)] = coefficients.w2.predict(&input);
-            weighted_probs[(3, runner)] = coefficients.w3.predict(&input);
+            weighted_probs[(1, runner)] = cap(coefficients.w1.predict(&input));
+            weighted_probs[(2, runner)] = cap(coefficients.w2.predict(&input));
+            weighted_probs[(3, runner)] = cap(coefficients.w3.predict(&input));
         }
     }
     for rank in 1..model::PODIUM {
@@ -270,6 +278,12 @@ fn fit_individual(
 
 #[inline(always)]
 fn scale_prob_capped(prob: &mut f64, adj: f64) {
-    let scaled = f64::max(0.0, f64::min(*prob * adj, 1.0));
-    *prob = scaled
+    *prob = cap(*prob * adj)
+}
+
+/// Caps a probability in the interval \[0 + epsilon, 1 - epsilon], where `epsilon` is the smallest
+/// representable quantity.
+#[inline(always)]
+fn cap(value: f64) -> f64 {
+    f64::max(f64::MIN_POSITIVE, f64::min(value, 1.0 - f64::EPSILON))
 }

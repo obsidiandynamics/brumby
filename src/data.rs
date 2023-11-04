@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use racing_scraper::get_racing_data;
@@ -108,18 +108,27 @@ impl From<Predicate> for PredicateClosure {
     }
 }
 
+#[derive(Debug)]
+pub struct RaceFile {
+    pub race: EventDetail,
+    pub file: PathBuf,
+}
+
 pub fn read_from_dir(
     path: impl AsRef<Path>,
     closurelike: impl Into<PredicateClosure>,
-) -> anyhow::Result<Vec<EventDetail>> {
+) -> anyhow::Result<Vec<RaceFile>> {
     let mut files = vec![];
     file::recurse_dir(path.as_ref().into(), &mut files, &mut |ext| ext == "json")?;
     let mut races = Vec::with_capacity(files.len());
     let mut closure = closurelike.into();
     for file in files {
-        let race = EventDetail::read_json_file(file)?;
+        let race = EventDetail::read_json_file(&file)?;
         if closure(&race) {
-            races.push(race);
+            races.push(RaceFile {
+                race,
+                file
+            });
         }
     }
     Ok(races)

@@ -69,8 +69,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let coefficients_file = match race.race_type {
-        EventType::Thoroughbred => PathBuf::from("config/thoroughbred.cf.json"),
-        EventType::Greyhound => PathBuf::from("config/greyhound.cf.json"),
+        EventType::Thoroughbred => "config/thoroughbred.cf.json",
+        EventType::Greyhound => "config/greyhound.cf.json",
         EventType::Harness => unimplemented!(),
     };
     debug!("loading coefficients from {coefficients_file:?}");

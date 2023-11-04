@@ -1,14 +1,17 @@
+use std::error::Error;
+use std::path::PathBuf;
+
+use stanza::renderer::console::Console;
+use stanza::renderer::Renderer;
+
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::cf::Coefficients;
 use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::model::cf::Coefficients;
+use brumby::model::fit::FitOptions;
 use brumby::print;
 use brumby::selection::{Rank, Runner};
-use stanza::renderer::console::Console;
-use stanza::renderer::Renderer;
-use std::error::Error;
-use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // probs taken from a popular website
@@ -39,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
     let config = Config {
         coefficients,
-        fit_options: Default::default(),
+        fit_options: FitOptions::fast(),
     };
     let calibrator = Calibrator::try_from(config)?;
 

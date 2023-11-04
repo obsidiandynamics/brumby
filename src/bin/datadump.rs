@@ -66,8 +66,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(race_type) = args.race_type {
         predicates.push(data::Predicate::Type { race_type });
     }
-    let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
-    let races: Vec<_> = races.into_iter().map(EventDetailExt::summarise).collect();
+    let race_files = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let races: Vec<_> = race_files.into_iter().map(|race_file| race_file.race).map(EventDetailExt::summarise).collect();
 
     for (index, race) in races.iter().enumerate() {
         debug!("fitting race: {race:?} ({} of {})", index + 1, races.len());
@@ -99,8 +99,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    let elapsed_time = start_time.elapsed();
-    info!("fitted {} races in {}s", races.len(), elapsed_time.as_millis() as f64 / 1_000.);
+    let elapsed = start_time.elapsed();
+    info!("fitted {} races in {}s", races.len(), elapsed.as_millis() as f64 / 1_000.);
 
     Ok(())
 }

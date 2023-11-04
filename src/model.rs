@@ -172,6 +172,9 @@ impl Calibrator {
     ) -> Result<Timed<Model>, anyhow::Error> {
         Timed::result(|| {
             wp.validate()?;
+            if overrounds.len() != PODIUM {
+                bail!("exactly {PODIUM} overrounds must be specified");
+            }
             let active_runners = wp.win.prices.iter().filter(|&&price| price > 0.).count();
             if active_runners < PODIUM {
                 bail!("at least {PODIUM} active runners required");
@@ -179,7 +182,7 @@ impl Calibrator {
 
             let fit_outcome = fit::fit_place(
                 &self.config.coefficients,
-                &FitOptions::default(),
+                &self.config.fit_options,
                 &wp.win,
                 &wp.place,
                 wp.places_paying - 1,
@@ -209,10 +212,6 @@ impl Calibrator {
         fit_outcome: &PlaceFitOutcome,
         overrounds: &[Overround],
     ) -> Result<TopN, anyhow::Error> {
-        if overrounds.len() != PODIUM {
-            bail!("exactly {PODIUM} overrounds must be specified");
-        }
-
         let mut engine = mc::MonteCarloEngine::default()
             .with_iterations(mc_iterations)
             .with_probs(Capture::Borrowed(&fit_outcome.fitted_probs));
@@ -264,7 +263,6 @@ impl Model {
     ) -> Result<Timed<DerivedPrice>, anyhow::Error> {
         Timed::result(|| {
             validate_plausible_selections(selections)?;
-            // let start_time = Instant::now();
             let mut overround = 1.;
             let win_probs = &self.fit_outcome.fitted_probs[0];
             for selection in selections {

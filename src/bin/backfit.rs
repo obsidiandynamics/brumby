@@ -53,10 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     args.validate()?;
     debug!("args: {args:?}");
 
-    let regressors_file = args
-        .regressors
-        .unwrap_or_else(|| PathBuf::from("../../config/greyhound.r.json"));
-    let regressors = Regressors::read_json_file(regressors_file)?;
+    let regressors = Regressors::read_json_file(args.regressors.unwrap())?;
     regressors.validate()?;
     debug!("regressors:\n{regressors:#?}");
 

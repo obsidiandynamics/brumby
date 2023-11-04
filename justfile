@@ -13,6 +13,10 @@ datadump *ARGS:
 backfit *ARGS:
     cargo run --release --bin backfit -- {{ARGS}}
 
+# evaluate the fitted model against a given dataset
+evaluate *ARGS:
+    cargo run --release --bin evaluate -- {{ARGS}}
+
 # run the multi example
 multi:
     cargo run --example multi --release

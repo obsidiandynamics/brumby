@@ -13,17 +13,20 @@ Circa 15M simulations/sec of a top-4 podium over 14 runners using the [tinyrand]
 Sourced from `examples/multi.rs`. To try this example, run `just multi` on the command line. You'll need [just](https://github.com/casey/just) installed.
 
 ```rust
+use std::error::Error;
+use std::path::PathBuf;
+
+use stanza::renderer::console::Console;
+use stanza::renderer::Renderer;
+
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::cf::Coefficients;
 use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::model::cf::Coefficients;
+use brumby::model::fit::FitOptions;
 use brumby::print;
 use brumby::selection::{Rank, Runner};
-use stanza::renderer::console::Console;
-use stanza::renderer::Renderer;
-use std::error::Error;
-use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // prices taken from a popular website
@@ -50,15 +53,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         28.0,
     ];
 
-    // load coefficients from a file and create a calibrator
+    // load coefficients from a file and create a calibrator for model fitting
     let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
     let config = Config {
         coefficients,
-        fit_options: Default::default(),
+        fit_options: FitOptions::fast()
     };
     let calibrator = Calibrator::try_from(config)?;
 
-    // fit Win and Place probabilities from the supplied prices, undoing the effect of the overrounds
+    // fit Win and Place probabilities from the supplied prices, undoing the overrounds
     let wp_markets = WinPlace {
         win: Market::fit(&OverroundMethod::Multiplicative, win_prices, 1.),
         place: Market::fit(&OverroundMethod::Multiplicative, place_prices, 3.),
@@ -70,11 +73,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // fit a model using the Win/Place prices and extrapolated overrounds
     let model = calibrator.fit(wp_markets, &overrounds)?.value;
-
-    // nicely format the derived prices
+    
+    // nicely format the derived price matrix
     let table = print::tabulate_derived_prices(&model.top_n.as_price_matrix());
     println!("\n{}", Console::default().render(&table));
-
+    
     // simulate a same-race multi for a chosen selection vector using the previously fitted model
     let selections = vec![
         Runner::number(6).top(Rank::number(1)),
