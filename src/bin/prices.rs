@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|rank| {
             Market::frame(
                 &Overround {
-                    method: OverroundMethod::Fractional,
+                    method: OverroundMethod::OddsRatio,
                     value: (rank + 1) as f64 * sample_overrounds[rank].value
                         / sample_overrounds[0].value,
                 },

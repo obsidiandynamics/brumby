@@ -37,7 +37,7 @@ impl Overround {
 pub enum OverroundMethod {
     Multiplicative,
     Power,
-    Fractional,
+    OddsRatio,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -88,7 +88,7 @@ impl Market {
         match method {
             OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, fair_sum),
             OverroundMethod::Power => Self::fit_power(prices, fair_sum),
-            OverroundMethod::Fractional => Self::fit_fractional(prices, fair_sum),
+            OverroundMethod::OddsRatio => Self::fit_odds_ratio(prices, fair_sum),
         }
     }
 
@@ -96,7 +96,7 @@ impl Market {
         match overround.method {
             OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround.value),
             OverroundMethod::Power => Self::frame_power(probs, overround.value),
-            OverroundMethod::Fractional => Self::frame_fractional(probs, overround.value)
+            OverroundMethod::OddsRatio => Self::frame_odds_ratio(probs, overround.value)
         }
     }
 
@@ -156,7 +156,7 @@ impl Market {
         }
     }
 
-    fn fit_fractional(prices: Vec<f64>, fair_sum: f64) -> Market {
+    fn fit_odds_ratio(prices: Vec<f64>, fair_sum: f64) -> Market {
         let overround = prices.invert().sum::<f64>() / fair_sum;
         let initial_d = overround;
         let outcome = opt::descent(
@@ -180,7 +180,6 @@ impl Market {
             },
         );
 
-        // println!("fit_fractional: outcome: {outcome:?}");
         let probs = prices
             .iter()
             .map(|price| {
@@ -193,7 +192,7 @@ impl Market {
             probs,
             prices,
             overround: Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: overround,
             },
         }
@@ -263,7 +262,7 @@ impl Market {
         }
     }
 
-    fn frame_fractional(probs: Vec<f64>, overround: f64) -> Market {
+    fn frame_odds_ratio(probs: Vec<f64>, overround: f64) -> Market {
         let fair_sum = probs.sum();
         let overround_sum = fair_sum * overround;
         let initial_d = overround;
@@ -289,7 +288,6 @@ impl Market {
             },
         );
 
-        // println!("frame_fractional: outcome: {outcome:?}");
         let prices = probs
             .iter()
             .map(|prob| {
@@ -307,7 +305,7 @@ impl Market {
             probs,
             prices,
             overround: Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: overround,
             },
         }

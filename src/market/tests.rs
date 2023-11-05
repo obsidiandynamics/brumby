@@ -114,37 +114,37 @@ fn fit_power() {
 }
 
 #[test]
-fn fit_fractional() {
+fn fit_odds_ratio() {
     {
         let prices = vec![10.0, 5.0, 3.333, 2.5];
-        let market = Market::fit(&OverroundMethod::Fractional, prices, 1.0);
+        let market = Market::fit(&OverroundMethod::OddsRatio, prices, 1.0);
         assert_slice_f64_relative(&[0.1, 0.2, 0.3, 0.4], &market.probs, 0.001);
         assert_float_absolute_eq!(1.0, market.overround.value, 0.001);
     }
     {
         let prices = vec![8.8335, 4.4816, 3.0309, 2.3056];
-        let market = Market::fit(&OverroundMethod::Fractional, prices, 1.0);
+        let market = Market::fit(&OverroundMethod::OddsRatio, prices, 1.0);
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[0.1, 0.2, 0.3, 0.4], &market.probs, 0.001);
         assert_float_absolute_eq!(1.1, market.overround.value, 0.001);
     }
     {
         let prices = vec![8.8335, 4.4816, 3.0309, 2.3056, f64::INFINITY];
-        let market = Market::fit(&OverroundMethod::Fractional, prices, 1.0);
+        let market = Market::fit(&OverroundMethod::OddsRatio, prices, 1.0);
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[0.1, 0.2, 0.3, 0.4, 0.0], &market.probs, 0.001);
         assert_float_absolute_eq!(1.1, market.overround.value, 0.001);
     }
     {
         let prices = vec![4.1132, 2.1675, 1.5189, 1.1946];
-        let market = Market::fit(&OverroundMethod::Fractional, prices, 2.0);
+        let market = Market::fit(&OverroundMethod::OddsRatio, prices, 2.0);
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[0.2, 0.4, 0.6, 0.8], &market.probs, 0.001);
         assert_float_absolute_eq!(1.1, market.overround.value, 0.001);
     }
     {
         let prices = vec![1.2494, 1.1109, 1.0647, 1.0416, f64::INFINITY];
-        let market = Market::fit(&OverroundMethod::Fractional, prices, 1.0);
+        let market = Market::fit(&OverroundMethod::OddsRatio, prices, 1.0);
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[0.1, 0.2, 0.3, 0.4, 0.0], &market.probs, 0.005);
         assert_float_absolute_eq!(3.6, market.overround.value, 0.001);
@@ -260,12 +260,12 @@ fn frame_power() {
 }
 
 #[test]
-fn frame_fractional() {
+fn frame_odds_ratio() {
     {
         let probs = vec![0.1, 0.2, 0.3, 0.4];
         let market = Market::frame(
             &Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: 1.0,
             },
             probs,
@@ -277,7 +277,7 @@ fn frame_fractional() {
         let probs = vec![0.1, 0.2, 0.3, 0.4];
         let market = Market::frame(
             &Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: 1.1,
             },
             probs,
@@ -289,7 +289,7 @@ fn frame_fractional() {
         let probs = vec![0.1, 0.2, 0.3, 0.4, 0.0];
         let market = Market::frame(
             &Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: 1.1,
             },
             probs,
@@ -305,7 +305,7 @@ fn frame_fractional() {
         let probs = vec![0.2, 0.4, 0.6, 0.8];
         let market = Market::frame(
             &Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: 1.1,
             },
             probs,
@@ -317,7 +317,7 @@ fn frame_fractional() {
         let probs = vec![0.1, 0.2, 0.3, 0.4, 0.0];
         let market = Market::frame(
             &Overround {
-                method: OverroundMethod::Fractional,
+                method: OverroundMethod::OddsRatio,
                 value: 3.6,
             },
             probs,

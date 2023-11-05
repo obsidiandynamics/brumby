@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         markets: (0..race.prices.rows())
             .map(|rank| {
                 let prices = race.prices.row_slice(rank).to_vec();
-                Market::fit(&OverroundMethod::Fractional, prices, rank as f64 + 1.)
+                Market::fit(&OverroundMethod::OddsRatio, prices, rank as f64 + 1.)
             })
             .collect(),
     };
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .map(|rank| {
                 Market::frame(
                     &Overround {
-                        method: OverroundMethod::Fractional,
+                        method: OverroundMethod::OddsRatio,
                         value: (rank + 1) as f64 * sample_overrounds[rank].value
                             / sample_overrounds[0].value,
                     },
