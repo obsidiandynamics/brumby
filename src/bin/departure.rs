@@ -133,22 +133,22 @@ fn find_quantiles(assessments: &[Assessment], quantiles: &[f64]) -> Vec<(f64, f6
 fn tabulate_subset(assessments: &[Assessment], start_index: usize) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
-            Col::new(Styles::default().with(MinWidth(6))),
-            Col::new(Styles::default().with(MinWidth(12))),
-            Col::new(Styles::default().with(MinWidth(10))),
-            Col::new(Styles::default().with(MinWidth(40))),
-            Col::new(Styles::default().with(MinWidth(14))),
-            Col::new(Styles::default().with(MinWidth(14))),
+            Col::new(Styles::default().with(MinWidth(5))),
+            Col::new(Styles::default()),
+            Col::new(Styles::default()),
+            Col::new(Styles::default().with(MinWidth(60))),
+            Col::new(Styles::default()),
+            Col::new(Styles::default()),
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
             vec![
                 "Rank".into(),
-                "Worst departure".into(),
-                "RMS departure".into(),
+                "Worst\ndeparture".into(),
+                "RMS\ndeparture".into(),
                 "File".into(),
-                "Race type".into(),
-                "Places paying".into(),
+                "Race\ntype".into(),
+                "Places\npaying".into(),
             ],
         ));
     table.push_rows(assessments.iter().enumerate().map(|(index, assessment)| {

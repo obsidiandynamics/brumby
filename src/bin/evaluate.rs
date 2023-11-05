@@ -14,7 +14,7 @@ use stanza::table::{Cell, Col, Row, Table};
 use tracing::{debug, info};
 
 use brumby::data;
-use brumby::data::{EventDetailExt, PredicateClosures, RaceSummary};
+use brumby::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::cf::Coefficients;
@@ -106,6 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             race_file.file.to_str().unwrap(),
             index + 1
         );
+        let departure = race_file.race.place_price_departure();
         let race = race_file.race.summarise();
         let calibrator = Calibrator::try_from(configs[&race.race_type].clone())?;
         let sample_top_n = TopN {
@@ -140,6 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             file: race_file.file,
             race,
             worst_rmsre,
+            departure,
         });
     }
     let mean_worst_rmsre = {
@@ -191,20 +193,24 @@ fn find_quantiles(evaluations: &[Evaluation], quantiles: &[f64]) -> Vec<(f64, f6
 fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
-            Col::new(Styles::default().with(MinWidth(6))),
-            Col::new(Styles::default().with(MinWidth(12))),
-            Col::new(Styles::default().with(MinWidth(40))),
-            Col::new(Styles::default().with(MinWidth(14))),
-            Col::new(Styles::default().with(MinWidth(14))),
+            Col::new(Styles::default().with(MinWidth(5))),
+            Col::new(Styles::default()),
+            Col::new(Styles::default()),
+            Col::new(Styles::default()),
+            Col::new(Styles::default().with(MinWidth(60))),
+            Col::new(Styles::default()),
+            Col::new(Styles::default()),
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
             vec![
                 "Rank".into(),
-                "Worst RMSRE".into(),
+                "Worst\nRMSRE".into(),
+                "Worst\ndeparture".into(),
+                "RMS\ndeparture".into(),
                 "File".into(),
-                "Race type".into(),
-                "Places paying".into(),
+                "Race\ntype".into(),
+                "Places\npaying".into(),
             ],
         ));
     table.push_rows(evaluations.iter().enumerate().map(|(index, evaluation)| {
@@ -218,6 +224,14 @@ fn tabulate_subset(evaluations: &[Evaluation], start_index: usize) -> Table {
                 Cell::new(
                     Styles::default().with(HAlign::Right),
                     format!("{:.6}", evaluation.worst_rmsre).into(),
+                ),
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{:.3}", evaluation.departure.worst).into(),
+                ),
+                Cell::new(
+                    Styles::default().with(HAlign::Right),
+                    format!("{:.3}", evaluation.departure.root_mean_sq).into(),
                 ),
                 Cell::new(
                     Styles::default(),
@@ -265,4 +279,5 @@ struct Evaluation {
     file: PathBuf,
     race: RaceSummary,
     worst_rmsre: f64,
+    departure: PlacePriceDeparture
 }

@@ -285,9 +285,12 @@ fn fit_individual(
     }
 }
 
+/// Adjust the given `probability` by multiplying it by the `adj` coefficient, capping the result
+/// using [cap_probability()]. The resulting adjusted probability will remain in the valid
+/// probability range.
 #[inline(always)]
-fn scale_prob_capped(prob: &mut f64, adj: f64) {
-    *prob = cap_probability(*prob * adj)
+fn scale_prob_capped(probability: &mut f64, adj: f64) {
+    *probability = cap_probability(*probability * adj)
 }
 
 /// Smallest permissible probability used for capping values produced by the linear model.

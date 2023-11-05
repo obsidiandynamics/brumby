@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
     let config = Config {
         coefficients,
-        fit_options: FitOptions::fast()
+        fit_options: FitOptions::fast() // use the default presents in production; fast presets are used for testing
     };
     let calibrator = Calibrator::try_from(config)?;
 
@@ -95,3 +95,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 ```
+
+# How it works
+Brumby is based on a regression-fitted, weighted Monte Carlo (MC) simulation.
+
+Ideally, one would start with a set of fair probabilities. But in less ideal scenarios, you might have prices with an overround applied; it is first necessary to remove the overround to obtain a set of fair probabilities. Brumby includes both fitting and framing support for several overround methods, including _multiplicative_, _power_ and _fractional_. Fitting and framing capabilities are complementary: by 'fitting' it is meant the removal of overrounds from an existing market offering; by 'framing' it is meant the application of overrounds to a set of fair probabilities to obtain a corresponding set of market prices.
+
+We start with a naive MC model. It simulates a podium finish using the supplied set of win probabilities. The naive model takes input a vector of probabilities _P_ and runs a series of random trials using a seeded pseudo-RNG. _P<sub>j</sub>_ is the probability of runner _j_ finishing first. In each trial, a uniformly distributed random number is mapped to an interval proportional to the supplied probabilities. This yields the winner of that trial. In the same trial, we then eliminate the winner's interval and adjust the output range of the RNG accordingly. The subsequent random number points to the second place getter, and so forth, until the desired podium is established. The podium is recorded for that trial and the next trial begins. As trials progress, the system establishes a matrix of top-N placement probabilities for each runner. (Row per rank and column per runner.) We have observed that 100K trials are generally sufficient to populate a probabilities matrix with sufficient precision to be used in wagering applications, such as pricing derivatives. Accuracy, however, is another matter.
+
+A minor digression: Brumby relies on a custom-built MC engine that utilises pooled memory buffers to avoid costly allocations — `malloc` and `free` syscalls. It also uses a custom 2D matrix data structure that flattens all rows into a contiguous vector, thereby avoiding memory sparsity and takes advantage of CPU-level caching to update and retrieve nearby data points. This provides a reasonably performant, allocation-free MC simulator, taking ~65 ns to perform one trial of a 4-place podium over a field of 14.
+
+The model above is unaware of the systemic biases such as the favourite-longshot bias, nor does it realise that longshots are more likely to place than their win probability might imply. (Conversely, favourites are less likely to place.) We don't go into details here, suffice it to say that real-life competitors are motivated differently depending on their position in the race. A naive MC model assumes a field of runners with constant exertion and no motives other than the ambition to come first.
+
+The naive model is clearly insufficient. The assumptions it makes are simply untrue in any competitive sport that we are aware of. While the accuracy may be palatable in a field of approximately equally-capable runners, it breaks down in fields of diverse runner strengths. Since the target applications mostly comprise the latter, we must modify the model to skew the probabilities of a runner coming in positions 2 through to 4 (assuming a four-place podium) without affecting their win probability. We introduce a fine-grained biasing layer capable of targeting individual runners in specific finishing position. Where the naive model uses a vector of probabilities _P_, the biased model uses a matrix _W_ — with one row per finishing rank. _W<sub>i,j</sub>_ is the relative probability of runner _j_ taking position _i_. When all rows are identical, the biased model behaves identically to the naive one.
+
+The offline-fitted model does not cater to specific biases present in individual races and, crucially, it does not protect the operator of the model against _internal arbitrage_ opportunities. This
+
