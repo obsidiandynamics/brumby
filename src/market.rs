@@ -1,5 +1,5 @@
 use crate::opt;
-use crate::opt::GradientDescentConfig;
+use crate::opt::DescentConfig;
 use crate::probs::SliceExt;
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -118,8 +118,8 @@ impl Market {
         let est_rtp = 1.0 / overround;
         let initial_k = 1.0 + f64::ln(est_rtp) / f64::ln(prices.len() as f64);
         // println!("fit_power: initial_k: {initial_k}");
-        let outcome = opt::gd(
-            GradientDescentConfig {
+        let outcome = opt::descent(
+            DescentConfig {
                 init_value: initial_k,
                 step: -0.01,
                 min_step: 0.0001,
@@ -159,8 +159,8 @@ impl Market {
     fn fit_fractional(prices: Vec<f64>, fair_sum: f64) -> Market {
         let overround = prices.invert().sum::<f64>() / fair_sum;
         let initial_d = overround;
-        let outcome = opt::gd(
-            GradientDescentConfig {
+        let outcome = opt::descent(
+            DescentConfig {
                 init_value: initial_d,
                 step: 0.1,
                 min_step: 0.0001,
@@ -220,8 +220,8 @@ impl Market {
         let initial_k = 1.0 + f64::ln(rtp) / f64::ln(probs.len() as f64);
         let min_scaled_price = 1.0 + (MIN_PRICE - 1.0) / fair_sum;
         let max_scaled_price = 1.0 + (MAX_PRICE - 1.0) / fair_sum;
-        let outcome = opt::gd(
-            GradientDescentConfig {
+        let outcome = opt::descent(
+            DescentConfig {
                 init_value: initial_k,
                 step: -0.01,
                 min_step: 0.0001,
@@ -267,8 +267,8 @@ impl Market {
         let fair_sum = probs.sum();
         let overround_sum = fair_sum * overround;
         let initial_d = overround;
-        let outcome = opt::gd(
-            GradientDescentConfig {
+        let outcome = opt::descent(
+            DescentConfig {
                 init_value: initial_d,
                 step: 0.1,
                 min_step: 0.0001,

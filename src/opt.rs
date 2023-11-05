@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-pub struct GradientDescentConfig {
+pub struct DescentConfig {
     pub init_value: f64,
     pub step: f64,
     pub min_step: f64,
@@ -8,20 +8,20 @@ pub struct GradientDescentConfig {
 }
 
 #[derive(Debug)]
-pub struct GradientDescentOutcome {
+pub struct DescentOutcome {
     pub iterations: u64,
     pub optimal_value: f64,
     pub optimal_residual: f64,
 }
 
-pub fn gd(
-    config: GradientDescentConfig,
+pub fn descent(
+    config: DescentConfig,
     mut loss_f: impl FnMut(f64) -> f64,
-) -> GradientDescentOutcome {
+) -> DescentOutcome {
     let mut iterations = 0;
     let mut residual = loss_f(config.init_value);
     if residual <= config.max_residual {
-        return GradientDescentOutcome {
+        return DescentOutcome {
             iterations: 0,
             optimal_value: config.init_value,
             optimal_residual: residual
@@ -60,7 +60,7 @@ pub fn gd(
         residual = new_residual;
         value = new_value;
     }
-    GradientDescentOutcome {
+    DescentOutcome {
         iterations,
         optimal_value,
         optimal_residual,
@@ -73,15 +73,15 @@ mod tests {
     use assert_float_eq::*;
 
     #[test]
-    fn gd_sqrt() {
-        let config = GradientDescentConfig {
+    fn descent_sqrt() {
+        let config = DescentConfig {
             init_value: 0.0,
             step: 0.1,
             min_step: 0.00001,
             max_steps: 100,
             max_residual: 0.0
         };
-        let outcome = gd(config.clone(), |value| (81.0 - value.powi(2)).powi(2));
+        let outcome = descent(config.clone(), |value| (81.0 - value.powi(2)).powi(2));
         assert_float_absolute_eq!(9.0, outcome.optimal_value, config.min_step);
     }
 }
