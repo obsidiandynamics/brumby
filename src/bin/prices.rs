@@ -2,7 +2,7 @@ use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use clap::Parser;
 use racing_scraper::models::{EventDetail, EventType};
 use stanza::renderer::console::Console;
@@ -16,8 +16,8 @@ use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
 use brumby::model::cf::Coefficients;
-use brumby::model::fit::compute_msre;
-use brumby::model::{fit, Calibrator, Config, TopN, WinPlace, PODIUM};
+use brumby::model::fit::{compute_msre, FitOptions};
+use brumby::model::{fit, Fitter, FitterConfig, TopN, WinPlace, PODIUM, Model, Primer};
 use brumby::print::{tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
 use brumby::selection::Selections;
 
@@ -35,6 +35,10 @@ struct Args {
 
     /// selections to price
     selections: Option<Selections<'static>>,
+
+    /// model type
+    #[clap(short = 'm', long, value_parser = parse_model_type, default_value = "fitted")]
+    model: ModelType
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -44,6 +48,19 @@ impl Args {
             bail!("either the -f or the -d flag must be specified");
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ModelType {
+    Primed,
+    Fitted
+}
+fn parse_model_type(s: &str) -> anyhow::Result<ModelType> {
+    match s.to_lowercase().as_str() {
+        "primed" => Ok(ModelType::Primed),
+        "fitted" => Ok(ModelType::Fitted),
+        _ => Err(anyhow!("unsupported model type {s}")),
     }
 }
 
@@ -83,11 +100,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             })
             .collect(),
     };
-
-    let calibrator = Calibrator::try_from(Config {
-        coefficients,
-        fit_options: Default::default(),
-    })?;
     let sample_wp = WinPlace {
         win: sample_top_n.markets[0].clone(),
         place: sample_top_n.markets[race.places_paying - 1].clone(),
@@ -129,14 +141,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    let model = calibrator.fit(sample_wp, &sample_overrounds)?;
-    debug!("fitted {model:?}");
-    let model = model.value;
+    let fit_options = FitOptions::default();
+    let model: Box<dyn Model> = match args.model {
+        ModelType::Primed => {
+            let primer = Primer::try_from(coefficients)?;
+            let model = primer.prime(&sample_wp.win, sample_wp.places_paying, fit_options.mc_trials, &sample_overrounds)?;
+            debug!("fitted {model:?}");
+            Box::new(model.value)
+        }
+        ModelType::Fitted => {
+            let calibrator = Fitter::try_from(FitterConfig {
+                coefficients,
+                fit_options
+            })?;
+            let model = calibrator.fit(&sample_wp, &sample_overrounds)?;
+            debug!("fitted {model:?}");
+            Box::new(model.value)
+        }
+    };
 
-    let probs_table = tabulate_probs(&model.fit_outcome.fitted_probs);
+    let probs_table = tabulate_probs(model.weighted_probs());
     println!("{}", Console::default().render(&probs_table));
 
-    let derived_prices = model.top_n.as_price_matrix();
+    let derived_prices = model.prices().as_price_matrix();
     let table = tabulate_derived_prices(&derived_prices);
     info!("\n{}", Console::default().render(&table));
 

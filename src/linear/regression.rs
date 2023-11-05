@@ -227,7 +227,7 @@ impl<O: AsIndex> RegressionModel<O> {
             table.push_row(Row::new(
                 Styles::default(),
                 vec![
-                    format!("{:?}", regressor).into(),
+                    format!("{regressor:?}").into(),
                     format!("{:.8}", self.predictor.coefficients[regressor_index]).into(),
                     format!("{:.6}", self.std_errors[regressor_index]).into(),
                     format!("{:.6}", self.p_values[regressor_index]).into(),

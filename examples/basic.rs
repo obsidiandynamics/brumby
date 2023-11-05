@@ -25,7 +25,7 @@ fn main() {
 
     // create an MC engine for reuse
     let mut engine = mc::MonteCarloEngine::default()
-        .with_iterations(100_000)
+        .with_trials(100_000)
         .with_probs(Capture::Owned(
             DilatedProbs::default()
                 .with_win_probs(Capture::Borrowed(&probs))

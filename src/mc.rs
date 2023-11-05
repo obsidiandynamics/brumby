@@ -1,14 +1,14 @@
 //! The core of the Monte Carlo simulator.
 
+use tinyrand::{Rand, StdRand};
+
 use crate::capture::{Capture, CaptureMut};
 use crate::linear::matrix::Matrix;
 use crate::probs::{Fraction, SliceExt};
 use crate::selection::{Selection, Selections};
-use std::ops::DerefMut;
-use tinyrand::{Rand, StdRand};
 
 pub struct MonteCarloEngine<'a, R: Rand> {
-    iterations: u64,
+    trials: u64,
     probs: Option<Capture<'a, Matrix<f64>, Matrix<f64>>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
@@ -21,7 +21,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         R: Default,
     {
         Self {
-            iterations: 10_000,
+            trials: 10_000,
             probs: None,
             podium: None,
             bitmap: None,
@@ -38,19 +38,21 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self.rand = rand.into();
     }
 
-    pub fn with_iterations(mut self, iterations: u64) -> Self {
-        self.iterations = iterations;
+    #[must_use]
+    pub fn with_trials(mut self, trials: u64) -> Self {
+        self.trials = trials;
         self
     }
 
-    pub fn set_iterations(&mut self, iterations: u64) {
-        self.iterations = iterations;
+    pub fn set_trials(&mut self, trials: u64) {
+        self.trials = trials;
     }
 
-    pub fn iterations(&self) -> u64 {
-        self.iterations
+    pub fn trials(&self) -> u64 {
+        self.trials
     }
 
+    #[must_use]
     pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) -> Self {
         self.probs = Some(probs);
         self
@@ -64,16 +66,19 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         self.probs.as_ref()
     }
 
+    #[must_use]
     pub fn with_podium(mut self, podium: CaptureMut<'a, Vec<usize>, [usize]>) -> Self {
         self.podium = Some(podium);
         self
     }
 
+    #[must_use]
     pub fn with_bitmap(mut self, bitmap: CaptureMut<'a, Vec<bool>, [bool]>) -> Self {
         self.bitmap = Some(bitmap);
         self
     }
 
+    #[must_use]
     pub fn with_totals(mut self, totals: CaptureMut<'a, Vec<f64>, [f64]>) -> Self {
         self.totals = Some(totals);
         self
@@ -102,13 +107,13 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
 
         simulate(
-            self.iterations,
+            self.trials,
             selections,
             self.probs.as_ref().unwrap(),
             self.podium.as_mut().unwrap(),
             self.bitmap.as_mut().unwrap(),
             self.totals.as_mut().unwrap(),
-            self.rand.deref_mut(),
+            &mut *self.rand,
         )
     }
 
@@ -121,15 +126,15 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
         // println!("simulating with: \n{}", self.probs.as_ref().unwrap().verbose());
 
         simulate_batch(
-            self.iterations,
+            self.trials,
             scenarios,
             counts,
             self.probs.as_ref().unwrap(),
             self.podium.as_mut().unwrap(),
             self.bitmap.as_mut().unwrap(),
             self.totals.as_mut().unwrap(),
-            self.rand.deref_mut(),
-        )
+            &mut *self.rand,
+        );
     }
 
     fn ensure_init(&mut self) {
@@ -137,10 +142,10 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
             self.bitmap = Some(CaptureMut::Owned(vec![true; self.num_runners()]));
         }
         if self.podium.is_none() {
-            self.podium = Some(CaptureMut::Owned(vec![usize::MAX; self.num_ranks()]))
+            self.podium = Some(CaptureMut::Owned(vec![usize::MAX; self.num_ranks()]));
         }
         if self.totals.is_none() {
-            self.totals = Some(CaptureMut::Owned(vec![1.0; self.num_ranks()]))
+            self.totals = Some(CaptureMut::Owned(vec![1.0; self.num_ranks()]));
         }
     }
 }
@@ -157,16 +162,19 @@ pub struct DilatedProbs<'a> {
     dilatives: Option<Capture<'a, Vec<f64>, [f64]>>,
 }
 impl<'a> DilatedProbs<'a> {
+    #[must_use]
     pub fn with_win_probs(mut self, win_probs: Capture<'a, Vec<f64>, [f64]>) -> Self {
         self.win_probs = Some(win_probs);
         self
     }
 
+    #[must_use]
     pub fn with_dilatives(mut self, dilatives: Capture<'a, Vec<f64>, [f64]>) -> Self {
         self.dilatives = Some(dilatives);
         self
     }
 
+    #[must_use]
     pub fn with_podium_places(self, podium_places: usize) -> Self {
         self.with_dilatives(Capture::Owned(vec![0.0; podium_places]))
     }
@@ -184,7 +192,7 @@ impl From<DilatedProbs<'_>> for Matrix<f64> {
 }
 
 pub fn simulate_batch(
-    iterations: u64,
+    trials: u64,
     scenarios: &[Selections],
     counts: &mut [u64],
     probs: &Matrix<f64>,
@@ -201,7 +209,7 @@ pub fn simulate_batch(
     );
 
     counts.fill(0);
-    for _ in 0..iterations {
+    for _ in 0..trials {
         run_once(probs, podium, bitmap, totals, rand);
         for (scenario_index, selections) in scenarios.iter().enumerate() {
             if selections.iter().all(|selection| selection.matches(podium)) {
@@ -212,7 +220,7 @@ pub fn simulate_batch(
 }
 
 pub fn simulate(
-    iterations: u64,
+    trials: u64,
     selections: &[Selection],
     probs: &Matrix<f64>,
     podium: &mut [usize],
@@ -223,7 +231,7 @@ pub fn simulate(
     assert!(validate_args(probs, podium, bitmap, totals));
 
     let mut matching_iters = 0;
-    for _ in 0..iterations {
+    for _ in 0..trials {
         run_once(probs, podium, bitmap, totals, rand);
         if selections.iter().all(|selection| selection.matches(podium)) {
             matching_iters += 1;
@@ -231,7 +239,7 @@ pub fn simulate(
     }
     Fraction {
         numerator: matching_iters,
-        denominator: iterations,
+        denominator: trials,
     }
 }
 

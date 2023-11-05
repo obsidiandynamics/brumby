@@ -22,7 +22,7 @@ use stanza::renderer::Renderer;
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::model::{Fitter, FitterConfig, WinPlace, Model};
 use brumby::model::cf::Coefficients;
 use brumby::model::fit::FitOptions;
 use brumby::print;
@@ -53,13 +53,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         28.0,
     ];
 
-    // load coefficients from a file and create a calibrator for model fitting
+    // load coefficients from a file and create a fitter
     let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
-    let config = Config {
+    let config = FitterConfig {
         coefficients,
         fit_options: FitOptions::fast() // use the default presents in production; fast presets are used for testing
     };
-    let calibrator = Calibrator::try_from(config)?;
+    let fitter = Fitter::try_from(config)?;
 
     // fit Win and Place probabilities from the supplied prices, undoing the overrounds
     let wp_markets = WinPlace {
@@ -72,10 +72,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let overrounds = wp_markets.extrapolate_overrounds()?;
 
     // fit a model using the Win/Place prices and extrapolated overrounds
-    let model = calibrator.fit(wp_markets, &overrounds)?.value;
+    let model = fitter.fit(&wp_markets, &overrounds)?.value;
     
     // nicely format the derived price matrix
-    let table = print::tabulate_derived_prices(&model.top_n.as_price_matrix());
+    let table = print::tabulate_derived_prices(&model.prices().as_price_matrix());
     println!("\n{}", Console::default().render(&table));
     
     // simulate a same-race multi for a chosen selection vector using the previously fitted model
@@ -111,17 +111,17 @@ Note, when all rows are identical, the biased model behaves identically to the n
 
 Take, for example, a field of 6 with win probabilities _P_ = (0.05, 0.1, 0.25, 0.1, 0.35, 0.15). For a two-place podium, _W_ might resemble the following:
 
-_W_<sub>1,_</sub> = (0.05, 0.1, 0.25, 0.1, 0.35, 0.15) = _P_
+_W_<sub>1,_</sub> = (0.05, 0.1, 0.25, 0.1, 0.35, 0.15) = _P_;
 
-_W_<sub>2,_</sub> = (0.09, 0.13, 0.22, 0.13, 0.28, 0.15)
+_W_<sub>2,_</sub> = (0.09, 0.13, 0.22, 0.13, 0.28, 0.15).
 
-In other words, the high-probability runners have had their relative ranking probabilities penalised, while low-probability runners were instead boosted. This reflects our updated assumption that low(/high)-probability runners are under(/over)estimated to place by a naive model.
+In other words, the high-probability runners have had their relative ranking probabilities suppressed, while low-probability runners were instead boosted. This reflects our updated assumption that low(/high)-probability runners are under(/over)estimated to place by a naive model.
 
-A pertinent questions is how to assign the relative probabilities in rows 2–_N_, given _P_ and possibly other data. An intuitive approach is to fit the probabilities based on historical data. Brumby uses a linear regression model with a configurable set of regressors. For example, a third degree polynomial comprising runner prices and the field size. (Which we found to be a reasonably effective predictor.) Distinct models may be used for different race types, competitor classes, track conditions, and so forth. The fitting process is performed offline; its output is a set of regression factor and coefficient pairs.
+A pertinent questions is how to assign the relative probabilities in rows 2–_N_, given _P_ and possibly other data. An intuitive approach is to fit the probabilities based on historical data. Brumby uses a linear regression model with a configurable set of regressors. For example, a third degree polynomial comprising runner prices and the field size. (Which we found to be a reasonably effective predictor.) Distinct models may be used for different race types, competitor classes, track conditions, and so forth. The fitting process is performed offline; its output is a set of regression factors and corresponding coefficients.
 
 The offline-fitted model does not cater to specific biases present in individual races and, crucially, it does not protect the operator of the model against _internal arbitrage_ opportunities. Let the Place market be paying _X_ places, where _X_ is typically 2 or 3. When deriving the Top-1.._N_ price matrix solely from Win prices, it is possible that the Top-_X_ prices differ from the Places price when the latter are sourced from an alternate model. This creates an internal price incoherency, where a semi-rational bettor will select the higher of the two prices, all other terms being equal. In the extreme case, the price difference may expose value in the bet and even enable rational bettors to take a risk-free position across a pair of incoherent markets.
 
-This problem is ideally solved by unifying the models so that the Place prices are taken directly from the Top-1.._N_ matrix. Often this is not viable, particularly when the operator sources its headline Win and Place markets from a commodity pricing supplier and/or applies manual price overrides on select runners. As such, Brumby allows the fitting of the Top-_X_ prices to the offered Place prices. The fitting is entirely online, typically following a price update, iterating while adjusting _W_<sub>_X_, _</sub> until the Top-_X_ prices match the Place prices within some margin of error. 
+This problem is ideally solved by unifying the models so that the Place prices are taken directly from the Top-1.._N_ matrix. Often this is not viable, particularly when the operator sources its Win and Place markets from a commodity pricing supplier and/or trades them manually. As such, Brumby allows the fitting of the Top-_X_ prices to the offered Place prices. The fitting is entirely online, typically following a price update, iterating while adjusting _W_<sub>_X_, _</sub> until the Top-_X_ prices match the Place prices within some acceptable margin of error. 
 
 Fitting of the Top-_X_ market to the Place market is a _closed loop_ process, using the fitted residuals to moderate subsequent adjustments and eventually terminate the fitting process. In each iteration, for every rank _i_ and every runner _j_, a price is fitted and compared with the sample price. The difference is used to scale the probability at _W_<sub>_i_,_j_</sub>. For example, let the fitted price _f_ be 2.34 and the sample price _s_ be 2.41 for runner 5 in rank 3. The adjustment factor is _s_ / _f_ = 1.03. _W′_<sub>3,5</sub> = _W_<sub>3,5</sub> × 1.03.
 

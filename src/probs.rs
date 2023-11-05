@@ -48,7 +48,7 @@ impl SliceExt for [f64] {
         fn dilate_additive_pve(slice: &mut [f64], factor: f64) {
             let share = factor / slice.len() as f64;
             for element in slice {
-                *element = (*element + share) / (1.0 + factor)
+                *element = (*element + share) / (1.0 + factor);
             }
         }
 

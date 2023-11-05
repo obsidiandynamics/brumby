@@ -1,5 +1,5 @@
-//! [Capture] is a minimalistic analogue of [Cow](std::borrow::Cow) that relaxes the [ToOwned] constrain while
-//! supporting [?Sized](Sized) types. [CaptureMut] extends [Capture] with support for mutable references.
+//! [`Capture`] is a minimalistic analogue of [`Cow`](std::borrow::Cow) that relaxes the [`ToOwned`] constrain while
+//! supporting [`?Sized`](Sized) types. [`CaptureMut`] extends [`Capture`] with support for mutable references.
 
 use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, DerefMut};
@@ -9,9 +9,6 @@ pub enum Capture<'a, W: Borrow<B>, B: ?Sized> {
     Owned(W),
     Borrowed(&'a B),
 }
-// impl<W: Borrow<B> + Default, B: ?Sized> Capture<'_, W, B> {
-//     pub fn
-// }
 
 impl<'a, W: Borrow<B> + Default, B: ?Sized> Default for Capture<'a, W, B> {
     fn default() -> Self {

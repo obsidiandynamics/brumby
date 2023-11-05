@@ -24,7 +24,7 @@ impl CsvWriter {
         R::Item: AsRef<str>,
     {
         let mut first = true;
-        for datum in record.into_iter() {
+        for datum in record {
             if first {
                 first = false;
             } else {
@@ -94,8 +94,8 @@ impl Record {
         Self { items }
     }
 
-    pub fn set(&mut self, ordinal: impl Into<usize>, value: impl ToString) {
-        self.items[ordinal.into()] = Cow::Owned(value.to_string())
+    pub fn set(&mut self, ordinal: impl Into<usize>, value: &impl ToString) {
+        self.items[ordinal.into()] = Cow::Owned(value.to_string());
     }
 
     pub fn len(&self) -> usize {

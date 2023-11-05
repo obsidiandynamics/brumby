@@ -18,7 +18,7 @@ use brumby::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceS
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::cf::Coefficients;
-use brumby::model::{fit, Calibrator, Config, TopN, WinPlace};
+use brumby::model::{fit, Fitter, FitterConfig, TopN, WinPlace};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 const TOP_SUBSET: usize = 25;
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             EventType::Harness => unimplemented!(),
         };
         debug!("loading {race_type} config from {filename}");
-        let config = Config {
+        let config = FitterConfig {
             coefficients: Coefficients::read_json_file(filename)?,
             fit_options: Default::default(),
         };
@@ -108,7 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         let departure = race_file.race.place_price_departure();
         let race = race_file.race.summarise();
-        let calibrator = Calibrator::try_from(configs[&race.race_type].clone())?;
+        let calibrator = Fitter::try_from(configs[&race.race_type].clone())?;
         let sample_top_n = TopN {
             markets: (0..race.prices.rows())
                 .map(|rank| {
@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             places_paying: race.places_paying,
         };
         let sample_overrounds = sample_top_n.overrounds()?;
-        let model = calibrator.fit(sample_wp, &sample_overrounds)?.value;
+        let model = calibrator.fit(&sample_wp, &sample_overrounds)?.value;
         let derived_prices = model.top_n.as_price_matrix();
         let errors: Vec<_> = (0..derived_prices.rows())
             .map(|rank| {

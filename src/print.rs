@@ -139,7 +139,7 @@ pub fn tabulate_values(values: &[f64], header: &str) -> Table {
             Styles::default(),
             vec![
                 format!("{}", Rank::index(rank)).into(),
-                format!("{:.6}", error).into(),
+                format!("{error:.6}").into(),
             ],
         ));
     }

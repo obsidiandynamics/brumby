@@ -7,7 +7,7 @@ use stanza::renderer::Renderer;
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Calibrator, Config, WinPlace};
+use brumby::model::{Fitter, FitterConfig, WinPlace, Model};
 use brumby::model::cf::Coefficients;
 use brumby::model::fit::FitOptions;
 use brumby::print;
@@ -38,13 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         28.0,
     ];
 
-    // load coefficients from a file and create a calibrator
+    // load coefficients from a file and create a fitter
     let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
-    let config = Config {
+    let config = FitterConfig {
         coefficients,
         fit_options: FitOptions::fast(),
     };
-    let calibrator = Calibrator::try_from(config)?;
+    let fitter = Fitter::try_from(config)?;
 
     // fit Win and Place probabilities from the supplied prices, undoing the effect of the overrounds
     let wp_markets = WinPlace {
@@ -57,10 +57,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let overrounds = wp_markets.extrapolate_overrounds()?;
 
     // fit a model using the Win/Place prices and extrapolated overrounds
-    let model = calibrator.fit(wp_markets, &overrounds)?.value;
+    let model = fitter.fit(&wp_markets, &overrounds)?.value;
 
     // nicely format the derived prices
-    let table = print::tabulate_derived_prices(&model.top_n.as_price_matrix());
+    let table = print::tabulate_derived_prices(&model.prices().as_price_matrix());
     println!("\n{}", Console::default().render(&table));
 
     // simulate a same-race multi for a chosen selection vector using the previously fitted model

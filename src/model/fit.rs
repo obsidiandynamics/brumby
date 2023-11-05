@@ -9,7 +9,6 @@ use tracing::trace;
 
 use mc::MonteCarloEngine;
 
-use crate::{mc, model, selection};
 use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
 use crate::market::{Market, MarketPrice, Overround};
@@ -17,12 +16,14 @@ use crate::mc::DilatedProbs;
 use crate::model::cf::{Coefficients, Factor};
 use crate::probs::SliceExt;
 use crate::selection::{Rank, Selections};
+use crate::{mc, model, selection};
 
-pub const FITTED_PRICE_RANGES: [Range<f64>; 4] = [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
+pub const FITTED_PRICE_RANGES: [Range<f64>; 4] =
+    [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FitOptions {
-    pub mc_iterations: u64,
+    pub mc_trials: u64,
     pub individual_target_msre: f64,
     pub max_individual_steps: u64,
     pub open_loop_exponent: f64,
@@ -30,9 +31,9 @@ pub struct FitOptions {
 
 impl FitOptions {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
-        const MIN_MC_ITERATIONS: u64 = 1_000;
-        if self.mc_iterations < MIN_MC_ITERATIONS  {
-            bail!("number of Monte Carlo iterations cannot be fewer than {MIN_MC_ITERATIONS}");
+        const MIN_MC_TRIALS: u64 = 1_000;
+        if self.mc_trials < MIN_MC_TRIALS {
+            bail!("number of Monte Carlo trials cannot be fewer than {MIN_MC_TRIALS}");
         }
         const MIN_TARGET_MSRE: f64 = f64::MIN_POSITIVE;
         if self.individual_target_msre < MIN_TARGET_MSRE {
@@ -51,7 +52,7 @@ impl FitOptions {
     /// Ultrafast presets when accuracy is unimportant (e.g., a demo).
     pub fn fast() -> Self {
         Self {
-            mc_iterations: 1_000,
+            mc_trials: 1_000,
             individual_target_msre: 1e-3,
             max_individual_steps: 10,
             open_loop_exponent: 1.0,
@@ -62,7 +63,7 @@ impl FitOptions {
 impl Default for FitOptions {
     fn default() -> Self {
         Self {
-            mc_iterations: 100_000,
+            mc_trials: 100_000,
             individual_target_msre: 1e-6,
             max_individual_steps: 100,
             open_loop_exponent: 1.0,
@@ -75,7 +76,7 @@ pub struct AllFitOutcome {
     pub fitted_probs: Matrix<f64>,
 }
 
-pub fn fit_all(options: FitOptions, markets: &[Market]) -> Result<AllFitOutcome, anyhow::Error> {
+pub fn fit_all(options: &FitOptions, markets: &[Market]) -> Result<AllFitOutcome, anyhow::Error> {
     options.validate()?;
     for market in markets {
         market.validate()?;
@@ -94,7 +95,7 @@ pub fn fit_all(options: FitOptions, markets: &[Market]) -> Result<AllFitOutcome,
             let outcome = fit_individual(
                 &scenarios,
                 &weighted_probs,
-                options.mc_iterations,
+                options.mc_trials,
                 options.individual_target_msre,
                 options.max_individual_steps,
                 rank,
@@ -120,17 +121,15 @@ pub struct PlaceFitOutcome {
     pub fitted_probs: Matrix<f64>,
 }
 
-pub fn fit_place(
+pub fn init_weighted_probs(
     coefficients: &Coefficients,
-    options: &FitOptions,
     win_market: &Market,
-    place_market: &Market,
     place_rank: usize,
-) -> Result<PlaceFitOutcome, anyhow::Error> {
+) -> Result<Matrix<f64>, anyhow::Error> {
     coefficients.validate()?;
-    options.validate()?;
     let num_runners = win_market.probs.len();
     let active_runners = win_market.probs.iter().filter(|&&prob| prob != 0.).count() as f64;
+
     let mut weighted_probs: Matrix<_> = DilatedProbs::default()
         .with_win_probs(Capture::Borrowed(&win_market.probs))
         .with_podium_places(model::PODIUM)
@@ -156,12 +155,22 @@ pub fn fit_place(
     for rank in 1..model::PODIUM {
         weighted_probs.row_slice_mut(rank).normalise(1.0);
     }
+    Ok(weighted_probs)
+}
 
+pub fn fit_place(
+    options: &FitOptions,
+    weighted_probs: &Matrix<f64>,
+    place_market: &Market,
+    place_rank: usize,
+) -> Result<PlaceFitOutcome, anyhow::Error> {
+    options.validate()?;
+    let num_runners = place_market.probs.len();
     let scenarios = selection::top_n_matrix(model::PODIUM, num_runners);
     let outcome = fit_individual(
         &scenarios,
-        &weighted_probs,
-        options.mc_iterations,
+        weighted_probs,
+        options.mc_trials,
         options.individual_target_msre,
         options.max_individual_steps,
         place_rank,
@@ -210,7 +219,7 @@ pub struct IndividualFitOutcome {
 fn fit_individual(
     scenarios: &Matrix<Selections>,
     weighted_probs: &Matrix<f64>,
-    mc_iterations: u64,
+    mc_trials: u64,
     target_msre: f64,
     max_individual_steps: u64,
     rank: usize,
@@ -223,7 +232,7 @@ fn fit_individual(
     let podium_places = weighted_probs.rows();
     let runners = weighted_probs.cols();
     let mut engine = MonteCarloEngine::default()
-        .with_iterations(mc_iterations)
+        .with_trials(mc_trials)
         .with_probs(Capture::Borrowed(weighted_probs));
 
     let mut optimal_msre = f64::MAX;
@@ -240,7 +249,7 @@ fn fit_individual(
         let fitted_probs: Vec<_> = counts
             .row_slice(rank)
             .iter()
-            .map(|&count| count as f64 / engine.iterations() as f64)
+            .map(|&count| count as f64 / engine.trials() as f64)
             .collect();
         let market = Market::frame(overround, fitted_probs);
         trace!("fitted prices:  {:?}", market.prices);
@@ -261,7 +270,11 @@ fn fit_individual(
                 let fitted_price = market.prices[runner];
                 let adj = fitted_price / sample_price;
                 for adj_rank in adj_ranks.clone() {
-                    let exponent = if adj_rank == rank { 1.0 } else { open_loop_exponent };
+                    let exponent = if adj_rank == rank {
+                        1.0
+                    } else {
+                        open_loop_exponent
+                    };
                     scale_prob_capped(&mut current_probs[(adj_rank, runner)], adj.powf(exponent));
                 }
             };
@@ -290,7 +303,7 @@ fn fit_individual(
 /// probability range.
 #[inline(always)]
 fn scale_prob_capped(probability: &mut f64, adj: f64) {
-    *probability = cap_probability(*probability * adj)
+    *probability = cap_probability(*probability * adj);
 }
 
 /// Smallest permissible probability used for capping values produced by the linear model.
@@ -300,5 +313,8 @@ pub const PROBABILITY_EPSILON: f64 = 1e-6;
 /// permissible probability, defined by [PROBABILITY_EPSILON].
 #[inline(always)]
 fn cap_probability(value: f64) -> f64 {
-    f64::max(PROBABILITY_EPSILON, f64::min(value, 1.0 - PROBABILITY_EPSILON))
+    f64::max(
+        PROBABILITY_EPSILON,
+        f64::min(value, 1.0 - PROBABILITY_EPSILON),
+    )
 }

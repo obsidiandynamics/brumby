@@ -147,11 +147,11 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Config {
+pub struct FitterConfig {
     pub coefficients: Coefficients,
     pub fit_options: FitOptions,
 }
-impl Config {
+impl FitterConfig {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         self.coefficients.validate()?;
         self.fit_options.validate()?;
@@ -160,15 +160,78 @@ impl Config {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Calibrator {
-    config: Config,
+pub struct Primer {
+    coefficients: Coefficients,
 }
-impl Calibrator {
+impl Primer {
+    pub fn prime(
+        &self,
+        win: &Market,
+        places_paying: usize,
+        mc_trials: u64,
+        overrounds: &[Overround],
+    ) -> Result<Timed<PrimedModel>, anyhow::Error> {
+        Timed::result(|| {
+            win.validate()?;
+            if overrounds.len() != PODIUM {
+                bail!("exactly {PODIUM} overrounds must be specified");
+            }
+            let weighted_probs = fit::init_weighted_probs(&self.coefficients, win, places_paying - 1)?;
+            let top_n = derive_prices(mc_trials, &weighted_probs, overrounds);
+            Ok(PrimedModel {
+                mc_trials,
+                weighted_probs,
+                top_n,
+            })
+        })
+    }
+}
+
+impl TryFrom<Coefficients> for Primer {
+    type Error = anyhow::Error;
+
+    fn try_from(coefficients: Coefficients) -> Result<Self, Self::Error> {
+        coefficients.validate()?;
+        Ok(Self { coefficients })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrimedModel {
+    pub mc_trials: u64,
+    pub weighted_probs: Matrix<f64>,
+    pub top_n: TopN,
+}
+
+impl Model for PrimedModel {
+    fn weighted_probs(&self) -> &Matrix<f64> {
+        &self.weighted_probs
+    }
+
+    fn prices(&self) -> &TopN {
+        &self.top_n
+    }
+
+    fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error> {
+        derive_multi(
+            &self.weighted_probs,
+            &self.top_n,
+            selections,
+            self.mc_trials,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fitter {
+    config: FitterConfig,
+}
+impl Fitter {
     pub fn fit(
         &self,
-        wp: WinPlace,
+        wp: &WinPlace,
         overrounds: &[Overround],
-    ) -> Result<Timed<Model>, anyhow::Error> {
+    ) -> Result<Timed<FittedModel>, anyhow::Error> {
         Timed::result(|| {
             wp.validate()?;
             if overrounds.len() != PODIUM {
@@ -179,10 +242,14 @@ impl Calibrator {
                 bail!("at least {PODIUM} active runners required");
             }
 
-            let fit_outcome = fit::fit_place(
+            let weighted_probs = fit::init_weighted_probs(
                 &self.config.coefficients,
-                &self.config.fit_options,
                 &wp.win,
+                &wp.places_paying - 1,
+            )?;
+            let fit_outcome = fit::fit_place(
+                &self.config.fit_options,
+                &weighted_probs,
                 &wp.place,
                 wp.places_paying - 1,
             )?;
@@ -193,101 +260,125 @@ impl Calibrator {
                 fit_outcome.stats.steps,
                 fit_outcome.stats.elapsed.as_millis() as f64 / 1_000.
             );
-            let top_n = Self::derive_prices(
-                self.config.fit_options.mc_iterations,
-                &fit_outcome,
+            let top_n = derive_prices(
+                self.config.fit_options.mc_trials,
+                &fit_outcome.fitted_probs,
                 overrounds,
-            )?;
-            Ok(Model {
-                mc_iterations: self.config.fit_options.mc_iterations,
+            );
+            Ok(FittedModel {
+                mc_trials: self.config.fit_options.mc_trials,
                 fit_outcome,
                 top_n,
             })
         })
     }
-
-    fn derive_prices(
-        mc_iterations: u64,
-        fit_outcome: &PlaceFitOutcome,
-        overrounds: &[Overround],
-    ) -> Result<TopN, anyhow::Error> {
-        let mut engine = mc::MonteCarloEngine::default()
-            .with_iterations(mc_iterations)
-            .with_probs(Capture::Borrowed(&fit_outcome.fitted_probs));
-
-        let runners = fit_outcome.fitted_probs.cols();
-        let mut counts = Matrix::allocate(PODIUM, runners);
-        let scenarios = selection::top_n_matrix(PODIUM, runners);
-        engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
-
-        let mut derived_probs = Matrix::allocate(PODIUM, runners);
-        for runner in 0..runners {
-            for rank in 0..PODIUM {
-                let probability = counts[(rank, runner)] as f64 / engine.iterations() as f64;
-                derived_probs[(rank, runner)] = probability;
-            }
-        }
-        let markets: Vec<_> = derived_probs
-            .into_iter()
-            .enumerate()
-            .map(|(rank, probs)| {
-                let overround = &overrounds[rank];
-                let probs = probs.to_vec();
-                Market::frame(overround, probs)
-            })
-            .collect();
-        Ok(TopN { markets })
-    }
 }
 
-impl TryFrom<Config> for Calibrator {
+impl TryFrom<FitterConfig> for Fitter {
     type Error = anyhow::Error;
 
-    fn try_from(config: Config) -> Result<Self, Self::Error> {
+    fn try_from(config: FitterConfig) -> Result<Self, Self::Error> {
         config.validate()?;
         Ok(Self { config })
     }
 }
 
+pub trait Model {
+    fn weighted_probs(&self) -> &Matrix<f64>;
+    fn prices(&self) -> &TopN;
+    fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error>;
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct Model {
-    pub mc_iterations: u64,
+pub struct FittedModel {
+    pub mc_trials: u64,
     pub fit_outcome: PlaceFitOutcome,
     pub top_n: TopN,
 }
-impl Model {
-    pub fn derive_multi(
-        &self,
-        selections: &[Selection],
-    ) -> Result<Timed<DerivedPrice>, anyhow::Error> {
-        Timed::result(|| {
-            validate_plausible_selections(selections)?;
-            let mut overround = 1.;
-            let win_probs = &self.fit_outcome.fitted_probs[0];
-            for selection in selections {
-                selection.validate(0..=PODIUM - 1, win_probs)?;
-                let (runner, rank) = match selection {
-                    Selection::Span { runner, ranks } => {
-                        (runner.as_index(), ranks.end().as_index())
-                    }
-                    Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
-                };
-                let market = &self.top_n.markets[rank];
-                let prob = market.probs[runner];
-                if prob == 0. {
-                    bail!("cannot price a runner with zero probability");
-                }
-                let price = market.prices[runner];
 
-                overround *= 1. / prob / price;
-            }
-            let mut engine = mc::MonteCarloEngine::default()
-                .with_iterations(self.mc_iterations)
-                .with_probs(Capture::Borrowed(&self.fit_outcome.fitted_probs));
-            let frac = engine.simulate(selections);
-            let probability = f64::max(LOWEST_PROBABILITY, frac.quotient());
-            let price = market::multiply_capped(1.0 / probability, overround);
-            Ok(DerivedPrice { probability, price })
-        })
+impl Model for FittedModel {
+    fn weighted_probs(&self) -> &Matrix<f64> {
+        &self.fit_outcome.fitted_probs
     }
+
+    fn prices(&self) -> &TopN {
+        &self.top_n
+    }
+
+    fn derive_multi(&self, selections: &[Selection]) -> Result<Timed<DerivedPrice>, anyhow::Error> {
+        derive_multi(
+            &self.fit_outcome.fitted_probs,
+            &self.top_n,
+            selections,
+            self.mc_trials,
+        )
+    }
+}
+
+fn derive_prices(
+    mc_trials: u64,
+    weighted_probs: &Matrix<f64>,
+    overrounds: &[Overround],
+) -> TopN {
+    let mut engine = mc::MonteCarloEngine::default()
+        .with_trials(mc_trials)
+        .with_probs(Capture::Borrowed(weighted_probs));
+
+    let runners = weighted_probs.cols();
+    let mut counts = Matrix::allocate(PODIUM, runners);
+    let scenarios = selection::top_n_matrix(PODIUM, runners);
+    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+
+    let mut derived_probs = Matrix::allocate(PODIUM, runners);
+    for runner in 0..runners {
+        for rank in 0..PODIUM {
+            let probability = counts[(rank, runner)] as f64 / engine.trials() as f64;
+            derived_probs[(rank, runner)] = probability;
+        }
+    }
+    let markets: Vec<_> = derived_probs
+        .into_iter()
+        .enumerate()
+        .map(|(rank, probs)| {
+            let overround = &overrounds[rank];
+            let probs = probs.to_vec();
+            Market::frame(overround, probs)
+        })
+        .collect();
+    TopN { markets }
+}
+
+fn derive_multi(
+    probs: &Matrix<f64>,
+    top_n: &TopN,
+    selections: &[Selection],
+    mc_trials: u64,
+) -> Result<Timed<DerivedPrice>, anyhow::Error> {
+    Timed::result(|| {
+        validate_plausible_selections(selections)?;
+        let mut overround = 1.;
+        let win_probs = &probs[0];
+        for selection in selections {
+            selection.validate(0..=PODIUM - 1, win_probs)?;
+            let (runner, rank) = match selection {
+                Selection::Span { runner, ranks } => (runner.as_index(), ranks.end().as_index()),
+                Selection::Exact { runner, rank } => (runner.as_index(), rank.as_index()),
+            };
+            let market = &top_n.markets[rank];
+            let prob = market.probs[runner];
+            if prob == 0. {
+                bail!("cannot price a runner with zero probability");
+            }
+            let price = market.prices[runner];
+
+            overround *= 1. / prob / price;
+        }
+        let mut engine = mc::MonteCarloEngine::default()
+            .with_trials(mc_trials)
+            .with_probs(Capture::Borrowed(probs));
+        let frac = engine.simulate(selections);
+        let probability = f64::max(LOWEST_PROBABILITY, frac.quotient());
+        let price = market::multiply_capped(1.0 / probability, overround);
+        Ok(DerivedPrice { probability, price })
+    })
 }

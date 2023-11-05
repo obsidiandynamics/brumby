@@ -27,7 +27,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut bitmap = [true; 14];
     let mut totals = [1.0; 4];
     let mut engine = MonteCarloEngine::default()
-        .with_iterations(1_000)
+        .with_trials(1_000)
         .with_bitmap(CaptureMut::Borrowed(&mut bitmap))
         .with_totals(CaptureMut::Borrowed(&mut totals))
         .with_podium(CaptureMut::Borrowed(&mut podium))

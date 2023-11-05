@@ -204,7 +204,7 @@ impl<'a> FromStr for Selections<'a> {
                     selections.push(Selection::Span {
                         runner,
                         ranks: Rank::first()..=Rank::index(rank),
-                    })
+                    });
                 }
             }
         }
@@ -240,8 +240,7 @@ pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), any
     let runners = selections
         .iter()
         .map(|selection| match selection {
-            Selection::Span { runner, .. } => runner.as_number(),
-            Selection::Exact { runner, .. } => runner.as_number(),
+            Selection::Span { runner, .. } | Selection::Exact { runner, .. } => runner.as_number(),
         })
         .max()
         .unwrap();

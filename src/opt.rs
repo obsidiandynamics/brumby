@@ -9,20 +9,20 @@ pub struct DescentConfig {
 
 #[derive(Debug)]
 pub struct DescentOutcome {
-    pub iterations: u64,
+    pub steps: u64,
     pub optimal_value: f64,
     pub optimal_residual: f64,
 }
 
 pub fn descent(
-    config: DescentConfig,
+    config: &DescentConfig,
     mut loss_f: impl FnMut(f64) -> f64,
 ) -> DescentOutcome {
-    let mut iterations = 0;
+    let mut steps = 0;
     let mut residual = loss_f(config.init_value);
     if residual <= config.max_residual {
         return DescentOutcome {
-            iterations: 0,
+            steps: 0,
             optimal_value: config.init_value,
             optimal_residual: residual
         };
@@ -33,8 +33,8 @@ pub fn descent(
     let (mut optimal_value, mut optimal_residual) = (value, residual);
     // let mut boost = 1.0;
     // let mut gradient: f64 = 1.0;
-    while iterations < config.max_steps {
-        iterations += 1;
+    while steps < config.max_steps {
+        steps += 1;
         let new_value = value + step;/* * boost*/ // * f64::min(gradient.abs(), 100.0);
         let new_residual = loss_f(new_value);
         // let gradient = (new_residual - residual) / (new_value - value);
@@ -61,7 +61,7 @@ pub fn descent(
         value = new_value;
     }
     DescentOutcome {
-        iterations,
+        steps,
         optimal_value,
         optimal_residual,
     }
@@ -81,7 +81,7 @@ mod tests {
             max_steps: 100,
             max_residual: 0.0
         };
-        let outcome = descent(config.clone(), |value| (81.0 - value.powi(2)).powi(2));
+        let outcome = descent(&config, |value| (81.0 - value.powi(2)).powi(2));
         assert_float_absolute_eq!(9.0, outcome.optimal_value, config.min_step);
     }
 }

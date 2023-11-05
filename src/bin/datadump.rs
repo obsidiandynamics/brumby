@@ -101,28 +101,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
             })
             .collect();
-        let fit_outcome = fit::fit_all(FitOptions::default(), &markets)?;
+        let fit_outcome = fit::fit_all(&FitOptions::default(), &markets)?;
         debug!(
             "individual fitting complete: stats: {:?}, probs: \n{}",
             fit_outcome.stats,
             fit_outcome.fitted_probs.verbose()
         );
 
-        let num_runners = markets[0].probs.len();
+        let runners = markets[0].probs.len();
         let active_runners = markets[0].probs.iter().filter(|&&prob| prob != 0.).count();
         let stdev = markets[0].probs.stdev();
-        for runner in 0..num_runners {
+        for runner in 0..runners {
             if markets[0].probs[runner] != 0.0 {
                 let mut record = Record::with_capacity(Factor::COUNT);
-                record.set(Factor::RaceId, race.id);
-                record.set(Factor::RunnerIndex, runner);
-                record.set(Factor::ActiveRunners, active_runners);
-                record.set(Factor::PlacesPaying, race.places_paying);
-                record.set(Factor::Stdev, stdev);
-                record.set(Factor::Weight0, fit_outcome.fitted_probs[(0, runner)]);
-                record.set(Factor::Weight1, fit_outcome.fitted_probs[(1, runner)]);
-                record.set(Factor::Weight2, fit_outcome.fitted_probs[(2, runner)]);
-                record.set(Factor::Weight3, fit_outcome.fitted_probs[(3, runner)]);
+                record.set(Factor::RaceId, &race.id);
+                record.set(Factor::RunnerIndex, &runner);
+                record.set(Factor::ActiveRunners, &active_runners);
+                record.set(Factor::PlacesPaying, &race.places_paying);
+                record.set(Factor::Stdev, &stdev);
+                record.set(Factor::Weight0, &fit_outcome.fitted_probs[(0, runner)]);
+                record.set(Factor::Weight1, &fit_outcome.fitted_probs[(1, runner)]);
+                record.set(Factor::Weight2, &fit_outcome.fitted_probs[(2, runner)]);
+                record.set(Factor::Weight3, &fit_outcome.fitted_probs[(3, runner)]);
                 debug!("{record:?}");
                 csv.append(record)?;
                 csv.flush()?;
