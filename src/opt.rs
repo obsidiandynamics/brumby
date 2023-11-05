@@ -38,7 +38,7 @@ pub fn descent(
         let new_value = value + step;/* * boost*/ // * f64::min(gradient.abs(), 100.0);
         let new_residual = loss_f(new_value);
         // let gradient = (new_residual - residual) / (new_value - value);
-        // println!("iterations: {iterations}, value: {value}, residual: {residual}, step: {step}, new_value: {new_value}, new_residual: {new_residual}, gradient: {gradient}");
+        // println!("iterations: {iterations}, value: {value}, residual: {residual}, step: {step}, new_value: {new_value}, new_residual: {new_residual}");
 
         if new_residual > residual {
             step = -step * 0.5;

@@ -127,13 +127,43 @@ Fitting of the Top-_X_ market to the Place market is a _closed loop_ process, us
 
 In addition to the closed-loop fitting of the Place rank, Brumby supports (and enables by default) the _open-loop_ fitting of the other markets. The rational is as follows: if there are errors in the Place rank, attributable to some specific but unknown bias, there are likely similar errors in other ranks also attributable to that bias. In other words, any specific bias is unlikely to be confined to just one rank. So in addition to the closed-loop fitting of the Top-_X_ price, the online model also translates the same adjustments to the other ranks. This assumption appears to be sound in practice; tested on historical prices, open loop fitting consistently demonstrates lower errors.
 
-Open-loop fitting isn't a binary on/off setting; instead, it is represented as an exponent: a real in the interval [0, 1]. The formula for adjusting the probabilities in _W_ becomes: _W′_<sub>_i_,_j_</sub> = _W_<sub>_i_,_j_</sub> × (_s_<sub>_i_,_j_</sub> / _f_<sub>_i_,_j_</sub>)<sup>_t_</sup>, where _t_ is the open-loop exponent. When _t_ = 0, the process is purely a closed-loop one: no adjustment is made to ranks other than the Place rank. When _t_ = 1, the magnitude of adjustment for the other ranks equals the magnitude of adjustment to the Place rank. When _t_ takes some intermediate value, open-loop adjustments are made, albeit to a lesser magnitude than the corresponding Place rank ones. The default setting is _t_ = 1.
+Open-loop fitting isn't a binary on/off setting; instead, it is represented as an exponent: a real in the interval [0, 1]. The formula for adjusting the probabilities in _W_ is _W′_<sub>_i_,_j_</sub> = _W_<sub>_i_,_j_</sub> × (_s_<sub>_i_,_j_</sub> / _f_<sub>_i_,_j_</sub>)<sup>_t_</sup>, where _t_ is the open-loop exponent. When _t_ = 0, the process is purely a closed-loop one: no adjustment is made to ranks other than the Place rank. When _t_ = 1, the magnitude of adjustment for the other ranks equals the magnitude of adjustment to the Place rank. When _t_ takes some intermediate value, open-loop adjustments are made, albeit to a lesser magnitude than the corresponding Place rank ones. For example, when _t_ = 0.5, the adjustments to the other ranks are equal to the square root of the adjustments to the Place rank. The default setting is _t_ = 1.
 
 ## Overrounds
 Brumby includes both fitting and framing support for several overround methods, including _multiplicative_, _power_ and _odds ratio_. Fitting and framing capabilities are complementary: by 'fitting' it is meant the removal of overrounds from an existing market offering; by 'framing' it is meant the application of overrounds to a set of fair probabilities to obtain a corresponding set of market prices.
+
+### Multiplicative method
+This is among the simplest and most commonly used methods, wherein each fair price is multiplied by a constant to achieve the desired overround. The fitting operation is the reverse of framing; in both cases the scaling coefficient is trivially closed-form obtainable. For framing:
+
+_m_<sub>_j_</sub> = _p_<sub>_j_</sub><sup>-1</sup> / _v_,
+
+where _m_ is the market price, _p_ is the fair probability and _v_ is the desired overround. Fitting is the inverse:
+
+_p_<sub>_j_</sub> = _m_<sub>_j_</sub><sup>-1</sup> / _v_, where _v_ is obtained by summing the implied probabilities _m_<sub>1</sub><sup>-1</sup> to _m_<sub>_M_</sub><sup>-1</sup>.
+
+Where the resulting price is > 1, the multiplicative method has the property of maintaining a constant margin regardless of the distribution of wagered money over the offered outcomes — every outcome offers the same return to player. When the method is applied naively, it is possible that the resulting price is less than or equal to 1 on high-probability runners. Therefore, its output must be capped to ensure that prices are greater than 1. In the capped case, the margin on the affected runners is reduced.
+
+### Power method
+This method is loosely based on the account of Stephen Clarke in [Adjusting Bookmaker’s Odds to Allow for Overround](https://www.researchgate.net/publication/326510904_Adjusting_Bookmaker's_Odds_to_Allow_for_Overround). The original work has limited application in the sports betting industry, being suited to games with equal-chance outcomes, such as Roulette. We augment Clarke's method by using the calculation of _k_ only as the initial estimate; thereafter iteratively optimising _k_ to minimise the relative error between the fitted and the ideal overrounds.
+
+Given the exponent _k_, the market price is obtained by _m_ = _p_<sup>-_k_</sup>. The initial estimate of _k_ is given by _k̂_<sub>0</sub> = 1 + _log_(1/_v_) / _log_(_N_). 
+
+Using Lagrange multipliers it can be shown that the overround is at its maximum when the probabilities are equal; any departure from equality yields a lower overround. Therefore, we conclude that the initial search direction is towards decreasing _k_. The fitting process is in the same vein: we take an initial estimate of _k_ using the observed overround and iterate, initially stepping in the direction of decreasing _k_, until the probabilities sum to 1.
+
+The power method has the property of skewing the margin towards (i.e., overcharging) low-probability outcomes, enacting the favourite-longshot bias.
+
+### Odds Ratio method
+This method is based on the account of Keith Cheung in [Fixed-odds betting and traditional odds](https://www.sportstradingnetwork.com/article/fixed-odds-betting-traditional-odds/). Rather than dealing with conventional probabilities, it translates probabilities to odds, where _o_<sub>_j_</sub> =  _p_<sub>_j_</sub> / (1 - _p_<sub>_j_</sub>). This crux of this method is in ensuring that every pair of fair odds and corresponding market odds remain in a constant ratio after the application of the overround. _m_<sub>_j_</sub> = ((1 / _p_<sub>_j_</sub>) - 1) / _d_ + 1, where _d_ is a constant.
+
+An optimiser is used to obtain _d_ for fields with arbitrary number of outcomes. The same is done in reverse during fitting.
+
+Like the Power method, the Odds Ratio method skews the margin towards low-probability outcomes.
 
 ## Monte Carlo engine
 Brumby relies on a custom-built MC engine that utilises pooled memory buffers to avoid costly allocations — `malloc` and `free` syscalls. It also uses a custom matrix data structure that flattens all rows into a contiguous vector, thereby avoiding memory sparsity and taking advantage of CPU-level caching to update and retrieve nearby data points. This provides a reasonably performant, allocation-free MC simulator, taking ~65 ns to perform one trial of a 4-place podium over a field of 14.
 
 ## Optimiser
-The optimiser used for fitting and framing overrounds is a form of univariate search that descends the residual curve in fixed steps for as long as the residual decreases. When the residual increases, the search direction is reversed and the step size is halved. The search terminates when either the residual is within the acceptable value, or the number of steps or the number of reversals is exhausted.
+The optimiser used for fitting and framing overrounds is a form of univariate search that descends the residual curve in fixed steps for as long as the residual decreases. Conversely, following the step where the residual increases, the search direction is reversed and the step size is halved. The search terminates when either the residual is within the acceptable value, or the number of steps or the number of reversals is exhausted. Each of these parameters, including the initial value and the initial search direction, are configurable.
+
+## Linear regression
+Brumby contains a linear regression (LR) model fitter that can also be driven as a predictor. This enables offline fitting to take place directly within Brumby, rather than relegating to a separate statistical package, such as _R_, to fit the coefficients. Our LR model is based on [linregress](https://github.com/n1m3/linregress), credited to the Computational Systems Medicine group of Technische Universität München, but with some important enhancements. The main one is to support the fitting of models without intercepts. Additionally, we amended the calculation of R-squared for models in such cases. Briefly, conventional R-squared is effectively a comparison to a reference model that predicts using only the sample mean (i.e., a linear model comprising only the intercept), where the _Sum of Squares Total_ (SST) term subtracts the mean from the sample value, squaring the difference. The elimination of the intercept makes such a comparison less meaningful. For intercept-free models, we use the same calculation as _R_ — wherein the SST term is noise — squaring of the sample values. We also amend the degrees of freedom in the calculation of the adjusted R-squared to mirror _R_'s approach.
