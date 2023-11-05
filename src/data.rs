@@ -31,8 +31,6 @@ impl EventDetailExt for EventDetail {
                     Some(prices) => {
                         let price = match rank {
                             0 => prices.win,
-                            // 1 => if self.places_paying == 2 { f32::min(prices.top2, prices.place) } else { prices.top2},
-                            // 2 => if self.places_paying == 3 { f32::min(prices.top3, prices.place) } else { prices.top3},
                             1 => prices.top2,
                             2 => prices.top3,
                             3 => prices.top4,
