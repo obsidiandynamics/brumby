@@ -254,7 +254,7 @@ just backfit data/thoroughbred.csv config/thoroughbred.r.json -o config/thorough
 
 The above example persists the fitted coefficients to `config/thoroughbred.cf.json` and prints the summary statistics, including the standard errors, p-values and R-squared values for each of the three predictors. Below is an output sample for one predictor.
 
-```
+```txt
 ╔══════════════════════════════╤════════════╤═══════════╤═════════╤═════╗
 ║Regressor                     │ Coefficient│ Std. error│  P-value│     ║
 ╠══════════════════════════════╪════════════╪═══════════╪═════════╪═════╣
