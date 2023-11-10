@@ -2,12 +2,12 @@
   "w1": {
     "regressors": [
       {
-        "Ordinal": "Weight0"
+        "Variable": "Weight0"
       },
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           2
         ]
@@ -15,18 +15,18 @@
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           3
         ]
       },
       {
-        "Ordinal": "ActiveRunners"
+        "Variable": "ActiveRunners"
       },
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           2
         ]
@@ -34,7 +34,7 @@
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           3
         ]
@@ -54,12 +54,12 @@
   "w2": {
     "regressors": [
       {
-        "Ordinal": "Weight0"
+        "Variable": "Weight0"
       },
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           2
         ]
@@ -67,18 +67,18 @@
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           3
         ]
       },
       {
-        "Ordinal": "ActiveRunners"
+        "Variable": "ActiveRunners"
       },
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           2
         ]
@@ -86,7 +86,7 @@
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           3
         ]
@@ -106,12 +106,12 @@
   "w3": {
     "regressors": [
       {
-        "Ordinal": "Weight0"
+        "Variable": "Weight0"
       },
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           2
         ]
@@ -119,18 +119,18 @@
       {
         "Exp": [
           {
-            "Ordinal": "Weight0"
+            "Variable": "Weight0"
           },
           3
         ]
       },
       {
-        "Ordinal": "ActiveRunners"
+        "Variable": "ActiveRunners"
       },
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           2
         ]
@@ -138,7 +138,7 @@
       {
         "Exp": [
           {
-            "Ordinal": "ActiveRunners"
+            "Variable": "ActiveRunners"
           },
           3
         ]

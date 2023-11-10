@@ -20,7 +20,7 @@ pub trait AsIndex {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Display)]
 pub enum Regressor<O: AsIndex> {
-    Ordinal(O),
+    Variable(O),
     Exp(Box<Regressor<O>>, i32),
     Product(Vec<Regressor<O>>),
     Intercept,
@@ -29,7 +29,7 @@ pub enum Regressor<O: AsIndex> {
 impl<O: AsIndex> Regressor<O> {
     pub fn resolve(&self, input: &[f64]) -> f64 {
         match self {
-            Regressor::Ordinal(ordinal) => input[ordinal.as_index()],
+            Regressor::Variable(ordinal) => input[ordinal.as_index()],
             Regressor::Exp(regressor, power) => regressor.resolve(input).powi(*power),
             Regressor::Product(regressors) => regressors
                 .iter()

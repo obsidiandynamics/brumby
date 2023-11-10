@@ -1,7 +1,7 @@
 use assert_float_eq::*;
 use ordinalizer::Ordinal;
 
-use Regressor::{Exp, Ordinal, Product};
+use Regressor::{Exp, Variable, Product};
 
 use crate::linear::regression::Regressor::{Intercept, Origin};
 use crate::testing::assert_slice_f64_relative;
@@ -9,12 +9,12 @@ use crate::testing::assert_slice_f64_relative;
 use super::*;
 
 #[derive(Debug, PartialEq, ordinalizer::Ordinal, Display, Serialize, Deserialize)]
-enum TestOrdinal {
+enum TestFactor {
     A,
     B,
 }
 
-impl AsIndex for TestOrdinal {
+impl AsIndex for TestFactor {
     fn as_index(&self) -> usize {
         self.ordinal()
     }
@@ -22,32 +22,32 @@ impl AsIndex for TestOrdinal {
 
 #[test]
 fn serde_json() {
-    fn to_json(r: &Regressor<TestOrdinal>) -> String {
+    fn to_json(r: &Regressor<TestFactor>) -> String {
         serde_json::to_string(&r).unwrap()
     }
 
-    fn from_json(json: &str) -> Regressor<TestOrdinal> {
+    fn from_json(json: &str) -> Regressor<TestFactor> {
         serde_json::from_str(&json).unwrap()
     }
 
     {
-        let r = Ordinal(TestOrdinal::A);
+        let r = Variable(TestFactor::A);
         let json = to_json(&r);
-        assert_eq!(r#"{"Ordinal":"A"}"#, json);
+        assert_eq!(r#"{"Variable":"A"}"#, json);
         let rr = from_json(&json);
         assert_eq!(r, rr);
     }
     {
-        let r = Exp(Ordinal(TestOrdinal::A).into(), 5);
+        let r = Exp(Variable(TestFactor::A).into(), 5);
         let json = to_json(&r);
-        assert_eq!(r#"{"Exp":[{"Ordinal":"A"},5]}"#, json);
+        assert_eq!(r#"{"Exp":[{"Variable":"A"},5]}"#, json);
         let rr = from_json(&json);
         assert_eq!(r, rr);
     }
     {
-        let r = Product(vec![Ordinal(TestOrdinal::A), Ordinal(TestOrdinal::B)]);
+        let r = Product(vec![Variable(TestFactor::A), Variable(TestFactor::B)]);
         let json = to_json(&r);
-        assert_eq!(r#"{"Product":[{"Ordinal":"A"},{"Ordinal":"B"}]}"#, json);
+        assert_eq!(r#"{"Product":[{"Variable":"A"},{"Variable":"B"}]}"#, json);
         let rr = from_json(&json);
         assert_eq!(r, rr);
     }
@@ -98,7 +98,7 @@ fn regression_data_1() {
     {
         // with intercept
         let model =
-            RegressionModel::fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data).unwrap();
+            RegressionModel::fit(Factor::Y, vec![Intercept, Variable(Factor::X)], &data).unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
             &[0.28813559322033333, 0.7288135593220351],
@@ -129,7 +129,7 @@ fn regression_data_1() {
     }
     {
         // without intercept
-        let model = RegressionModel::fit(Factor::Y, vec![Origin, Ordinal(Factor::X)], &data)
+        let model = RegressionModel::fit(Factor::Y, vec![Origin, Variable(Factor::X)], &data)
             .unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
@@ -157,8 +157,8 @@ fn regression_data_1() {
             Factor::Y,
             vec![
                 Intercept,
-                Ordinal(Factor::X),
-                Exp(Ordinal(Factor::X).into(), 2),
+                Variable(Factor::X),
+                Exp(Variable(Factor::X).into(), 2),
             ],
             &data,
         )
@@ -195,7 +195,7 @@ fn regression_data_1() {
         // with multiple distinct regressors
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Intercept, Variable(Factor::X), Variable(Factor::W)],
             &data,
         )
         .unwrap();
@@ -231,7 +231,7 @@ fn regression_data_1() {
         // with multiple distinct regressors and no intercept
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![Origin, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Origin, Variable(Factor::X), Variable(Factor::W)],
             &data,
         )
         .unwrap();
@@ -269,7 +269,7 @@ fn regression_data_1() {
             Factor::Y,
             vec![
                 Origin,
-                Product(vec![Ordinal(Factor::X), Ordinal(Factor::W)]),
+                Product(vec![Variable(Factor::X), Variable(Factor::W)]),
             ],
             &data,
         )
@@ -330,7 +330,7 @@ fn regression_data_2() {
     {
         // with intercept
         let model =
-            RegressionModel::fit(Factor::Y, vec![Intercept, Ordinal(Factor::X)], &data).unwrap();
+            RegressionModel::fit(Factor::Y, vec![Intercept, Variable(Factor::X)], &data).unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
             &[2.1428571428571446, 0.2499999999999994],
@@ -361,7 +361,7 @@ fn regression_data_2() {
     }
     {
         // without intercept
-        let model = RegressionModel::fit(Factor::Y, vec![Origin, Ordinal(Factor::X)], &data)
+        let model = RegressionModel::fit(Factor::Y, vec![Origin, Variable(Factor::X)], &data)
             .unwrap();
         assert_slice_f64_relative(
             &model.predictor.coefficients,
@@ -387,7 +387,7 @@ fn regression_data_2() {
         // with multiple distinct regressors
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![Intercept, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Intercept, Variable(Factor::X), Variable(Factor::W)],
             &data,
         )
         .unwrap();
@@ -423,7 +423,7 @@ fn regression_data_2() {
         // with multiple distinct regressors and no intercept
         let model = RegressionModel::fit(
             Factor::Y,
-            vec![Origin, Ordinal(Factor::X), Ordinal(Factor::W)],
+            vec![Origin, Variable(Factor::X), Variable(Factor::W)],
             &data,
         )
         .unwrap();
