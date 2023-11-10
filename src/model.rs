@@ -326,8 +326,8 @@ fn derive_prices(
 
     let runners = weighted_probs.cols();
     let mut counts = Matrix::allocate(PODIUM, runners);
-    let scenarios = selection::top_n_matrix(PODIUM, runners);
-    engine.simulate_batch(scenarios.flatten(), counts.flatten_mut());
+    let all_selections = selection::top_n_matrix(PODIUM, runners);
+    engine.simulate_batch(all_selections.flatten(), counts.flatten_mut());
 
     let mut derived_probs = Matrix::allocate(PODIUM, runners);
     for runner in 0..runners {

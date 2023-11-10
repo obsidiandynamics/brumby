@@ -119,7 +119,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
     pub fn simulate_batch(
         &mut self,
-        scenarios: &[Selections],
+        selections_list: &[Selections],
         counts: &mut [u64],
     ) {
         self.ensure_init();
@@ -127,7 +127,7 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
 
         simulate_batch(
             self.trials,
-            scenarios,
+            selections_list,
             counts,
             self.probs.as_ref().unwrap(),
             self.podium.as_mut().unwrap(),
@@ -193,7 +193,7 @@ impl From<DilatedProbs<'_>> for Matrix<f64> {
 
 pub fn simulate_batch(
     trials: u64,
-    scenarios: &[Selections],
+    selections_list: &[Selections],
     counts: &mut [u64],
     probs: &Matrix<f64>,
     podium: &mut [usize],
@@ -203,17 +203,17 @@ pub fn simulate_batch(
 ) {
     assert!(validate_args(probs, podium, bitmap, totals));
     assert_eq!(
-        scenarios.len(),
+        selections_list.len(),
         counts.len(),
-        "a count must exist for each scenario"
+        "a count must exist for each set of selections"
     );
 
     counts.fill(0);
     for _ in 0..trials {
         run_once(probs, podium, bitmap, totals, rand);
-        for (scenario_index, selections) in scenarios.iter().enumerate() {
+        for (selections_index, selections) in selections_list.iter().enumerate() {
             if selections.iter().all(|selection| selection.matches(podium)) {
-                counts[scenario_index] += 1;
+                counts[selections_index] += 1;
             }
         }
     }
