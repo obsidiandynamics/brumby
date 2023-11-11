@@ -37,6 +37,10 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 tinyrand-alloc = "0.5.0"
 
 [[bench]]
+name = "cri_comb"
+harness = false
+
+[[bench]]
 name = "cri_mc"
 harness = false
 
