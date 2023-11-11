@@ -1,9 +1,11 @@
 use ordinalizer::Ordinal;
 
+use multinomial::binomial;
+
+use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
 use crate::linear::matrix::Matrix;
 use crate::probs::SliceExt;
-use crate::{factorial, poisson};
 
 #[derive(Debug, Ordinal)]
 pub enum GoalEvent {
@@ -233,9 +235,9 @@ pub fn from_binomial(
     for home_goals in 0..=home_intervals {
         for away_goals in 0..=away_intervals {
             let home_prob =
-                factorial::binomial(home_intervals, home_goals, interval_home_prob, &factorial);
+                binomial(home_intervals, home_goals, interval_home_prob, &factorial);
             let away_prob =
-                factorial::binomial(away_intervals, away_goals, interval_away_prob, &factorial);
+                binomial(away_intervals, away_goals, interval_away_prob, &factorial);
             scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
         }
     }
