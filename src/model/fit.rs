@@ -87,13 +87,13 @@ pub fn fit_all(options: &FitOptions, markets: &[Market]) -> Result<AllFitOutcome
         .with_podium_places(model::PODIUM)
         .into();
 
-    let all_selections = selection::top_n_matrix(model::PODIUM, num_runners);
+    let top_n_selections = selection::top_n_matrix(model::PODIUM, num_runners);
 
     let outcomes: Vec<_> = (1..model::PODIUM)
         .map(|rank| {
             let market = &markets[rank];
             let outcome = fit_individual(
-                &all_selections,
+                &top_n_selections,
                 &weighted_probs,
                 options.mc_trials,
                 options.individual_target_msre,
@@ -166,9 +166,9 @@ pub fn fit_place(
 ) -> Result<PlaceFitOutcome, anyhow::Error> {
     options.validate()?;
     let num_runners = place_market.probs.len();
-    let all_selections = selection::top_n_matrix(model::PODIUM, num_runners);
+    let top_n_selections = selection::top_n_matrix(model::PODIUM, num_runners);
     let outcome = fit_individual(
-        &all_selections,
+        &top_n_selections,
         weighted_probs,
         options.mc_trials,
         options.individual_target_msre,
@@ -217,7 +217,7 @@ pub struct IndividualFitOutcome {
 }
 
 fn fit_individual(
-    all_selections: &Matrix<Selections>,
+    top_n_selections: &Matrix<Selections>,
     weighted_probs: &Matrix<f64>,
     mc_trials: u64,
     target_msre: f64,
@@ -245,7 +245,7 @@ fn fit_individual(
             Rank::index(rank)
         );
         let mut counts = Matrix::allocate(podium_places, runners);
-        engine.simulate_batch(all_selections.flatten(), counts.flatten_mut());
+        engine.simulate_batch(top_n_selections.flatten(), counts.flatten_mut());
         let fitted_probs: Vec<_> = counts
             .row_slice(rank)
             .iter()

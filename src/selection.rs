@@ -214,13 +214,13 @@ impl<'a> FromStr for Selections<'a> {
 
 /// Builds a `podium_places` x `num_runners` matrix populated with top-_N_ selections.
 pub fn top_n_matrix(podium_places: usize, num_runners: usize) -> Matrix<Selections<'static>> {
-    let mut all_selections = Matrix::allocate(podium_places, num_runners);
+    let mut top_n_selections = Matrix::allocate(podium_places, num_runners);
     for runner in 0..num_runners {
         for rank in 0..podium_places {
-            all_selections[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))].into();
+            top_n_selections[(rank, runner)] = vec![Runner::index(runner).top(Rank::index(rank))].into();
         }
     }
-    all_selections
+    top_n_selections
 }
 
 pub fn validate_plausible_selections(selections: &[Selection]) -> Result<(), anyhow::Error> {
