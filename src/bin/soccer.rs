@@ -1,4 +1,3 @@
-use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
@@ -159,7 +158,7 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
         &HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-6,
-            bounds: Capture::Owned(vec![0.0..=0.5, 0.0..=0.5]),
+            bounds: vec![0.0..=0.5, 0.0..=0.5].into(),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5]),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5, 0.0..=0.1]), // for the bivariate
             resolution: 4,

@@ -26,6 +26,14 @@ pub fn bivariate(
     f64::exp(-lambda_1 - lambda_2 - lambda_3) * lambda_1.powi(k_1 as i32) * lambda_2.powi(k_2 as i32) / (factorial.get(k_1) * factorial.get(k_2)) as f64 * sum
 }
 
+// pub fn lambda_to_interval_probability(lambda: f64, interval_ratio: f64, factorial: &impl Factorial) -> f64 {
+//     let mut prob = 0.0;
+//     for k in 1..5 {
+//         prob = univariate(k, lambda * interval_ratio, factorial);
+//     }
+//     prob
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;

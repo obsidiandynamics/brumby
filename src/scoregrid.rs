@@ -1,16 +1,16 @@
 use ordinalizer::Ordinal;
 
 use crate::comb::{count_permutations, pick};
-use crate::{factorial, poisson};
 use crate::linear::matrix::Matrix;
 use crate::probs::SliceExt;
+use crate::{factorial, poisson};
 
 #[derive(Debug, Ordinal)]
 pub enum GoalEvent {
     Neither,
     Home,
     Away,
-    Both
+    Both,
 }
 impl GoalEvent {
     pub fn is_home(&self) -> bool {
@@ -30,7 +30,7 @@ impl From<usize> for GoalEvent {
             1 => GoalEvent::Home,
             2 => GoalEvent::Away,
             3 => GoalEvent::Both,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -42,23 +42,20 @@ pub struct Score {
 }
 impl Score {
     pub fn new(home: u8, away: u8) -> Self {
-        Self {
-            home,
-            away,
-        }
+        Self { home, away }
     }
 }
 
 #[derive(Debug)]
 pub struct ProbableScoreOutcome {
     pub score: Score,
-    pub probability: f64
+    pub probability: f64,
 }
 
 #[derive(Debug)]
 pub struct ScoreOutcomeSpace {
     pub interval_home_prob: f64,
-    pub interval_away_prob: f64
+    pub interval_away_prob: f64,
 }
 
 pub struct Iter<'a> {
@@ -81,7 +78,7 @@ impl<'a> Iter<'a> {
             neither_prob,
             home_only_prob,
             away_only_prob,
-            both_prob
+            both_prob,
         }
     }
 }
@@ -91,7 +88,11 @@ impl<'a> Iterator for Iter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.permutation < self.fixtures.permutations {
-            pick(&self.fixtures.cardinalities, self.permutation, &mut self.fixtures.ordinals);
+            pick(
+                &self.fixtures.cardinalities,
+                self.permutation,
+                &mut self.fixtures.ordinals,
+            );
             let mut probability = 1.0;
             let (mut home_goals, mut away_goals) = (0, 0);
             for &ordinal in self.fixtures.ordinals.iter() {
@@ -132,7 +133,7 @@ impl<'a> Iterator for Iter<'a> {
 pub struct IterFixtures {
     cardinalities: Vec<usize>,
     ordinals: Vec<usize>,
-    permutations: u64
+    permutations: u64,
 }
 impl IterFixtures {
     pub fn new(intervals: usize) -> Self {
@@ -152,7 +153,8 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     debug_assert_eq!(iter.fixtures.cardinalities.len() + 1, scoregrid.cols());
 
     for outcome in iter {
-        scoregrid[(outcome.score.home as usize, outcome.score.away as usize)] += outcome.probability;
+        scoregrid[(outcome.score.home as usize, outcome.score.away as usize)] +=
+            outcome.probability;
     }
 }
 
@@ -167,23 +169,73 @@ pub fn from_univariate_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut M
     }
 }
 
-pub fn from_bivariate_poisson(home_rate: f64, away_rate: f64, common: f64, scoregrid: &mut Matrix<f64>) {
+pub fn from_bivariate_poisson(
+    home_rate: f64,
+    away_rate: f64,
+    common_rate: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
     let factorial = factorial::Calculator;
     for home_goals in 0..scoregrid.rows() {
         for away_goals in 0..scoregrid.cols() {
-            scoregrid[(home_goals, away_goals)] = poisson::bivariate(home_goals as u8, away_goals as u8, home_rate, away_rate, common, &factorial);
+            scoregrid[(home_goals, away_goals)] = poisson::bivariate(
+                home_goals as u8,
+                away_goals as u8,
+                home_rate,
+                away_rate,
+                common_rate,
+                &factorial,
+            );
         }
     }
 }
 
-pub fn from_binomial(interval_home_prob: f64, interval_away_prob: f64, scoregrid: &mut Matrix<f64>) {
+// pub fn from_wierd(home_rate: f64, away_rate: f64, common: f64, scoregrid: &mut Matrix<f64>) {
+//     let lambda_1 = home_rate - common;
+//     let lambda_2 = away_rate - common;
+//     let factorial = factorial::Calculator;
+//     for home_goals in 0..scoregrid.rows() {
+//         for away_goals in 0..scoregrid.cols() {
+//             let home_prob = poisson::univariate(home_goals as u8, lambda_1, &factorial);
+//             let away_prob = poisson::univariate(away_goals as u8, lambda_2, &factorial);
+//             scoregrid[(home_goals, away_goals)] = home_prob * away_prob;
+//         }
+//     }
+//     for both_goals in 1..scoregrid.rows() {
+//         let both_probs =  poisson::univariate(both_goals as u8, common, &factorial);
+//         let mut eligibles = 0;
+//         for home_goals in 0..scoregrid.rows() {
+//             for away_goals in 0..scoregrid.cols() {
+//                 if home_goals >= both_goals && away_goals >= both_goals {
+//                     eligibles += 1;
+//                 }
+//             }
+//         }
+//         for home_goals in 0..scoregrid.rows() {
+//             for away_goals in 0..scoregrid.cols() {
+//                 if home_goals >= both_goals && away_goals >= both_goals {
+//                     scoregrid[(home_goals, away_goals)] += both_probs / eligibles as f64;
+//                 }
+//             }
+//         }
+//     }
+//     scoregrid.flatten_mut().normalise(1.0);
+// }
+
+pub fn from_binomial(
+    interval_home_prob: f64,
+    interval_away_prob: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
     let factorial = factorial::Calculator;
     let home_intervals = scoregrid.rows() as u8 - 1;
     let away_intervals = scoregrid.cols() as u8 - 1;
     for home_goals in 0..=home_intervals {
         for away_goals in 0..=away_intervals {
-            let home_prob = factorial::binomial(home_intervals, home_goals, interval_home_prob, &factorial);
-            let away_prob = factorial::binomial(away_intervals, away_goals, interval_away_prob, &factorial);
+            let home_prob =
+                factorial::binomial(home_intervals, home_goals, interval_home_prob, &factorial);
+            let away_prob =
+                factorial::binomial(away_intervals, away_goals, interval_away_prob, &factorial);
             scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
         }
     }
@@ -200,7 +252,7 @@ pub enum Outcome {
     Draw,
     GoalsUnder(u8),
     GoalsOver(u8),
-    CorrectScore(Score)
+    CorrectScore(Score),
 }
 impl Outcome {
     pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
@@ -276,7 +328,7 @@ impl Outcome {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {
     Home,
-    Away
+    Away,
 }
 
 #[cfg(test)]
