@@ -10,9 +10,10 @@ use stanza::style::{HAlign, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use std::collections::HashMap;
 use HAlign::Left;
+use brumby::probs::SliceExt;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
-const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=201.0;
+const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
 
 pub fn main() {
     let correct_score_prices = HashMap::from([
@@ -74,27 +75,30 @@ pub fn main() {
     println!("correct_score: {correct_score:?}");
 
     let search_outcome = fit_scoregrid(&h2h, &goals_ou);
+    println!("---");
     println!("search outcome: {search_outcome:?}");
 
-    let scoregrid = create_scoregrid(
+    let scoregrid = interval_scoregrid(
         search_outcome.optimal_values[0],
         search_outcome.optimal_values[1],
+        // search_outcome.optimal_values[2]
     );
-    println!("scoregrid\n{}", scoregrid.verbose());
+    println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
 
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
-    println!("fitted_h2h: {fitted_h2h:?}");
-    let table_h2h = print_market(&LabelledMarket {
-        outcomes: h2h.outcomes,
+    let fitted_h2h = LabelledMarket {
+        outcomes: h2h.outcomes.clone(),
         market: fitted_h2h,
-    });
+    };
+    let table_h2h = print_market(&fitted_h2h);
     println!("H2H:\n{}", Console::default().render(&table_h2h));
 
     let fitted_goals_ou = frame_prices(&scoregrid, &goals_ou.outcomes, &goals_ou.market.overround);
-    let table_goals_ou = print_market(&LabelledMarket {
-        outcomes: goals_ou.outcomes,
+    let fitted_goals_ou = LabelledMarket {
+        outcomes: goals_ou.outcomes.clone(),
         market: fitted_goals_ou,
-    });
+    };
+    let table_goals_ou = print_market(&fitted_goals_ou);
     println!("Goals O/U:\n{}", Console::default().render(&table_goals_ou));
 
     let fitted_correct_score = frame_prices(
@@ -102,13 +106,33 @@ pub fn main() {
         &correct_score.outcomes,
         &correct_score.market.overround,
     );
-    let table_correct_score = print_market(&LabelledMarket {
-        outcomes: correct_score.outcomes,
+    let fitted_correct_score = LabelledMarket {
+        outcomes: correct_score.outcomes.clone(),
         market: fitted_correct_score,
-    });
+    };
+    let table_correct_score = print_market(&fitted_correct_score);
     println!(
-        "Correct score:\n{}",
+        "Correct Score:\n{}",
         Console::default().render(&table_correct_score)
+    );
+
+    let market_errors = [
+        ("H2H", &h2h, &fitted_h2h),
+        ("Goals O/U", &goals_ou, &fitted_goals_ou),
+        ("Correct Score", &correct_score, &fitted_correct_score),
+    ]
+    .iter()
+    .map(|(key, sample, fitted)| {
+        (
+            *key,
+            compute_msre(&sample.market.prices, &fitted.market.prices).sqrt(),
+        )
+    })
+    .collect::<Vec<_>>();
+    let table_errors = print_errors(&market_errors);
+    println!(
+        "Fitting errors:\n{}",
+        Console::default().render(&table_errors)
     );
 }
 
@@ -133,13 +157,15 @@ pub struct LabelledMarket {
 fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSearchOutcome {
     hypergrid_search(
         &HypergridSearchConfig {
-            max_steps: 10,
+            max_steps: 100,
             acceptable_residual: 1e-6,
             bounds: Capture::Owned(vec![0.0..=0.5, 0.0..=0.5]),
-            resolution: 10,
+            // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5]),
+            // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5, 0.0..=0.1]), // for the bivariate
+            resolution: 4,
         },
         |values| {
-            let scoregrid = create_scoregrid(values[0], values[1]);
+            let scoregrid = binomial_scoregrid(values[0], values[1]);
 
             let mut residual = 0.0;
             for market in [&h2h, &goals_ou] {
@@ -155,8 +181,9 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
     )
 }
 
-fn create_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 6;
+/// Intervals.
+fn interval_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<f64> {
+    const INTERVALS: usize = 10;
     let space = ScoreOutcomeSpace {
         interval_home_prob,
         interval_away_prob,
@@ -166,7 +193,33 @@ fn create_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_iterator(iter, &mut scoregrid);
     scoregrid::inflate_zero(0.035, &mut scoregrid);
-    // scoregrid::inflate_zero(0.02, &mut scoregrid);
+    scoregrid
+}
+
+/// Binomial.
+fn binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<f64> {
+    const INTERVALS: usize = 10;
+    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
+    scoregrid::from_binomial(interval_home_prob, interval_away_prob, &mut scoregrid);
+    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid
+}
+
+/// Independent Poisson.
+fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64) -> Matrix<f64> {
+    const INTERVALS: usize = 6;
+    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
+    scoregrid::from_univariate_poisson(home_rate, away_rate, &mut scoregrid);
+    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid
+}
+
+/// Bivariate Poisson.
+fn bivariate_poisson_scoregrid(home_rate: f64, away_rate: f64, common: f64) -> Matrix<f64> {
+    const INTERVALS: usize = 6;
+    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
+    scoregrid::from_bivariate_poisson(home_rate, away_rate, common, &mut scoregrid);
+    scoregrid::inflate_zero(0.035, &mut scoregrid);
     scoregrid
 }
 
@@ -178,7 +231,21 @@ fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[Outcome], overround: &Overr
     Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
 }
 
-pub fn print_market(market: &LabelledMarket) -> Table {
+fn compute_msre(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
+    let mut sq_rel_error = 0.0;
+    let mut counted = 0;
+    for (index, sample_price) in sample_prices.iter().enumerate() {
+        let fitted_price: f64 = fitted_prices[index];
+        if fitted_price.is_finite() {
+            counted += 1;
+            let relative_error = (sample_price - fitted_price) / sample_price;
+            sq_rel_error += relative_error.powi(2);
+        }
+    }
+    sq_rel_error / counted as f64
+}
+
+fn print_market(market: &LabelledMarket) -> Table {
     let mut table = Table::default().with_cols(vec![
         Col::new(Styles::default().with(MinWidth(10)).with(Left)),
         Col::new(Styles::default().with(MinWidth(10)).with(HAlign::Right)),
@@ -190,6 +257,20 @@ pub fn print_market(market: &LabelledMarket) -> Table {
                 format!("{outcome:?}").into(),
                 format!("{:.2}", market.market.prices[index]).into(),
             ],
+        ));
+    }
+    table
+}
+
+fn print_errors(errors: &[(&str, f64)]) -> Table {
+    let mut table = Table::default().with_cols(vec![
+        Col::new(Styles::default().with(MinWidth(10)).with(Left)),
+        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+    ]);
+    for (key, error) in errors {
+        table.push_row(Row::new(
+            Styles::default(),
+            vec![key.to_string().into(), format!("{error:.3}").into()],
         ));
     }
     table
