@@ -18,6 +18,7 @@ pub mod mc;
 pub mod opt;
 pub mod print;
 pub mod probs;
+pub mod scoregrid;
 pub mod selection;
 pub mod timed;
 
