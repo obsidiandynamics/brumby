@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby::comb::{count_combinations, is_unique_linear, pick};
+use brumby::comb::{count_permutations, is_unique_linear, pick};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn fixtures(items: usize, times: usize) -> (Vec<bool>, Vec<usize>, Vec<usize>) {
@@ -16,21 +16,20 @@ fn criterion_benchmark(c: &mut Criterion) {
     let (mut bitmap, cardinalities, mut ordinals) = fixtures(10, 5);
 
     // sanity check
-    let unique_combinations = (0..count_combinations(&cardinalities))
+    let unique_combinations = (0..count_permutations(&cardinalities))
         .into_iter()
-        .map(|combination| {
+        .filter(|&combination| {
             pick(&cardinalities, combination, &mut ordinals);
             is_unique_linear(&ordinals, &mut bitmap)
         })
-        .filter(|&unique| unique)
         .count();
     assert_eq!(10 * 9 * 8 * 7 * 6, unique_combinations);
 
     fn bench(c: &mut Criterion, items: usize, times: usize) {
         let (mut bitmap, cardinalities, mut ordinals) = fixtures(items, times);
-        c.bench_function(&format!("cri_comb_{items}c{times}"), |b| {
+        c.bench_function(&format!("cri_comb_{items}p{times}"), |b| {
             b.iter(|| {
-                for combination in 0..count_combinations(&cardinalities) {
+                for combination in 0..count_permutations(&cardinalities) {
                     pick(&cardinalities, combination, &mut ordinals);
                     is_unique_linear(&ordinals, &mut bitmap);
                 }

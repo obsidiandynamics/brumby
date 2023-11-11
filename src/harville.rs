@@ -1,4 +1,4 @@
-use crate::comb::{count_combinations, is_unique_linear, pick};
+use crate::comb::{count_permutations, is_unique_linear, pick};
 use crate::linear::matrix::Matrix;
 
 pub fn harville(probs: &Matrix<f64>, podium: &[usize]) -> f64 {
@@ -59,9 +59,9 @@ pub fn harville_summary_no_alloc(
         bitmap.len(),
         "number of columns in the probabilities matrix must equal to the bitmap length"
     );
-    let combinations = count_combinations(cardinalities);
-    for combination in 0..combinations {
-        pick(cardinalities, combination, podium);
+    let permutations = count_permutations(cardinalities);
+    for permutation in 0..permutations {
+        pick(cardinalities, permutation, podium);
         if !is_unique_linear(podium, bitmap) {
             continue;
         }
@@ -78,7 +78,7 @@ mod tests {
     use assert_float_eq::*;
 
     use crate::capture::Capture;
-    use crate::comb::{is_unique_quadratic, Combinator};
+    use crate::comb::{is_unique_quadratic, Permuter};
     use crate::mc::DilatedProbs;
     use crate::probs::SliceExt;
     use crate::testing::assert_slice_f64_relative;
@@ -101,8 +101,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_podium_places(3),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {
@@ -129,8 +129,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_podium_places(RANKS),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {
@@ -162,8 +162,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_podium_places(RANKS),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {
@@ -191,8 +191,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_podium_places(RANKS),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {
@@ -219,8 +219,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_podium_places(RANKS),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {
@@ -248,8 +248,8 @@ mod tests {
                 .with_win_probs(Capture::Borrowed(&WIN_PROBS))
                 .with_dilatives(Capture::Borrowed(&DILATIVES)),
         );
-        let combinator = Combinator::new(&[RUNNERS; RANKS]);
-        let probs = combinator
+        let permuter = Permuter::new(&[RUNNERS; RANKS]);
+        let probs = permuter
             .into_iter()
             .filter(|podium| is_unique_quadratic(&podium))
             .map(|podium| {

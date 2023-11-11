@@ -1,8 +1,8 @@
 //! Combinatorics.
 
 #[inline]
-pub fn pick(cardinalities: &[usize], combination: u64, ordinals: &mut [usize]) {
-    let mut residual = combination;
+pub fn pick(cardinalities: &[usize], permutation: u64, ordinals: &mut [usize]) {
+    let mut residual = permutation;
     for (index, &cardinality) in cardinalities.iter().enumerate() {
         let cardinality = cardinality as u64;
         let (quotient, remainder) = (residual / cardinality, residual % cardinality);
@@ -12,52 +12,52 @@ pub fn pick(cardinalities: &[usize], combination: u64, ordinals: &mut [usize]) {
 }
 
 #[inline]
-pub fn count_combinations(cardinalities: &[usize]) -> u64 {
+pub fn count_permutations(cardinalities: &[usize]) -> u64 {
     cardinalities.iter().fold(1u64, |acc, &num| acc * num as u64)
 }
 
-pub struct Combinator<'a> {
+pub struct Permuter<'a> {
     cardinalities: &'a [usize],
-    combinations: u64,
+    permutations: u64,
 }
-impl<'a> Combinator<'a> {
+impl<'a> Permuter<'a> {
     pub fn new(cardinalities: &'a [usize]) -> Self {
-        let combinations = count_combinations(cardinalities);
+        let permutations = count_permutations(cardinalities);
         Self {
             cardinalities,
-            combinations,
+            permutations,
         }
     }
 }
 
-impl<'a> IntoIterator for Combinator<'a> {
+impl<'a> IntoIterator for Permuter<'a> {
     type Item = Vec<usize>;
     type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
-            combinator: self,
-            combination: 0,
+            permuter: self,
+            permutation: 0,
         }
     }
 }
 
 pub struct Iter<'a> {
-    combinator: Combinator<'a>,
-    combination: u64,
+    permuter: Permuter<'a>,
+    permutation: u64,
 }
 impl<'a> Iterator for Iter<'a> {
     type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.combination != self.combinator.combinations {
-            let mut ordinals = vec![0; self.combinator.cardinalities.len()];
+        if self.permutation != self.permuter.permutations {
+            let mut ordinals = vec![0; self.permuter.cardinalities.len()];
             pick(
-                self.combinator.cardinalities,
-                self.combination,
+                self.permuter.cardinalities,
+                self.permutation,
                 &mut ordinals,
             );
-            self.combination += 1;
+            self.permutation += 1;
             Some(ordinals)
         } else {
             None
@@ -97,11 +97,11 @@ mod tests {
     fn test_pick() {
         let cardinalities = &[2, 3, 4];
         let mut outputs = vec![];
-        let combinations = count_combinations(cardinalities);
-        assert_eq!(24, combinations);
-        for combination in 0..combinations {
+        let permutations = count_permutations(cardinalities);
+        assert_eq!(24, permutations);
+        for permutation in 0..permutations {
             let mut ordinals = [0; 3];
-            pick(cardinalities, combination, &mut ordinals);
+            pick(cardinalities, permutation, &mut ordinals);
             outputs.push(ordinals.to_vec());
             println!("ordinals: {ordinals:?}");
         }
@@ -139,8 +139,8 @@ mod tests {
 
     #[test]
     fn iterator() {
-        let combinator = Combinator::new(&[2, 3, 4]);
-        let outputs = combinator.into_iter().collect::<Vec<_>>();
+        let permuter = Permuter::new(&[2, 3, 4]);
+        let outputs = permuter.into_iter().collect::<Vec<_>>();
         let expected_outputs = vec![
             [0, 0, 0],
             [1, 0, 0],
