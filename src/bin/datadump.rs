@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use brumby::csv::{CsvWriter, Record};
-use brumby::data;
+use brumby::{data, model};
 use brumby::data::{EventDetailExt, PredicateClosures};
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::cf::Factor;
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Market::fit(&OVERROUND_METHOD, prices, rank as f64 + 1.0)
             })
             .collect();
-        let fit_outcome = fit::fit_all(&FitOptions::default(), &markets)?;
+        let fit_outcome = fit::fit_all(&FitOptions::default(), &markets, &model::SINGLE_PRICE_BOUNDS)?;
         debug!(
             "individual fitting complete: stats: {:?}, probs: \n{}",
             fit_outcome.stats,

@@ -15,6 +15,7 @@ use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
+use brumby::model;
 use brumby::model::cf::Coefficients;
 use brumby::model::fit::{compute_msre, FitOptions};
 use brumby::model::{fit, Fitter, FitterConfig, TopN, WinPlace, PODIUM, Model, Primer};
@@ -122,6 +123,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         / sample_overrounds[0].value,
                 },
                 implied_probs.clone(),
+                &model::SINGLE_PRICE_BOUNDS
             )
         })
         .collect();

@@ -5,8 +5,10 @@ use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
-const MIN_PRICE: f64 = 1.04;
-const MAX_PRICE: f64 = 10001.0;
+// const MIN_PRICE: f64 = 1.04;
+// const MAX_PRICE: f64 = 200.0;
+
+pub type PriceBounds = RangeInclusive<f64>;
 
 pub trait MarketPrice {
     fn decimal(&self) -> f64;
@@ -92,11 +94,11 @@ impl Market {
         }
     }
 
-    pub fn frame(overround: &Overround, probs: Vec<f64>) -> Self {
+    pub fn frame(overround: &Overround, probs: Vec<f64>, bounds: &PriceBounds) -> Self {
         match overround.method {
-            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround.value),
-            OverroundMethod::Power => Self::frame_power(probs, overround.value),
-            OverroundMethod::OddsRatio => Self::frame_odds_ratio(probs, overround.value)
+            OverroundMethod::Multiplicative => Self::frame_multiplicative(probs, overround.value, bounds),
+            OverroundMethod::Power => Self::frame_power(probs, overround.value, bounds),
+            OverroundMethod::OddsRatio => Self::frame_odds_ratio(probs, overround.value, bounds)
         }
     }
 
@@ -171,9 +173,9 @@ impl Market {
                 let mut sum = 0.0;
                 for &price in &prices {
                     let uncapped_scaled_price = 1.0 + (price - 1.0) / d;
-                    let capped_scaled_price =
-                        cap(uncapped_scaled_price, MIN_PRICE, MAX_PRICE);
-                    sum += 1.0 / capped_scaled_price;
+                    // let capped_scaled_price =
+                    //     cap(uncapped_scaled_price, MIN_PRICE, MAX_PRICE);
+                    sum += 1.0 / uncapped_scaled_price;
                 }
 
                 (sum - fair_sum).powi(2)
@@ -198,10 +200,10 @@ impl Market {
         }
     }
 
-    fn frame_multiplicative(probs: Vec<f64>, overround: f64) -> Self {
+    fn frame_multiplicative(probs: Vec<f64>, overround: f64, bounds: &PriceBounds) -> Self {
         let prices: Vec<_> = probs
             .iter()
-            .map(|prob| multiply_capped(1.0 / prob, overround))
+            .map(|prob| multiply_capped(1.0 / prob, overround, bounds))
             .collect();
         Self {
             probs,
@@ -213,12 +215,12 @@ impl Market {
         }
     }
 
-    fn frame_power(probs: Vec<f64>, overround: f64) -> Market {
+    fn frame_power(probs: Vec<f64>, overround: f64, bounds: &PriceBounds) -> Market {
         let rtp = 1.0 / overround;
         let fair_sum = probs.sum();
         let initial_k = 1.0 + f64::ln(rtp) / f64::ln(probs.len() as f64);
-        let min_scaled_price = 1.0 + (MIN_PRICE - 1.0) / fair_sum;
-        let max_scaled_price = 1.0 + (MAX_PRICE - 1.0) / fair_sum;
+        let min_scaled_price = 1.0 + (bounds.start() - 1.0) / fair_sum;
+        let max_scaled_price = 1.0 + (bounds.end() - 1.0) / fair_sum;
         let outcome = opt::univariate_descent(
             &UnivariateDescentConfig {
                 init_value: initial_k,
@@ -245,7 +247,7 @@ impl Market {
             .map(|prob| {
                 let uncapped_price = (fair_sum / prob).powf(outcome.optimal_value) / fair_sum;
                 if uncapped_price.is_finite() {
-                    cap(uncapped_price, MIN_PRICE, MAX_PRICE)
+                    cap(uncapped_price, *bounds.start(), *bounds.end())
                 } else {
                     uncapped_price
                 }
@@ -262,7 +264,7 @@ impl Market {
         }
     }
 
-    fn frame_odds_ratio(probs: Vec<f64>, overround: f64) -> Market {
+    fn frame_odds_ratio(probs: Vec<f64>, overround: f64, bounds: &PriceBounds) -> Market {
         let fair_sum = probs.sum();
         let overround_sum = fair_sum * overround;
         let initial_d = overround;
@@ -280,7 +282,7 @@ impl Market {
                     let price = 1.0 / prob;
                     let uncapped_scaled_price = 1.0 + (price - 1.0) / d;
                     let capped_scaled_price =
-                        cap(uncapped_scaled_price, MIN_PRICE, MAX_PRICE);
+                        cap(uncapped_scaled_price, *bounds.start(), *bounds.end());
                     sum += 1.0 / capped_scaled_price;
                 }
 
@@ -294,7 +296,7 @@ impl Market {
                 let price = 1.0 / prob;
                 let uncapped_price = 1.0 + (price - 1.0) / outcome.optimal_value;
                 if uncapped_price.is_finite() {
-                    cap(uncapped_price, MIN_PRICE, MAX_PRICE)
+                    cap(uncapped_price, *bounds.start(), *bounds.end())
                 } else {
                     uncapped_price
                 }
@@ -313,10 +315,10 @@ impl Market {
 }
 
 #[inline]
-pub fn multiply_capped(fair_price: f64, overround: f64) -> f64 {
+pub fn multiply_capped(fair_price: f64, overround: f64, bounds: &PriceBounds) -> f64 {
     let quotient = fair_price / overround;
     if quotient.is_finite() {
-        cap(quotient, MIN_PRICE, MAX_PRICE)
+        cap(quotient, *bounds.start(), *bounds.end())
     } else {
         quotient
     }
