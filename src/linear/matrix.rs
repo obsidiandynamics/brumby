@@ -54,10 +54,26 @@ impl<T> Matrix<T> {
     }
 
     pub fn clone_row(&mut self, source_row: &[T]) where T: Copy {
-        debug_assert_eq!(self.cols, source_row.len(), "length of source row {} does not match number of columns {}", source_row.len(), self.cols);
+        debug_assert_eq!(self.cols, source_row.len(), "length of source row ({}) does not match number of columns ({})", source_row.len(), self.cols);
         for row in 0..self.rows {
             let row_slice = self.row_slice_mut(row);
             row_slice.copy_from_slice(source_row);
+        }
+    }
+
+    pub fn col(&self, col: usize) -> ColCellIter<T> {
+        debug_assert!(col < self.cols, "column out of bounds");
+        ColCellIter {
+            matrix: self,
+            col,
+            row: 0,
+        }
+    }
+
+    pub fn read_col(&self, col: usize, target: &mut [T]) where T: Copy {
+        debug_assert_eq!(self.rows, target.len(), "length of target vector ({}) does not match number of rows ({})", target.len(), self.rows);
+        for row in 0..self.rows {
+            target[row] = self[(row, col)];
         }
     }
 
@@ -157,7 +173,7 @@ impl<T> IndexMut<usize> for Matrix<T> {
 
 impl<'a, T> IntoIterator for &'a Matrix<T> {
     type Item = &'a [T];
-    type IntoIter = MatrixIter<'a, T>;
+    type IntoIter = RowIter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
@@ -167,12 +183,12 @@ impl<'a, T> IntoIterator for &'a Matrix<T> {
     }
 }
 
-pub struct MatrixIter<'a, T> {
+pub struct RowIter<'a, T> {
     matrix: &'a Matrix<T>,
     row: usize,
 }
 
-impl<'a, T> Iterator for MatrixIter<'a, T> {
+impl<'a, T> Iterator for RowIter<'a, T> {
     type Item = &'a [T];
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -182,6 +198,25 @@ impl<'a, T> Iterator for MatrixIter<'a, T> {
             next
         } else {
             None
+        }
+    }
+}
+
+pub struct ColCellIter<'a, T> {
+    matrix: &'a Matrix<T>,
+    col: usize,
+    row: usize,
+}
+impl<'a, T> Iterator for ColCellIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.row == self.matrix.rows {
+            None
+        } else {
+            let result = Some(&self.matrix[(self.row, self.col)]);
+            self.row += 1;
+            result
         }
     }
 }
@@ -315,5 +350,30 @@ mod tests {
         assert_eq!(Some(&matrix[1]), iter.next());
         assert_eq!(Some(&matrix[2]), iter.next());
         assert_eq!(None, iter.next());
+    }
+
+    #[test]
+    fn read_col() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        let mut col = vec![0.; 3];
+
+        matrix.read_col(0, &mut col);
+        assert_eq!(&[0., 20., 40.], &col[..]);
+
+        matrix.read_col(1, &mut col);
+        assert_eq!(&[10., 30., 50.], &col[..]);
+    }
+
+    #[test]
+    fn col() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+
+        let mut col = matrix.col(0);
+        assert_eq!(Some(&0.), col.next());
+        assert_eq!(Some(&20.), col.next());
+        assert_eq!(Some(&40.), col.next());
+        assert_eq!(None, col.next());
     }
 }

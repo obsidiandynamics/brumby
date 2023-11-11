@@ -10,6 +10,7 @@ pub mod csv;
 pub mod data;
 pub mod display;
 pub mod file;
+pub mod harville;
 pub mod linear;
 pub mod market;
 pub mod model;

@@ -128,7 +128,6 @@ where
         .next()
         .ok_or(anyhow!("at least one market must be present"))?;
     for other in markets {
-        let other = other;
         if first.probs.len() != other.probs.len() {
             bail!("the number of probabilities across correlated markets must match");
         }
