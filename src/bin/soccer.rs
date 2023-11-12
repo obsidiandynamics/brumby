@@ -80,7 +80,7 @@ pub fn main() {
     let scoregrid = interval_scoregrid(
         search_outcome.optimal_values[0],
         search_outcome.optimal_values[1],
-        // search_outcome.optimal_values[2]
+        search_outcome.optimal_values[2]
     );
     println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
 
@@ -158,14 +158,14 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
         &HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-6,
-            bounds: vec![0.0..=0.5, 0.0..=0.5].into(),
+            bounds: vec![0.01..=0.5, 0.01..=0.5, 0.01..=0.5].into(),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5]),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5, 0.0..=0.1]), // for the bivariate
             resolution: 4,
         },
+        |values| values.sum() <= 1.0,
         |values| {
-            let scoregrid = binomial_scoregrid(values[0], values[1]);
-
+            let scoregrid = bivariate_binomial_scoregrid(values[0], values[1], values[2]);
             let mut residual = 0.0;
             for market in [&h2h, &goals_ou] {
                 for (index, outcome) in market.outcomes.iter().enumerate() {
@@ -173,6 +173,7 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
                     let sample_prob = market.market.probs[index];
                     let relative_error = (sample_prob - fitted_prob) / sample_prob;
                     residual += relative_error.powi(2);
+                    // residual += (sample_prob - fitted_prob).powi(2);
                 }
             }
             residual
@@ -181,16 +182,10 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
 }
 
 /// Intervals.
-fn interval_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<f64> {
+fn interval_scoregrid(interval_home_prob: f64, interval_away_prob: f64, interval_common_prob: f64) -> Matrix<f64> {
     const INTERVALS: usize = 10;
-    let space = ScoreOutcomeSpace {
-        interval_home_prob,
-        interval_away_prob,
-    };
-    let mut fixtures = IterFixtures::new(INTERVALS);
-    let iter = Iter::new(&space, &mut fixtures);
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    scoregrid::from_iterator(iter, &mut scoregrid);
+    scoregrid::from_interval(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
     scoregrid::inflate_zero(0.035, &mut scoregrid);
     scoregrid
 }
@@ -200,6 +195,15 @@ fn binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matri
     const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_binomial(interval_home_prob, interval_away_prob, &mut scoregrid);
+    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid
+}
+
+/// Bivariate binomial.
+fn bivariate_binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64, interval_common_prob: f64) -> Matrix<f64> {
+    const INTERVALS: usize = 10;
+    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
+    scoregrid::from_bivariate_binomial(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
     scoregrid::inflate_zero(0.035, &mut scoregrid);
     scoregrid
 }
