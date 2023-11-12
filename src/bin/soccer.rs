@@ -1,18 +1,21 @@
-use brumby::linear::matrix::Matrix;
-use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
-use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
-use brumby::scoregrid;
-use brumby::scoregrid::{Iter, IterFixtures, Outcome, Score, ScoreOutcomeSpace, Side};
+use std::collections::HashMap;
+
+use HAlign::Left;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
-use std::collections::HashMap;
-use HAlign::Left;
+
+use brumby::linear::matrix::Matrix;
+use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
+use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
 use brumby::probs::SliceExt;
+use brumby::scoregrid;
+use brumby::scoregrid::{Outcome, Score, Side};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
+const ZERO_INFLATION: f64 = 0.035;
 
 pub fn main() {
     let correct_score_prices = HashMap::from([
@@ -186,7 +189,7 @@ fn interval_scoregrid(interval_home_prob: f64, interval_away_prob: f64, interval
     const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_interval(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
-    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
@@ -195,7 +198,7 @@ fn binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matri
     const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_binomial(interval_home_prob, interval_away_prob, &mut scoregrid);
-    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
@@ -204,7 +207,7 @@ fn bivariate_binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64
     const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_bivariate_binomial(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
-    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
@@ -213,7 +216,7 @@ fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64) -> Matrix<f64> {
     const INTERVALS: usize = 6;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_univariate_poisson(home_rate, away_rate, &mut scoregrid);
-    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
@@ -222,7 +225,7 @@ fn bivariate_poisson_scoregrid(home_rate: f64, away_rate: f64, common: f64) -> M
     const INTERVALS: usize = 6;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_bivariate_poisson(home_rate, away_rate, common, &mut scoregrid);
-    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
