@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use HAlign::Left;
 use stanza::renderer::console::Console;
@@ -16,6 +17,8 @@ use brumby::scoregrid::{Outcome, Score, Side};
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
 const ZERO_INFLATION: f64 = 0.035;
+const INTERVALS: usize = 10;
+const MAX_TOTAL_GOALS: u16 = 8;
 
 pub fn main() {
     let correct_score_prices = HashMap::from([
@@ -76,9 +79,11 @@ pub fn main() {
     let correct_score = fit_market(&correct_score_prices);
     println!("correct_score: {correct_score:?}");
 
+    println!("*** fitting scoregrid ***");
+    let start = Instant::now();
     let search_outcome = fit_scoregrid(&h2h, &goals_ou);
-    println!("---");
-    println!("search outcome: {search_outcome:?}");
+    let elapsed = start.elapsed();
+    println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
 
     let scoregrid = interval_scoregrid(
         search_outcome.optimal_values[0],
@@ -161,14 +166,15 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
         &HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-6,
-            bounds: vec![0.01..=0.5, 0.01..=0.5, 0.01..=0.5].into(),
+            bounds: vec![0.0001..=0.5, 0.0001..=0.5, 0.00..=0.1].into(),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5]),
             // bounds: Capture::Owned(vec![0.5..=3.5, 0.5..=3.5, 0.0..=0.1]), // for the bivariate
             resolution: 4,
         },
         |values| values.sum() <= 1.0,
         |values| {
-            let scoregrid = bivariate_binomial_scoregrid(values[0], values[1], values[2]);
+            // let scoregrid = bivariate_binomial_scoregrid(values[0], values[1], values[2]);
+            let scoregrid = interval_scoregrid(values[0], values[1], values[2]);
             let mut residual = 0.0;
             for market in [&h2h, &goals_ou] {
                 for (index, outcome) in market.outcomes.iter().enumerate() {
@@ -186,16 +192,15 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
 
 /// Intervals.
 fn interval_scoregrid(interval_home_prob: f64, interval_away_prob: f64, interval_common_prob: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 10;
-    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    scoregrid::from_interval(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
+    let dim = usize::min(MAX_TOTAL_GOALS as usize, INTERVALS) + 1;
+    let mut scoregrid = Matrix::allocate(dim, dim);
+    scoregrid::from_interval(INTERVALS as u8, MAX_TOTAL_GOALS, interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
     scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
     scoregrid
 }
 
 /// Binomial.
 fn binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_binomial(interval_home_prob, interval_away_prob, &mut scoregrid);
     scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -204,7 +209,6 @@ fn binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matri
 
 /// Bivariate binomial.
 fn bivariate_binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64, interval_common_prob: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 10;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_bivariate_binomial(interval_home_prob, interval_away_prob, interval_common_prob, &mut scoregrid);
     scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -213,7 +217,6 @@ fn bivariate_binomial_scoregrid(interval_home_prob: f64, interval_away_prob: f64
 
 /// Independent Poisson.
 fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 6;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_univariate_poisson(home_rate, away_rate, &mut scoregrid);
     scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -222,7 +225,6 @@ fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64) -> Matrix<f64> {
 
 /// Bivariate Poisson.
 fn bivariate_poisson_scoregrid(home_rate: f64, away_rate: f64, common: f64) -> Matrix<f64> {
-    const INTERVALS: usize = 6;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_bivariate_poisson(home_rate, away_rate, common, &mut scoregrid);
     scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -233,6 +235,7 @@ fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[Outcome], overround: &Overr
     let probs = outcomes
         .iter()
         .map(|outcome| outcome.gather(scoregrid))
+        .map(|prob| f64::max(0.0001, prob))
         .collect();
     Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
 }

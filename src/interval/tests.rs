@@ -2,14 +2,15 @@ use super::*;
 
 #[test]
 fn explore_all_2x2() {
-    let scenarios = explore_all(&IntervalConfig {
+    let exploration = explore_all(&IntervalConfig {
         intervals: 2,
         home_prob: 0.25,
         away_prob: 0.25,
         common_prob: 0.25,
+        max_total_goals: u16::MAX,
     });
-    assert_eq!(9, scenarios.len());
-    assert_eq!(1.0, scenarios.values().sum::<f64>());
+    assert_eq!(9, exploration.scenarios.len());
+    assert_eq!(1.0, exploration.scenarios.values().sum::<f64>());
     let expected = [
         (
             Scenario {
@@ -66,35 +67,40 @@ fn explore_all_2x2() {
             0.125,
         ),
     ];
-    assert_eq!(expected.len(), scenarios.len());
+    assert_eq!(expected.len(), exploration.scenarios.len());
+    assert_eq!(0.0, exploration.pruned);
     for (expected_scenario, expected_probability) in expected {
         assert_eq!(
             &expected_probability,
-            scenarios.get(&expected_scenario).unwrap()
+            exploration.scenarios.get(&expected_scenario).unwrap()
         );
     }
 }
 
 #[test]
 fn explore_all_3x3() {
-    let scenarios = explore_all(&IntervalConfig {
+    let exploration = explore_all(&IntervalConfig {
         intervals: 3,
         home_prob: 0.25,
         away_prob: 0.25,
         common_prob: 0.25,
+        max_total_goals: u16::MAX,
     });
-    assert_eq!(16, scenarios.len());
-    assert_eq!(1.0, scenarios.values().sum::<f64>());
+    assert_eq!(16, exploration.scenarios.len());
+    assert_eq!(1.0, exploration.scenarios.values().sum::<f64>());
+    assert_eq!(0.0, exploration.pruned);
 }
 
 #[test]
 fn explore_all_4x4() {
-    let scenarios = explore_all(&IntervalConfig {
+    let exploration = explore_all(&IntervalConfig {
         intervals: 4,
         home_prob: 0.25,
         away_prob: 0.25,
         common_prob: 0.25,
+        max_total_goals: u16::MAX,
     });
-    assert_eq!(25, scenarios.len());
-    assert_eq!(1.0, scenarios.values().sum::<f64>());
+    assert_eq!(25, exploration.scenarios.len());
+    assert_eq!(1.0, exploration.scenarios.values().sum::<f64>());
+    assert_eq!(0.0, exploration.pruned);
 }

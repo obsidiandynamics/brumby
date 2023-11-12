@@ -42,6 +42,10 @@ name = "cri_comb"
 harness = false
 
 [[bench]]
+name = "cri_interval"
+harness = false
+
+[[bench]]
 name = "cri_mc"
 harness = false
 

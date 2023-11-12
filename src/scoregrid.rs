@@ -1,14 +1,16 @@
 use ordinalizer::Ordinal;
+use strum_macros::{EnumCount, EnumIter};
 
 use multinomial::binomial;
 
 use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
+use crate::interval::{explore_all, IntervalConfig};
 use crate::linear::matrix::Matrix;
 use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
 
-#[derive(Debug, Ordinal)]
+#[derive(Debug, Ordinal, EnumCount, EnumIter)]
 pub enum GoalEvent {
     Neither,
     Home,
@@ -46,6 +48,17 @@ pub struct Score {
 impl Score {
     pub fn new(home: u8, away: u8) -> Self {
         Self { home, away }
+    }
+
+    pub fn nil_all() -> Self {
+        Self {
+            home: 0,
+            away: 0
+        }
+    }
+
+    pub fn total(&self) -> u16 {
+        (self.home + self.away) as u16
     }
 }
 
@@ -155,23 +168,42 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     }
 }
 
-
+// pub fn from_interval(
+//     interval_home_prob: f64,
+//     interval_away_prob: f64,
+//     interval_common_prob: f64,
+//     scoregrid: &mut Matrix<f64>,
+// ) {
+//     assert_eq!(scoregrid.rows(), scoregrid.cols());
+//     let intervals = scoregrid.rows() - 1;
+//     let space = ScoreOutcomeSpace {
+//         interval_home_prob,
+//         interval_away_prob,
+//         interval_common_prob,
+//     };
+//     let mut fixtures = IterFixtures::new(intervals);
+//     let iter = Iter::new(&space, &mut fixtures);
+//     from_iterator(iter, scoregrid);
+// }
 pub fn from_interval(
-    interval_home_prob: f64,
-    interval_away_prob: f64,
-    interval_common_prob: f64,
+    intervals: u8,
+    max_total_goals: u16,
+    home_prob: f64,
+    away_prob: f64,
+    common_prob: f64,
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
-    let intervals = scoregrid.rows() - 1;
-    let space = ScoreOutcomeSpace {
-        interval_home_prob,
-        interval_away_prob,
-        interval_common_prob,
-    };
-    let mut fixtures = IterFixtures::new(intervals);
-    let iter = Iter::new(&space, &mut fixtures);
-    from_iterator(iter, scoregrid);
+    let exploration = explore_all(&IntervalConfig {
+        intervals,
+        home_prob,
+        away_prob,
+        common_prob,
+        max_total_goals
+    });
+    for (scenario, prob) in exploration.scenarios {
+        scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
+    }
 }
 
 pub fn from_univariate_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
