@@ -35,21 +35,21 @@ fn create_test_4x4_scoregrid() -> Matrix<f64> {
 #[test]
 pub fn outcome_win_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.65, Outcome::Win(Side::Home).gather(&scoregrid));
-    assert_eq!(0.15, Outcome::Win(Side::Away).gather(&scoregrid));
+    assert_eq!(0.65, OutcomeType::Win(Side::Home).gather(&scoregrid));
+    assert_eq!(0.15, OutcomeType::Win(Side::Away).gather(&scoregrid));
 }
 
 #[test]
 pub fn outcome_draw_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.2, Outcome::Draw.gather(&scoregrid));
+    assert_eq!(0.2, OutcomeType::Draw.gather(&scoregrid));
 }
 
 #[test]
 pub fn outcome_goals_ou_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.35, Outcome::GoalsUnder(3).gather(&scoregrid));
-    assert_eq!(0.65, Outcome::GoalsOver(2).gather(&scoregrid));
+    assert_eq!(0.35, OutcomeType::Under(3).gather(&scoregrid));
+    assert_eq!(0.65, OutcomeType::Over(2).gather(&scoregrid));
 }
 
 #[test]
@@ -57,11 +57,11 @@ pub fn outcome_correct_score_gather() {
     let scoregrid = create_test_4x4_scoregrid();
     assert_eq!(
         0.04,
-        Outcome::CorrectScore(Score::new(0, 0)).gather(&scoregrid)
+        OutcomeType::Exact(Score::new(0, 0)).gather(&scoregrid)
     );
     assert_eq!(
         0.08,
-        Outcome::CorrectScore(Score::new(3, 2)).gather(&scoregrid)
+        OutcomeType::Exact(Score::new(3, 2)).gather(&scoregrid)
     );
 }
 

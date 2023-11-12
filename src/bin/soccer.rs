@@ -12,65 +12,139 @@ use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
 use brumby::probs::SliceExt;
 use brumby::scoregrid;
-use brumby::scoregrid::{Outcome, Score, Side};
+use brumby::scoregrid::{MarketType, OutcomeType, Over, Score, Side};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
-const ZERO_INFLATION: f64 = 0.035;
+const ZERO_INFLATION: f64 = 0.015;
 const INTERVALS: usize = 10;
 const MAX_TOTAL_GOALS: u16 = 8;
 
-pub fn main() {
-    let correct_score_prices = HashMap::from([
+type Odds = HashMap<OutcomeType, f64>;
+
+fn verona_vs_leece() -> HashMap<MarketType, Odds> {
+    let h2h = HashMap::from([
+        (OutcomeType::Win(Side::Home), 2.7),
+        (OutcomeType::Draw, 2.87),
+        (OutcomeType::Win(Side::Away), 2.87),
+    ]);
+
+    let goals_ou =
+        HashMap::from([(OutcomeType::Over(2), 2.47), (OutcomeType::Under(3), 1.5)]);
+
+    let correct_score = HashMap::from([
         // home wins
-        (Outcome::CorrectScore(Score::new(1, 0)), 7.0),
-        (Outcome::CorrectScore(Score::new(2, 0)), 12.0),
-        (Outcome::CorrectScore(Score::new(2, 1)), 10.0),
-        (Outcome::CorrectScore(Score::new(3, 0)), 26.0),
-        (Outcome::CorrectScore(Score::new(3, 1)), 23.0),
-        (Outcome::CorrectScore(Score::new(3, 2)), 46.0),
-        (Outcome::CorrectScore(Score::new(4, 0)), 101.0),
-        (Outcome::CorrectScore(Score::new(4, 1)), 81.0),
-        (Outcome::CorrectScore(Score::new(4, 2)), 126.0),
-        (Outcome::CorrectScore(Score::new(4, 3)), 200.0),
-        (Outcome::CorrectScore(Score::new(5, 0)), 200.0),
-        (Outcome::CorrectScore(Score::new(5, 1)), 200.0),
-        (Outcome::CorrectScore(Score::new(5, 2)), 200.0),
-        (Outcome::CorrectScore(Score::new(5, 3)), 200.0),
-        (Outcome::CorrectScore(Score::new(5, 4)), 200.0),
+        (OutcomeType::Exact(Score::new(1, 0)), 7.0),
+        (OutcomeType::Exact(Score::new(2, 0)), 12.0),
+        (OutcomeType::Exact(Score::new(2, 1)), 10.0),
+        (OutcomeType::Exact(Score::new(3, 0)), 26.0),
+        (OutcomeType::Exact(Score::new(3, 1)), 23.0),
+        (OutcomeType::Exact(Score::new(3, 2)), 46.0),
+        (OutcomeType::Exact(Score::new(4, 0)), 101.0),
+        (OutcomeType::Exact(Score::new(4, 1)), 81.0),
+        (OutcomeType::Exact(Score::new(4, 2)), 126.0),
+        (OutcomeType::Exact(Score::new(4, 3)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 0)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 1)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 2)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 3)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 4)), 200.0),
         // draws
-        (Outcome::CorrectScore(Score::new(0, 0)), 6.75),
-        (Outcome::CorrectScore(Score::new(1, 1)), 5.90),
-        (Outcome::CorrectScore(Score::new(2, 2)), 16.00),
-        (Outcome::CorrectScore(Score::new(3, 3)), 101.00),
-        (Outcome::CorrectScore(Score::new(4, 4)), 200.00),
-        (Outcome::CorrectScore(Score::new(5, 5)), 200.00),
+        (OutcomeType::Exact(Score::new(0, 0)), 6.75),
+        (OutcomeType::Exact(Score::new(1, 1)), 5.90),
+        (OutcomeType::Exact(Score::new(2, 2)), 16.00),
+        (OutcomeType::Exact(Score::new(3, 3)), 101.00),
+        (OutcomeType::Exact(Score::new(4, 4)), 200.00),
+        (OutcomeType::Exact(Score::new(5, 5)), 200.00),
         // away wins
-        (Outcome::CorrectScore(Score::new(0, 1)), 7.25),
-        (Outcome::CorrectScore(Score::new(0, 2)), 12.0),
-        (Outcome::CorrectScore(Score::new(1, 2)), 10.5),
-        (Outcome::CorrectScore(Score::new(0, 3)), 31.0),
-        (Outcome::CorrectScore(Score::new(1, 3)), 23.0),
-        (Outcome::CorrectScore(Score::new(2, 3)), 41.0),
-        (Outcome::CorrectScore(Score::new(0, 4)), 101.0),
-        (Outcome::CorrectScore(Score::new(1, 4)), 81.0),
-        (Outcome::CorrectScore(Score::new(2, 4)), 151.0),
-        (Outcome::CorrectScore(Score::new(3, 4)), 200.0),
-        (Outcome::CorrectScore(Score::new(0, 5)), 200.0),
-        (Outcome::CorrectScore(Score::new(1, 5)), 200.0),
-        (Outcome::CorrectScore(Score::new(2, 5)), 200.0),
-        (Outcome::CorrectScore(Score::new(3, 5)), 200.0),
-        (Outcome::CorrectScore(Score::new(4, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(0, 1)), 7.25),
+        (OutcomeType::Exact(Score::new(0, 2)), 12.0),
+        (OutcomeType::Exact(Score::new(1, 2)), 10.5),
+        (OutcomeType::Exact(Score::new(0, 3)), 31.0),
+        (OutcomeType::Exact(Score::new(1, 3)), 23.0),
+        (OutcomeType::Exact(Score::new(2, 3)), 41.0),
+        (OutcomeType::Exact(Score::new(0, 4)), 101.0),
+        (OutcomeType::Exact(Score::new(1, 4)), 81.0),
+        (OutcomeType::Exact(Score::new(2, 4)), 151.0),
+        (OutcomeType::Exact(Score::new(3, 4)), 200.0),
+        (OutcomeType::Exact(Score::new(0, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(1, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(2, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(3, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(4, 5)), 200.0),
     ]);
 
-    let h2h_prices = HashMap::from([
-        (Outcome::Win(Side::Home), 2.7),
-        (Outcome::Draw, 2.87),
-        (Outcome::Win(Side::Away), 2.87),
+    HashMap::from([
+        (MarketType::HeadToHead, h2h),
+        (MarketType::TotalGoalsOverUnder(Over(2)), goals_ou),
+        (MarketType::CorrectScore, correct_score),
+    ])
+}
+
+fn atlanta_vs_sporting_lisbon() -> HashMap<MarketType, Odds> {
+    let h2h = HashMap::from([
+        (OutcomeType::Win(Side::Home), 2.0),
+        (OutcomeType::Draw, 3.5),
+        (OutcomeType::Win(Side::Away), 3.4),
     ]);
 
-    let goals_ou_prices =
-        HashMap::from([(Outcome::GoalsOver(2), 2.47), (Outcome::GoalsUnder(3), 1.5)]);
+    let goals_ou =
+        HashMap::from([(OutcomeType::Over(2), 1.66), (OutcomeType::Under(3), 2.1)]);
+
+    let correct_score = HashMap::from([
+        // home wins
+        (OutcomeType::Exact(Score::new(1, 0)), 9.25),
+        (OutcomeType::Exact(Score::new(2, 0)), 11.5),
+        (OutcomeType::Exact(Score::new(2, 1)), 8.75),
+        (OutcomeType::Exact(Score::new(3, 0)), 19.0),
+        (OutcomeType::Exact(Score::new(3, 1)), 15.0),
+        (OutcomeType::Exact(Score::new(3, 2)), 21.0),
+        (OutcomeType::Exact(Score::new(4, 0)), 46.0),
+        (OutcomeType::Exact(Score::new(4, 1)), 34.0),
+        (OutcomeType::Exact(Score::new(4, 2)), 61.0),
+        (OutcomeType::Exact(Score::new(4, 3)), 126.0),
+        (OutcomeType::Exact(Score::new(5, 0)), 126.0),
+        (OutcomeType::Exact(Score::new(5, 1)), 126.0),
+        (OutcomeType::Exact(Score::new(5, 2)), 176.0),
+        (OutcomeType::Exact(Score::new(5, 3)), 200.0),
+        (OutcomeType::Exact(Score::new(5, 4)), 200.0),
+        // draws
+        (OutcomeType::Exact(Score::new(0, 0)), 13.0),
+        (OutcomeType::Exact(Score::new(1, 1)), 7.0),
+        (OutcomeType::Exact(Score::new(2, 2)), 12.5),
+        (OutcomeType::Exact(Score::new(3, 3)), 51.00),
+        (OutcomeType::Exact(Score::new(4, 4)), 200.00),
+        (OutcomeType::Exact(Score::new(5, 5)), 200.00),
+        // away wins
+        (OutcomeType::Exact(Score::new(0, 1)), 14.0),
+        (OutcomeType::Exact(Score::new(0, 2)), 21.0),
+        (OutcomeType::Exact(Score::new(1, 2)), 12.5),
+        (OutcomeType::Exact(Score::new(0, 3)), 41.0),
+        (OutcomeType::Exact(Score::new(1, 3)), 26.0),
+        (OutcomeType::Exact(Score::new(2, 3)), 34.0),
+        (OutcomeType::Exact(Score::new(0, 4)), 126.0),
+        (OutcomeType::Exact(Score::new(1, 4)), 81.0),
+        (OutcomeType::Exact(Score::new(2, 4)), 101.0),
+        (OutcomeType::Exact(Score::new(3, 4)), 151.0),
+        (OutcomeType::Exact(Score::new(0, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(1, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(2, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(3, 5)), 200.0),
+        (OutcomeType::Exact(Score::new(4, 5)), 200.0),
+    ]);
+
+    HashMap::from([
+        (MarketType::HeadToHead, h2h),
+        (MarketType::TotalGoalsOverUnder(Over(2)), goals_ou),
+        (MarketType::CorrectScore, correct_score),
+    ])
+}
+
+pub fn main() {
+    let ext_markets = atlanta_vs_sporting_lisbon();
+    let correct_score_prices = ext_markets[&MarketType::CorrectScore].clone();
+    let h2h_prices = ext_markets[&MarketType::HeadToHead].clone();
+    let goals_ou_prices = ext_markets[&MarketType::TotalGoalsOverUnder(Over(2))].clone();
 
     let h2h = fit_market(&h2h_prices);
     println!("h2h: {h2h:?}");
@@ -81,7 +155,7 @@ pub fn main() {
 
     println!("*** fitting scoregrid ***");
     let start = Instant::now();
-    let search_outcome = fit_scoregrid(&h2h, &goals_ou);
+    let search_outcome = fit_scoregrid(&[&h2h, &goals_ou]);
     let elapsed = start.elapsed();
     println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
 
@@ -90,7 +164,7 @@ pub fn main() {
         search_outcome.optimal_values[1],
         search_outcome.optimal_values[2]
     );
-    println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
+    // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
 
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
     let fitted_h2h = LabelledMarket {
@@ -143,7 +217,7 @@ pub fn main() {
     );
 }
 
-fn fit_market(map: &HashMap<Outcome, f64>) -> LabelledMarket {
+fn fit_market(map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
     let mut entries = map.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let outcomes = entries
@@ -157,11 +231,11 @@ fn fit_market(map: &HashMap<Outcome, f64>) -> LabelledMarket {
 
 #[derive(Debug)]
 pub struct LabelledMarket {
-    outcomes: Vec<Outcome>,
+    outcomes: Vec<OutcomeType>,
     market: Market,
 }
 
-fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSearchOutcome {
+fn fit_scoregrid(markets: &[&LabelledMarket]) -> HypergridSearchOutcome {
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 100,
@@ -176,7 +250,7 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
             // let scoregrid = bivariate_binomial_scoregrid(values[0], values[1], values[2]);
             let scoregrid = interval_scoregrid(values[0], values[1], values[2]);
             let mut residual = 0.0;
-            for market in [&h2h, &goals_ou] {
+            for market in markets {
                 for (index, outcome) in market.outcomes.iter().enumerate() {
                     let fitted_prob = outcome.gather(&scoregrid);
                     let sample_prob = market.market.probs[index];
@@ -231,7 +305,7 @@ fn bivariate_poisson_scoregrid(home_rate: f64, away_rate: f64, common: f64) -> M
     scoregrid
 }
 
-fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[Outcome], overround: &Overround) -> Market {
+fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[OutcomeType], overround: &Overround) -> Market {
     let probs = outcomes
         .iter()
         .map(|outcome| outcome.gather(scoregrid))
