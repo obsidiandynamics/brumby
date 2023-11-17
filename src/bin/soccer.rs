@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 
 use HAlign::Left;
@@ -6,19 +6,20 @@ use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
+use brumby::entity::{MarketType, OutcomeType, Over, Player, Score, Side};
+use brumby::entity::Player::Named;
+use brumby::interval::{explore, IntervalConfig, isolate};
 
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
 use brumby::probs::SliceExt;
 use brumby::scoregrid;
-use brumby::scoregrid::{MarketType, OutcomeType, Over, Player, Score, Side};
-use Player::Named;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
 const ZERO_INFLATION: f64 = 0.015;
-const INTERVALS: usize = 10;
+const INTERVALS: usize = 6;
 const MAX_TOTAL_GOALS: u16 = 8;
 
 type Odds = HashMap<OutcomeType, f64>;
@@ -219,6 +220,19 @@ pub fn main() {
     );
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
 
+    let mut first_goalscorer_probs = BTreeMap::new();
+    for (index, outcome) in first_gs.outcomes.iter().enumerate() {
+        match outcome {
+            OutcomeType::Player(player) => {
+                let player_search_outcome = fit_first_goalscorer(&search_outcome.optimal_values, player, first_gs.market.probs[index]);
+                println!("for player {player:?}, {player_search_outcome:?}");
+                first_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_values[0]);
+            }
+            OutcomeType::None => {},
+            _ => unreachable!()
+        }
+    }
+
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
     let fitted_h2h = LabelledMarket {
         outcomes: h2h.outcomes.clone(),
@@ -313,6 +327,30 @@ fn fit_scoregrid(markets: &[&LabelledMarket]) -> HypergridSearchOutcome {
                 }
             }
             residual
+        },
+    )
+}
+
+fn fit_first_goalscorer(optimal_scoring_probs: &[f64], player: &Player, expected_prob: f64) -> HypergridSearchOutcome {
+    hypergrid_search(
+        &HypergridSearchConfig {
+            max_steps: 100,
+            acceptable_residual: 1e-6,
+            bounds: vec![0.0001..=0.2].into(),
+            resolution: 4,
+        },
+        |values| true,
+        |values| {
+            let exploration = explore(&IntervalConfig {
+                intervals: INTERVALS as u8,
+                home_prob: optimal_scoring_probs[0],
+                away_prob: optimal_scoring_probs[1],
+                common_prob: optimal_scoring_probs[2],
+                max_total_goals: MAX_TOTAL_GOALS,
+                scorers: vec![(player.clone(), values[0])],
+            });
+            let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+            ((isolated_prob - expected_prob)/expected_prob).powi(2)
         },
     )
 }
