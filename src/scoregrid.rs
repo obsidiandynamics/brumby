@@ -5,7 +5,7 @@ use multinomial::binomial;
 
 use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
-use crate::interval::{explore_all, IntervalConfig};
+use crate::interval::{explore_all, IntervalConfig, other_player};
 use crate::linear::matrix::Matrix;
 use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
@@ -199,9 +199,11 @@ pub fn from_interval(
         home_prob,
         away_prob,
         common_prob,
-        max_total_goals
+        max_total_goals,
+        home_scorers: other_player(),
+        away_scorers: other_player(),
     });
-    for (scenario, prob) in exploration.scenarios {
+    for (scenario, prob) in exploration.prospects {
         scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
     }
 }
@@ -297,14 +299,19 @@ pub enum MarketType {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Player {
+    Named(Side, String),
+    Other
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OutcomeType {
     Win(Side),
     Draw,
     Under(u8),
     Over(u8),
-    Exact(Score),
-    Named(String),
-    Other,
+    Score(Score),
+    Player(Player),
     None,
 }
 impl OutcomeType {
@@ -314,7 +321,7 @@ impl OutcomeType {
             OutcomeType::Draw => Self::gather_draw(scoregrid),
             OutcomeType::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
             OutcomeType::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
-            OutcomeType::Exact(score) => Self::gather_correct_score(score, scoregrid),
+            OutcomeType::Score(score) => Self::gather_correct_score(score, scoregrid),
             _ => unimplemented!()
         }
     }

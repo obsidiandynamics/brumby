@@ -57,11 +57,11 @@ pub fn outcome_correct_score_gather() {
     let scoregrid = create_test_4x4_scoregrid();
     assert_eq!(
         0.04,
-        OutcomeType::Exact(Score::new(0, 0)).gather(&scoregrid)
+        OutcomeType::Score(Score::new(0, 0)).gather(&scoregrid)
     );
     assert_eq!(
         0.08,
-        OutcomeType::Exact(Score::new(3, 2)).gather(&scoregrid)
+        OutcomeType::Score(Score::new(3, 2)).gather(&scoregrid)
     );
 }
 
