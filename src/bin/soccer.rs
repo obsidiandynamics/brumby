@@ -183,11 +183,59 @@ fn atlanta_vs_sporting_lisbon() -> HashMap<MarketType, Odds> {
         (OutcomeType::None, 11.5),
     ]);
 
+    let anytime_goalscorer = HashMap::from([
+        (OutcomeType::Player(Named(Side::Home, "Muriel".into())), 2.4),
+        (OutcomeType::Player(Named(Side::Home, "Scamacca".into())), 2.7),
+        (OutcomeType::Player(Named(Side::Home, "Lookman".into())), 2.85),
+        (OutcomeType::Player(Named(Side::Home, "Miranchuk".into())), 3.5),
+        (OutcomeType::Player(Named(Side::Home, "Pasalic".into())), 4.0),
+        (OutcomeType::Player(Named(Side::Home, "Koopmeiners".into())), 4.25),
+        (OutcomeType::Player(Named(Side::Home, "Ederson".into())), 4.2),
+        (OutcomeType::Player(Named(Side::Home, "Cisse".into())), 4.25),
+        (OutcomeType::Player(Named(Side::Home, "Bakker".into())), 4.4),
+        (OutcomeType::Player(Named(Side::Home, "Holm".into())), 4.9),
+        (OutcomeType::Player(Named(Side::Home, "Toloi".into())), 8.5),
+        (OutcomeType::Player(Named(Side::Home, "Hateboer".into())), 9.0),
+        (OutcomeType::Player(Named(Side::Home, "Mendicino".into())), 9.25),
+        (OutcomeType::Player(Named(Side::Home, "Scalvini".into())), 10.5),
+        (OutcomeType::Player(Named(Side::Home, "Bonfanti".into())), 11.0),
+        (OutcomeType::Player(Named(Side::Home, "Adopo".into())), 13.0),
+        (OutcomeType::Player(Named(Side::Home, "Zortea".into())), 12.0),
+        (OutcomeType::Player(Named(Side::Home, "Kolasinac".into())), 12.5),
+        (OutcomeType::Player(Named(Side::Home, "Djimsiti".into())), 13.0),
+        (OutcomeType::Player(Named(Side::Home, "De Roon".into())), 14.0),
+        (OutcomeType::Player(Named(Side::Home, "Ruggeri".into())), 15.0),
+        (OutcomeType::Player(Named(Side::Home, "Del Lungo".into())), 26.0),
+        (OutcomeType::Player(Named(Side::Away, "Gyokeres".into())), 2.75),
+        (OutcomeType::Player(Named(Side::Away, "Santos".into())), 3.6),
+        (OutcomeType::Player(Named(Side::Away, "Paulinho".into())), 3.75),
+        (OutcomeType::Player(Named(Side::Away, "Pote".into())), 3.8),
+        (OutcomeType::Player(Named(Side::Away, "Edwards".into())), 4.25),
+        (OutcomeType::Player(Named(Side::Away, "Ribeiro".into())), 4.5),
+        (OutcomeType::Player(Named(Side::Away, "Trincao".into())), 4.8),
+        (OutcomeType::Player(Named(Side::Away, "Moreira".into())), 6.25),
+        (OutcomeType::Player(Named(Side::Away, "Morita".into())), 7.75),
+        (OutcomeType::Player(Named(Side::Away, "Braganca".into())), 11.0),
+        (OutcomeType::Player(Named(Side::Away, "Catamo".into())), 14.0),
+        (OutcomeType::Player(Named(Side::Away, "Essugo".into())), 15.0),
+        (OutcomeType::Player(Named(Side::Away, "Reis".into())), 15.0),
+        (OutcomeType::Player(Named(Side::Away, "Esgaio".into())), 16.0),
+        (OutcomeType::Player(Named(Side::Away, "St. Juste".into())), 17.0),
+        (OutcomeType::Player(Named(Side::Away, "Hjulmand".into())), 7.75),
+        (OutcomeType::Player(Named(Side::Away, "Coates".into())), 16.0),
+        (OutcomeType::Player(Named(Side::Away, "Diomande".into())), 18.0),
+        (OutcomeType::Player(Named(Side::Away, "Quaresma".into())), 21.0),
+        (OutcomeType::Player(Named(Side::Away, "Inacio".into())), 26.0),
+        (OutcomeType::Player(Named(Side::Away, "Fresneda".into())), 26.0),
+        (OutcomeType::Player(Named(Side::Away, "Neto".into())), 31.0),
+    ]);
+
     HashMap::from([
         (MarketType::HeadToHead, h2h),
         (MarketType::TotalGoalsOverUnder(Over(2)), goals_ou),
         (MarketType::CorrectScore, correct_score),
         (MarketType::FirstGoalscorer, first_goalscorer),
+        (MarketType::AnytimeGoalscorer, anytime_goalscorer),
     ])
 }
 
@@ -197,15 +245,18 @@ pub fn main() {
     let h2h_prices = ext_markets[&MarketType::HeadToHead].clone();
     let goals_ou_prices = ext_markets[&MarketType::TotalGoalsOverUnder(Over(2))].clone();
     let first_gs = ext_markets[&MarketType::FirstGoalscorer].clone();
+    let anytime_gs = ext_markets[&MarketType::AnytimeGoalscorer].clone();
 
-    let h2h = fit_market(&h2h_prices);
-    println!("h2h: {h2h:?}");
-    let goals_ou = fit_market(&goals_ou_prices);
-    println!("goals_ou: {goals_ou:?}");
-    let correct_score = fit_market(&correct_score_prices);
-    println!("correct_score: {correct_score:?}");
-    let first_gs = fit_market(&first_gs);
-    println!("first_gs: {first_gs:?}");
+    let h2h = fit_market(MarketType::HeadToHead, &h2h_prices);
+    // println!("h2h: {h2h:?}");
+    let goals_ou = fit_market(MarketType::TotalGoalsOverUnder(Over(2)), &goals_ou_prices);
+    // println!("goals_ou: {goals_ou:?}");
+    let correct_score = fit_market(MarketType::CorrectScore, &correct_score_prices);
+    // println!("correct_score: {correct_score:?}");
+    let first_gs = fit_market(MarketType::FirstGoalscorer, &first_gs);
+    // println!("first_gs: {first_gs:?}");
+    let anytime_gs = fit_market(MarketType::AnytimeGoalscorer, &anytime_gs);
+    // println!("anytime_gs: {anytime_gs:?}");
 
     println!("*** fitting scoregrid ***");
     let start = Instant::now();
@@ -220,21 +271,87 @@ pub fn main() {
     );
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
 
-    let mut first_goalscorer_probs = BTreeMap::new();
+    let mut fitted_goalscorer_probs = BTreeMap::new();
     for (index, outcome) in first_gs.outcomes.iter().enumerate() {
         match outcome {
             OutcomeType::Player(player) => {
                 let player_search_outcome = fit_first_goalscorer(&search_outcome.optimal_values, player, first_gs.market.probs[index]);
-                println!("for player {player:?}, {player_search_outcome:?}");
-                first_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_values[0]);
+                // println!("for player {player:?}, {player_search_outcome:?}");
+                fitted_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_values[0]);
             }
             OutcomeType::None => {},
             _ => unreachable!()
         }
     }
 
+    //TODO need an uninflated draw probability
+
+    //TODO why doesn't the fitted_goalscorer_probs sum to 1?
+
+    let mut fitted_first_goalscorer_probs = vec![];
+    for (player, prob) in &fitted_goalscorer_probs {
+        let exploration = explore(&IntervalConfig {
+            intervals: INTERVALS as u8,
+            home_prob: search_outcome.optimal_values[0],
+            away_prob: search_outcome.optimal_values[1],
+            common_prob: search_outcome.optimal_values[2],
+            max_total_goals: MAX_TOTAL_GOALS,
+            scorers: vec![(player.clone(), *prob)],
+        });
+        let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+        fitted_first_goalscorer_probs.push(isolated_prob);
+        // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
+    }
+    fitted_first_goalscorer_probs.push(scoregrid[(0, 0)]);
+    let anytime_goalscorer_booksum = fitted_first_goalscorer_probs.sum();
+    println!("first scorer sum: {anytime_goalscorer_booksum}");
+    let fitted_first_goalscorer = LabelledMarket {
+        market_type: MarketType::FirstGoalscorer,
+        outcomes: first_gs.outcomes.clone(),
+        market: Market::frame(&first_gs.market.overround, fitted_first_goalscorer_probs, &SINGLE_PRICE_BOUNDS),
+    };
+    let table_first_goalscorer = print_market(&fitted_first_goalscorer);
+    println!(
+        "First Goalscorer:\n{}",
+        Console::default().render(&table_first_goalscorer)
+    );
+
+    let mut fitted_anytime_goalscorer_probs = vec![];
+    for (player, prob) in &fitted_goalscorer_probs {
+        let exploration = explore(&IntervalConfig {
+            intervals: INTERVALS as u8,
+            home_prob: search_outcome.optimal_values[0],
+            away_prob: search_outcome.optimal_values[1],
+            common_prob: search_outcome.optimal_values[2],
+            max_total_goals: MAX_TOTAL_GOALS,
+            scorers: vec![(player.clone(), *prob)],
+        });
+        let isolated_prob = isolate(&MarketType::AnytimeGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+        fitted_anytime_goalscorer_probs.push(isolated_prob);
+        // println!("anytime scorer {player:?}, prob: {isolated_prob:.3}");
+    }
+    // println!("anytime scorer {:?}, prob: {:.3}", OutcomeType::None, scoregrid[(0, 0)]);
+    fitted_anytime_goalscorer_probs.scale(1.0 / (1.0 - scoregrid[(0, 0)]));
+    let anytime_goalscorer_booksum = fitted_anytime_goalscorer_probs.sum();
+    println!("anytime scorer sum: {anytime_goalscorer_booksum}");
+    let anytime_goalscorer_overround = Market::fit(&OVERROUND_METHOD, anytime_gs.market.prices.clone(), anytime_goalscorer_booksum);
+    let fitted_anytime_goalscorer = LabelledMarket {
+        market_type: MarketType::AnytimeGoalscorer,
+        outcomes: anytime_gs.outcomes.clone(),
+        market: Market::frame(&anytime_goalscorer_overround.overround, fitted_anytime_goalscorer_probs, &SINGLE_PRICE_BOUNDS),
+    };
+    let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
+    println!(
+        "Anytime Goalscorer:\n{}",
+        Console::default().render(&table_anytime_goalscorer)
+    );
+    // let draw_prob = scoregrid[(0, 0)];
+    // anytime_goalscorer_probs.push(draw_prob);
+
+
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
     let fitted_h2h = LabelledMarket {
+        market_type: MarketType::HeadToHead,
         outcomes: h2h.outcomes.clone(),
         market: fitted_h2h,
     };
@@ -243,6 +360,7 @@ pub fn main() {
 
     let fitted_goals_ou = frame_prices(&scoregrid, &goals_ou.outcomes, &goals_ou.market.overround);
     let fitted_goals_ou = LabelledMarket {
+        market_type: MarketType::TotalGoalsOverUnder(Over(2)),
         outcomes: goals_ou.outcomes.clone(),
         market: fitted_goals_ou,
     };
@@ -255,6 +373,7 @@ pub fn main() {
         &correct_score.market.overround,
     );
     let fitted_correct_score = LabelledMarket {
+        market_type: MarketType::CorrectScore,
         outcomes: correct_score.outcomes.clone(),
         market: fitted_correct_score,
     };
@@ -268,6 +387,8 @@ pub fn main() {
         ("H2H", &h2h, &fitted_h2h),
         ("Goals O/U", &goals_ou, &fitted_goals_ou),
         ("Correct Score", &correct_score, &fitted_correct_score),
+        ("First Goalscorer", &first_gs, &fitted_first_goalscorer),
+        ("Anytime Goalscorer", &anytime_gs, &fitted_anytime_goalscorer),
     ]
     .iter()
     .map(|(key, sample, fitted)| {
@@ -282,9 +403,15 @@ pub fn main() {
         "Fitting errors:\n{}",
         Console::default().render(&table_errors)
     );
+
+    let table_overrounds = print_overrounds(&[fitted_h2h, fitted_goals_ou, fitted_correct_score, fitted_first_goalscorer, fitted_anytime_goalscorer]);
+    println!(
+        "Market overrounds:\n{}",
+        Console::default().render(&table_overrounds)
+    );
 }
 
-fn fit_market(map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
+fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
     let mut entries = map.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let outcomes = entries
@@ -293,11 +420,12 @@ fn fit_market(map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
         .collect::<Vec<_>>();
     let prices = entries.iter().map(|(_, &price)| price).collect::<Vec<_>>();
     let market = Market::fit(&OVERROUND_METHOD, prices, 1.0);
-    LabelledMarket { outcomes, market }
+    LabelledMarket { market_type, outcomes, market }
 }
 
 #[derive(Debug)]
 pub struct LabelledMarket {
+    market_type: MarketType,
     outcomes: Vec<OutcomeType>,
     market: Market,
 }
@@ -339,7 +467,7 @@ fn fit_first_goalscorer(optimal_scoring_probs: &[f64], player: &Player, expected
             bounds: vec![0.0001..=0.2].into(),
             resolution: 4,
         },
-        |values| true,
+        |_| true,
         |values| {
             let exploration = explore(&IntervalConfig {
                 intervals: INTERVALS as u8,
@@ -445,6 +573,20 @@ fn print_errors(errors: &[(&str, f64)]) -> Table {
         table.push_row(Row::new(
             Styles::default(),
             vec![key.to_string().into(), format!("{error:.3}").into()],
+        ));
+    }
+    table
+}
+
+fn print_overrounds(markets: &[LabelledMarket]) -> Table {
+    let mut table = Table::default().with_cols(vec![
+        Col::new(Styles::default().with(MinWidth(10)).with(Left)),
+        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+    ]);
+    for market in markets {
+        table.push_row(Row::new(
+            Styles::default(),
+            vec![format!("{:?}", market.market_type).into(), format!("{:.3}", market.market.overround.value).into()],
         ));
     }
     table
