@@ -179,7 +179,7 @@ pub fn from_interval(
         away_prob,
         common_prob,
         max_total_goals,
-        scorers: vec![],
+        players: vec![],
     });
     for (scenario, prob) in exploration.prospects {
         scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
