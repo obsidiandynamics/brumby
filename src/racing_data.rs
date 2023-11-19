@@ -17,43 +17,9 @@ pub struct PlacePriceDeparture {
 }
 
 pub trait EventDetailExt {
-    fn summarise(self) -> RaceSummary;
     fn place_price_departure(&self) -> PlacePriceDeparture;
 }
 impl EventDetailExt for EventDetail {
-    fn summarise(self) -> RaceSummary {
-        let mut prices = Matrix::allocate(PODIUM, self.runners.len());
-        for rank in 0..PODIUM {
-            let row_slice = prices.row_slice_mut(rank);
-            for (runner_index, runner_data) in self.runners.iter().enumerate() {
-                row_slice[runner_index] = match &runner_data.prices {
-                    None => f64::INFINITY,
-                    Some(prices) => {
-                        let price = match rank {
-                            0 => prices.win,
-                            1 => prices.top2,
-                            2 => prices.top3,
-                            3 => prices.top4,
-                            _ => unimplemented!(),
-                        };
-                        price as f64
-                    }
-                }
-            }
-        }
-        RaceSummary {
-            id: self.id,
-            race_name: self.race_name,
-            meeting_name: self.meeting_name,
-            race_type: self.race_type,
-            race_number: self.race_number,
-            capture_time: self.capture_time,
-            places_paying: self.places_paying as usize,
-            class_name: self.class_name,
-            prices,
-        }
-    }
-
     fn place_price_departure(&self) -> PlacePriceDeparture {
         let mut sum_sq = 0.;
         let mut worst_sq = 0.;
@@ -86,6 +52,41 @@ impl EventDetailExt for EventDetail {
         PlacePriceDeparture {
             root_mean_sq,
             worst,
+        }
+    }
+}
+
+impl From<EventDetail> for RaceSummary {
+    fn from(external: EventDetail) -> Self {
+        let mut prices = Matrix::allocate(PODIUM, external.runners.len());
+        for rank in 0..PODIUM {
+            let row_slice = prices.row_slice_mut(rank);
+            for (runner_index, runner_data) in external.runners.iter().enumerate() {
+                row_slice[runner_index] = match &runner_data.prices {
+                    None => f64::INFINITY,
+                    Some(prices) => {
+                        let price = match rank {
+                            0 => prices.win,
+                            1 => prices.top2,
+                            2 => prices.top3,
+                            3 => prices.top4,
+                            _ => unimplemented!(),
+                        };
+                        price as f64
+                    }
+                }
+            }
+        }
+        Self {
+            id: external.id,
+            race_name: external.race_name,
+            meeting_name: external.meeting_name,
+            race_type: external.race_type,
+            race_number: external.race_number,
+            capture_time: external.capture_time,
+            places_paying: external.places_paying as usize,
+            class_name: external.class_name,
+            prices,
         }
     }
 }

@@ -11,7 +11,7 @@ use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
+use brumby::racing_data::{download_by_id, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
@@ -243,5 +243,5 @@ async fn read_race_data(args: &Args) -> anyhow::Result<RaceSummary> {
             unreachable!()
         }
     };
-    Ok(event_detail.summarise())
+    Ok(event_detail.into())
 }

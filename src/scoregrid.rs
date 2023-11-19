@@ -326,7 +326,11 @@ impl OutcomeType {
     }
 
     fn gather_correct_score(score: &Score, scoregrid: &Matrix<f64>) -> f64 {
-        scoregrid[(score.home as usize, score.away as usize)]
+        if (score.home as usize) < scoregrid.rows() && (score.away as usize) < scoregrid.cols() {
+            scoregrid[(score.home as usize, score.away as usize)]
+        } else {
+            0.0
+        }
     }
 }
 

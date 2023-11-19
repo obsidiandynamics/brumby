@@ -1,11 +1,17 @@
 use std::collections::{BTreeMap, HashMap};
+use std::env;
+use std::error::Error;
+use std::path::PathBuf;
 use std::time::Instant;
+use anyhow::bail;
+use clap::Parser;
 
 use HAlign::Left;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
+use tracing::{debug, info};
 use brumby::entity::{MarketType, OutcomeType, Over, Player, Score, Side};
 use brumby::entity::Player::Named;
 use brumby::interval::{explore, IntervalConfig, isolate};
@@ -15,14 +21,37 @@ use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
 use brumby::probs::SliceExt;
 use brumby::scoregrid;
+use brumby::soccer_data::{ContestSummary, download_by_id};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
-const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=200.0;
-const ZERO_INFLATION: f64 = 0.015;
-const INTERVALS: usize = 6;
+const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
+const ZERO_INFLATION: f64 = 0.0;
+const INTERVALS: usize = 12;
 const MAX_TOTAL_GOALS: u16 = 8;
+const ERROR_TYPE: ErrorType = ErrorType::SquaredAbsolute;
 
 type Odds = HashMap<OutcomeType, f64>;
+
+#[derive(Debug, clap::Parser, Clone)]
+struct Args {
+    /// file to source the contest data from
+    #[clap(short = 'f', long)]
+    file: Option<PathBuf>,
+
+    /// download contest data by ID
+    #[clap(short = 'd', long)]
+    download: Option<String>,
+}
+impl Args {
+    fn validate(&self) -> anyhow::Result<()> {
+        if self.file.is_none() && self.download.is_none()
+            || self.file.is_some() && self.download.is_some()
+        {
+            bail!("either the -f or the -d flag must be specified");
+        }
+        Ok(())
+    }
+}
 
 fn verona_vs_leece() -> HashMap<MarketType, Odds> {
     let h2h = HashMap::from([
@@ -239,13 +268,28 @@ fn atlanta_vs_sporting_lisbon() -> HashMap<MarketType, Odds> {
     ])
 }
 
-pub fn main() {
-    let ext_markets = atlanta_vs_sporting_lisbon();
-    let correct_score_prices = ext_markets[&MarketType::CorrectScore].clone();
-    let h2h_prices = ext_markets[&MarketType::HeadToHead].clone();
-    let goals_ou_prices = ext_markets[&MarketType::TotalGoalsOverUnder(Over(2))].clone();
-    let first_gs = ext_markets[&MarketType::FirstGoalscorer].clone();
-    let anytime_gs = ext_markets[&MarketType::AnytimeGoalscorer].clone();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    if env::var("RUST_BACKTRACE").is_err() {
+        env::set_var("RUST_BACKTRACE", "full")
+    }
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info")
+    }
+    tracing_subscriber::fmt::init();
+
+    let args = Args::parse();
+    args.validate()?;
+    debug!("args: {args:?}");
+    let contest = read_contest_data(&args).await?;
+    info!("contest.name: {}", contest.name);
+
+    // let ext_markets = atlanta_vs_sporting_lisbon();
+    let correct_score_prices = contest.offerings[&MarketType::CorrectScore].clone();
+    let h2h_prices = contest.offerings[&MarketType::HeadToHead].clone();
+    let goals_ou_prices = contest.offerings[&MarketType::TotalGoalsOverUnder(Over(2))].clone();
+    let first_gs = contest.offerings[&MarketType::FirstGoalscorer].clone();
+    let anytime_gs = contest.offerings[&MarketType::AnytimeGoalscorer].clone();
 
     let h2h = fit_market(MarketType::HeadToHead, &h2h_prices);
     // println!("h2h: {h2h:?}");
@@ -261,6 +305,7 @@ pub fn main() {
     println!("*** fitting scoregrid ***");
     let start = Instant::now();
     let search_outcome = fit_scoregrid(&[&h2h, &goals_ou]);
+    // let search_outcome = fit_scoregrid(&[&correct_score]);
     let elapsed = start.elapsed();
     println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
 
@@ -316,8 +361,10 @@ pub fn main() {
         Console::default().render(&table_first_goalscorer)
     );
 
+    let mut fitted_anytime_goalscorer_outcomes = vec![];
     let mut fitted_anytime_goalscorer_probs = vec![];
     for (player, prob) in &fitted_goalscorer_probs {
+        fitted_anytime_goalscorer_outcomes.push(OutcomeType::Player(player.clone()));
         let exploration = explore(&IntervalConfig {
             intervals: INTERVALS as u8,
             home_prob: search_outcome.optimal_values[0],
@@ -330,6 +377,9 @@ pub fn main() {
         fitted_anytime_goalscorer_probs.push(isolated_prob);
         // println!("anytime scorer {player:?}, prob: {isolated_prob:.3}");
     }
+    fitted_anytime_goalscorer_outcomes.push(OutcomeType::None);
+    fitted_anytime_goalscorer_probs.push(scoregrid[(0, 0)]);
+
     // println!("anytime scorer {:?}, prob: {:.3}", OutcomeType::None, scoregrid[(0, 0)]);
     fitted_anytime_goalscorer_probs.scale(1.0 / (1.0 - scoregrid[(0, 0)]));
     let anytime_goalscorer_booksum = fitted_anytime_goalscorer_probs.sum();
@@ -337,7 +387,7 @@ pub fn main() {
     let anytime_goalscorer_overround = Market::fit(&OVERROUND_METHOD, anytime_gs.market.prices.clone(), anytime_goalscorer_booksum);
     let fitted_anytime_goalscorer = LabelledMarket {
         market_type: MarketType::AnytimeGoalscorer,
-        outcomes: anytime_gs.outcomes.clone(),
+        outcomes: fitted_anytime_goalscorer_outcomes,
         market: Market::frame(&anytime_goalscorer_overround.overround, fitted_anytime_goalscorer_probs, &SINGLE_PRICE_BOUNDS),
     };
     let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
@@ -394,7 +444,7 @@ pub fn main() {
     .map(|(key, sample, fitted)| {
         (
             *key,
-            compute_msre(&sample.market.prices, &fitted.market.prices).sqrt(),
+            compute_error(&sample.market.prices, &fitted.market.prices),
         )
     })
     .collect::<Vec<_>>();
@@ -409,6 +459,8 @@ pub fn main() {
         "Market overrounds:\n{}",
         Console::default().render(&table_overrounds)
     );
+
+    Ok(())
 }
 
 fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
@@ -418,7 +470,7 @@ fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>) -> Label
         .iter()
         .map(|(outcome, _)| (*outcome).clone())
         .collect::<Vec<_>>();
-    let prices = entries.iter().map(|(_, &price)| price).collect::<Vec<_>>();
+    let prices = entries.iter().map(|(_, &price)| price).collect();
     let market = Market::fit(&OVERROUND_METHOD, prices, 1.0);
     LabelledMarket { market_type, outcomes, market }
 }
@@ -449,9 +501,7 @@ fn fit_scoregrid(markets: &[&LabelledMarket]) -> HypergridSearchOutcome {
                 for (index, outcome) in market.outcomes.iter().enumerate() {
                     let fitted_prob = outcome.gather(&scoregrid);
                     let sample_prob = market.market.probs[index];
-                    let relative_error = (sample_prob - fitted_prob) / sample_prob;
-                    residual += relative_error.powi(2);
-                    // residual += (sample_prob - fitted_prob).powi(2);
+                    residual += ERROR_TYPE.calculate(sample_prob, fitted_prob);
                 }
             }
             residual
@@ -478,9 +528,26 @@ fn fit_first_goalscorer(optimal_scoring_probs: &[f64], player: &Player, expected
                 players: vec![(player.clone(), values[0])],
             });
             let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects, &exploration.player_lookup);
-            ((isolated_prob - expected_prob)/expected_prob).powi(2)
+            ERROR_TYPE.calculate(expected_prob, isolated_prob)
         },
     )
+}
+
+enum ErrorType {
+    SquaredRelative,
+    SquaredAbsolute
+}
+impl ErrorType {
+    fn calculate(&self, expected: f64, sample: f64) -> f64 {
+        match self {
+            ErrorType::SquaredRelative => ((expected - sample)/sample).powi(2),
+            ErrorType::SquaredAbsolute => (expected - sample).powi(2)
+        }
+    }
+
+    fn reverse(&self, error: f64) -> f64 {
+        error.sqrt()
+    }
 }
 
 /// Intervals.
@@ -533,18 +600,19 @@ fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[OutcomeType], overround: &O
     Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
 }
 
-fn compute_msre(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
-    let mut sq_rel_error = 0.0;
+fn compute_error(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
+    let mut error_sum = 0.0;
     let mut counted = 0;
     for (index, sample_price) in sample_prices.iter().enumerate() {
         let fitted_price: f64 = fitted_prices[index];
         if fitted_price.is_finite() {
             counted += 1;
-            let relative_error = (sample_price - fitted_price) / sample_price;
-            sq_rel_error += relative_error.powi(2);
+            let (sample_prob, fitted_prob) = (1.0 / sample_price, 1.0 / fitted_price);
+            error_sum += ERROR_TYPE.calculate(sample_prob, fitted_prob);
         }
     }
-    sq_rel_error / counted as f64
+    let mean_error = error_sum / counted as f64;
+    ERROR_TYPE.reverse(mean_error)
 }
 
 fn print_market(market: &LabelledMarket) -> Table {
@@ -590,4 +658,18 @@ fn print_overrounds(markets: &[LabelledMarket]) -> Table {
         ));
     }
     table
+}
+
+async fn read_contest_data(args: &Args) -> anyhow::Result<ContestSummary> {
+    let contest = {
+        if let Some(_) = args.file.as_ref() {
+            //ContestModel::read_json_file(path)?
+            unimplemented!()
+        } else if let Some(id) = args.download.as_ref() {
+            download_by_id(id.clone()).await?
+        } else {
+            unreachable!()
+        }
+    };
+    Ok(contest.into())
 }
