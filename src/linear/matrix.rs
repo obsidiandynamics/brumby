@@ -29,6 +29,10 @@ impl<T> Matrix<T> {
         Self { data, rows, cols }
     }
 
+    pub fn fill(&mut self, value: T) where T: Clone {
+        self.data.fill(value);
+    }
+
     pub fn rows(&self) -> usize {
         self.rows
     }
@@ -375,5 +379,15 @@ mod tests {
         assert_eq!(Some(&20.), col.next());
         assert_eq!(Some(&40.), col.next());
         assert_eq!(None, col.next());
+    }
+
+    #[test]
+    fn fill() {
+        let mut matrix = Matrix::allocate(3, 2);
+        populate_with_test_data(&mut matrix);
+        matrix.fill(0.0);
+        for row in matrix.into_iter() {
+            assert_eq!([0.0, 0.0], row);
+        }
     }
 }

@@ -46,7 +46,6 @@ pub fn bivariate_binomial(n: u8, r_1: u8, r_2: u8, p_1: f64, p_2: f64, p_3: f64,
     }).sum()
 }
 
-
 #[cfg(test)]
 mod tests {
     use assert_float_eq::*;
