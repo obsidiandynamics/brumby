@@ -5,6 +5,7 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod capture;
+pub mod comb;
 pub mod csv;
 pub mod data;
 pub mod display;
