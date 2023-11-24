@@ -1,28 +1,31 @@
-use anyhow::bail;
-use clap::Parser;
 use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use brumby::entity::Player::Named;
-use brumby::entity::{MarketType, OutcomeType, Over, Player, Score, Side};
-use brumby::interval::{explore, isolate, IntervalConfig};
+use anyhow::bail;
+use clap::Parser;
+use HAlign::Left;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
-use stanza::style::{HAlign, MinWidth, Styles};
+use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
-use HAlign::Left;
 
+use brumby::{factorial, poisson, scoregrid};
+use brumby::entity::{MarketType, OutcomeType, Over, Player, Side};
+use brumby::entity::Player::Named;
+use brumby::interval::{explore, IntervalConfig, isolate};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
-use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent, UnivariateDescentConfig, UnivariateDescentOutcome};
+use brumby::opt::{
+    hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent,
+    UnivariateDescentConfig, UnivariateDescentOutcome,
+};
 use brumby::probs::SliceExt;
-use brumby::scoregrid::from_correct_score;
-use brumby::soccer_data::{download_by_id, ContestSummary};
-use brumby::{factorial, poisson, scoregrid};
+use brumby::scoregrid::{from_correct_score, home_away_expectations};
+use brumby::soccer_data::{ContestSummary, download_by_id};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Power;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
@@ -30,8 +33,6 @@ const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
 const INTERVALS: usize = 18;
 const MAX_TOTAL_GOALS: u16 = 8;
 const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
-
-type Odds = HashMap<OutcomeType, f64>;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -52,429 +53,6 @@ impl Args {
         }
         Ok(())
     }
-}
-
-fn verona_vs_leece() -> HashMap<MarketType, Odds> {
-    let h2h = HashMap::from([
-        (OutcomeType::Win(Side::Home), 2.7),
-        (OutcomeType::Draw, 2.87),
-        (OutcomeType::Win(Side::Away), 2.87),
-    ]);
-
-    let goals_ou = HashMap::from([(OutcomeType::Over(2), 2.47), (OutcomeType::Under(3), 1.5)]);
-
-    let correct_score = HashMap::from([
-        // home wins
-        (OutcomeType::Score(Score::new(1, 0)), 7.0),
-        (OutcomeType::Score(Score::new(2, 0)), 12.0),
-        (OutcomeType::Score(Score::new(2, 1)), 10.0),
-        (OutcomeType::Score(Score::new(3, 0)), 26.0),
-        (OutcomeType::Score(Score::new(3, 1)), 23.0),
-        (OutcomeType::Score(Score::new(3, 2)), 46.0),
-        (OutcomeType::Score(Score::new(4, 0)), 101.0),
-        (OutcomeType::Score(Score::new(4, 1)), 81.0),
-        (OutcomeType::Score(Score::new(4, 2)), 126.0),
-        (OutcomeType::Score(Score::new(4, 3)), 200.0),
-        (OutcomeType::Score(Score::new(5, 0)), 200.0),
-        (OutcomeType::Score(Score::new(5, 1)), 200.0),
-        (OutcomeType::Score(Score::new(5, 2)), 200.0),
-        (OutcomeType::Score(Score::new(5, 3)), 200.0),
-        (OutcomeType::Score(Score::new(5, 4)), 200.0),
-        // draws
-        (OutcomeType::Score(Score::new(0, 0)), 6.75),
-        (OutcomeType::Score(Score::new(1, 1)), 5.90),
-        (OutcomeType::Score(Score::new(2, 2)), 16.00),
-        (OutcomeType::Score(Score::new(3, 3)), 101.00),
-        (OutcomeType::Score(Score::new(4, 4)), 200.00),
-        (OutcomeType::Score(Score::new(5, 5)), 200.00),
-        // away wins
-        (OutcomeType::Score(Score::new(0, 1)), 7.25),
-        (OutcomeType::Score(Score::new(0, 2)), 12.0),
-        (OutcomeType::Score(Score::new(1, 2)), 10.5),
-        (OutcomeType::Score(Score::new(0, 3)), 31.0),
-        (OutcomeType::Score(Score::new(1, 3)), 23.0),
-        (OutcomeType::Score(Score::new(2, 3)), 41.0),
-        (OutcomeType::Score(Score::new(0, 4)), 101.0),
-        (OutcomeType::Score(Score::new(1, 4)), 81.0),
-        (OutcomeType::Score(Score::new(2, 4)), 151.0),
-        (OutcomeType::Score(Score::new(3, 4)), 200.0),
-        (OutcomeType::Score(Score::new(0, 5)), 200.0),
-        (OutcomeType::Score(Score::new(1, 5)), 200.0),
-        (OutcomeType::Score(Score::new(2, 5)), 200.0),
-        (OutcomeType::Score(Score::new(3, 5)), 200.0),
-        (OutcomeType::Score(Score::new(4, 5)), 200.0),
-    ]);
-
-    HashMap::from([
-        (MarketType::HeadToHead, h2h),
-        (MarketType::TotalGoalsOverUnder(Over(2)), goals_ou),
-        (MarketType::CorrectScore, correct_score),
-    ])
-}
-
-fn atlanta_vs_sporting_lisbon() -> HashMap<MarketType, Odds> {
-    let h2h = HashMap::from([
-        (OutcomeType::Win(Side::Home), 2.0),
-        (OutcomeType::Draw, 3.5),
-        (OutcomeType::Win(Side::Away), 3.4),
-    ]);
-
-    let goals_ou = HashMap::from([(OutcomeType::Over(2), 1.66), (OutcomeType::Under(3), 2.1)]);
-
-    let correct_score = HashMap::from([
-        // home wins
-        (OutcomeType::Score(Score::new(1, 0)), 9.25),
-        (OutcomeType::Score(Score::new(2, 0)), 11.5),
-        (OutcomeType::Score(Score::new(2, 1)), 8.75),
-        (OutcomeType::Score(Score::new(3, 0)), 19.0),
-        (OutcomeType::Score(Score::new(3, 1)), 15.0),
-        (OutcomeType::Score(Score::new(3, 2)), 21.0),
-        (OutcomeType::Score(Score::new(4, 0)), 46.0),
-        (OutcomeType::Score(Score::new(4, 1)), 34.0),
-        (OutcomeType::Score(Score::new(4, 2)), 61.0),
-        (OutcomeType::Score(Score::new(4, 3)), 126.0),
-        (OutcomeType::Score(Score::new(5, 0)), 126.0),
-        (OutcomeType::Score(Score::new(5, 1)), 126.0),
-        (OutcomeType::Score(Score::new(5, 2)), 176.0),
-        (OutcomeType::Score(Score::new(5, 3)), 200.0),
-        (OutcomeType::Score(Score::new(5, 4)), 200.0),
-        // draws
-        (OutcomeType::Score(Score::new(0, 0)), 13.0),
-        (OutcomeType::Score(Score::new(1, 1)), 7.0),
-        (OutcomeType::Score(Score::new(2, 2)), 12.5),
-        (OutcomeType::Score(Score::new(3, 3)), 51.00),
-        (OutcomeType::Score(Score::new(4, 4)), 200.00),
-        (OutcomeType::Score(Score::new(5, 5)), 200.00),
-        // away wins
-        (OutcomeType::Score(Score::new(0, 1)), 14.0),
-        (OutcomeType::Score(Score::new(0, 2)), 21.0),
-        (OutcomeType::Score(Score::new(1, 2)), 12.5),
-        (OutcomeType::Score(Score::new(0, 3)), 41.0),
-        (OutcomeType::Score(Score::new(1, 3)), 26.0),
-        (OutcomeType::Score(Score::new(2, 3)), 34.0),
-        (OutcomeType::Score(Score::new(0, 4)), 126.0),
-        (OutcomeType::Score(Score::new(1, 4)), 81.0),
-        (OutcomeType::Score(Score::new(2, 4)), 101.0),
-        (OutcomeType::Score(Score::new(3, 4)), 151.0),
-        (OutcomeType::Score(Score::new(0, 5)), 200.0),
-        (OutcomeType::Score(Score::new(1, 5)), 200.0),
-        (OutcomeType::Score(Score::new(2, 5)), 200.0),
-        (OutcomeType::Score(Score::new(3, 5)), 200.0),
-        (OutcomeType::Score(Score::new(4, 5)), 200.0),
-    ]);
-
-    let first_goalscorer = HashMap::from([
-        (
-            OutcomeType::Player(Named(Side::Home, "Muriel".into())),
-            5.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Scamacca".into())),
-            5.8,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Lookman".into())),
-            6.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Miranchuk".into())),
-            7.75,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Pasalic".into())),
-            9.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Koopmeiners".into())),
-            9.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Ederson".into())),
-            9.5,
-        ),
-        (OutcomeType::Player(Named(Side::Home, "Cisse".into())), 9.5),
-        (
-            OutcomeType::Player(Named(Side::Home, "Bakker".into())),
-            9.75,
-        ),
-        (OutcomeType::Player(Named(Side::Home, "Holm".into())), 11.0),
-        (OutcomeType::Player(Named(Side::Home, "Toloi".into())), 16.0),
-        (
-            OutcomeType::Player(Named(Side::Home, "Hateboer".into())),
-            17.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Mendicino".into())),
-            18.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Scalvini".into())),
-            21.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Bonfanti".into())),
-            21.0,
-        ),
-        (OutcomeType::Player(Named(Side::Home, "Adopo".into())), 23.0),
-        (
-            OutcomeType::Player(Named(Side::Home, "Zortea".into())),
-            23.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Kolasinac".into())),
-            23.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Djimsiti".into())),
-            26.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "De Roon".into())),
-            26.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Ruggeri".into())),
-            31.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Del Lungo".into())),
-            61.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Gyokeres".into())),
-            6.25,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Santos".into())), 8.5),
-        (
-            OutcomeType::Player(Named(Side::Away, "Paulinho".into())),
-            8.75,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Pote".into())), 8.75),
-        (
-            OutcomeType::Player(Named(Side::Away, "Edwards".into())),
-            9.75,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Ribeiro".into())),
-            10.5,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Trincao".into())),
-            11.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Moreira".into())),
-            13.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Morita".into())),
-            15.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Braganca".into())),
-            21.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Catamo".into())),
-            29.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Essugo".into())),
-            31.0,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Reis".into())), 31.0),
-        (
-            OutcomeType::Player(Named(Side::Away, "Esgaio".into())),
-            31.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "St. Juste".into())),
-            34.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Hjulmand".into())),
-            34.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Coates".into())),
-            34.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Diomande".into())),
-            41.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Quaresma".into())),
-            51.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Inacio".into())),
-            51.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Fresneda".into())),
-            61.0,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Neto".into())), 71.0),
-        (OutcomeType::None, 11.5),
-    ]);
-
-    let anytime_goalscorer = HashMap::from([
-        (OutcomeType::Player(Named(Side::Home, "Muriel".into())), 2.4),
-        (
-            OutcomeType::Player(Named(Side::Home, "Scamacca".into())),
-            2.7,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Lookman".into())),
-            2.85,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Miranchuk".into())),
-            3.5,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Pasalic".into())),
-            4.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Koopmeiners".into())),
-            4.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Ederson".into())),
-            4.2,
-        ),
-        (OutcomeType::Player(Named(Side::Home, "Cisse".into())), 4.25),
-        (OutcomeType::Player(Named(Side::Home, "Bakker".into())), 4.4),
-        (OutcomeType::Player(Named(Side::Home, "Holm".into())), 4.9),
-        (OutcomeType::Player(Named(Side::Home, "Toloi".into())), 8.5),
-        (
-            OutcomeType::Player(Named(Side::Home, "Hateboer".into())),
-            9.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Mendicino".into())),
-            9.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Scalvini".into())),
-            10.5,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Bonfanti".into())),
-            11.0,
-        ),
-        (OutcomeType::Player(Named(Side::Home, "Adopo".into())), 13.0),
-        (
-            OutcomeType::Player(Named(Side::Home, "Zortea".into())),
-            12.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Kolasinac".into())),
-            12.5,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Djimsiti".into())),
-            13.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "De Roon".into())),
-            14.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Ruggeri".into())),
-            15.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Home, "Del Lungo".into())),
-            26.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Gyokeres".into())),
-            2.75,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Santos".into())), 3.6),
-        (
-            OutcomeType::Player(Named(Side::Away, "Paulinho".into())),
-            3.75,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Pote".into())), 3.8),
-        (
-            OutcomeType::Player(Named(Side::Away, "Edwards".into())),
-            4.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Ribeiro".into())),
-            4.5,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Trincao".into())),
-            4.8,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Moreira".into())),
-            6.25,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Morita".into())),
-            7.75,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Braganca".into())),
-            11.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Catamo".into())),
-            14.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Essugo".into())),
-            15.0,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Reis".into())), 15.0),
-        (
-            OutcomeType::Player(Named(Side::Away, "Esgaio".into())),
-            16.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "St. Juste".into())),
-            17.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Hjulmand".into())),
-            7.75,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Coates".into())),
-            16.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Diomande".into())),
-            18.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Quaresma".into())),
-            21.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Inacio".into())),
-            26.0,
-        ),
-        (
-            OutcomeType::Player(Named(Side::Away, "Fresneda".into())),
-            26.0,
-        ),
-        (OutcomeType::Player(Named(Side::Away, "Neto".into())), 31.0),
-    ]);
-
-    HashMap::from([
-        (MarketType::HeadToHead, h2h),
-        (MarketType::TotalGoalsOverUnder(Over(2)), goals_ou),
-        (MarketType::CorrectScore, correct_score),
-        (MarketType::FirstGoalscorer, first_goalscorer),
-        (MarketType::AnytimeGoalscorer, anytime_goalscorer),
-    ])
 }
 
 #[tokio::main]
@@ -521,7 +99,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .optimal_values
             .iter()
             .map(|optimal_value| {
-                1.0 - poisson::univariate(0, optimal_value / INTERVALS as f64, &factorial::Calculator)
+                1.0 - poisson::univariate(
+                    0,
+                    optimal_value / INTERVALS as f64,
+                    &factorial::Calculator,
+                )
                 // poisson::univariate(1, optimal_value / INTERVALS as f64, &factorial::Calculator)
             })
             .collect::<Vec<_>>()
@@ -530,7 +112,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("*** fitting bivariate binomial scoregrid ***");
     let start = Instant::now();
-    let search_outcome = fit_binomial_scoregrid(&[&h2h, &goals_ou], &init_estimates);
+    let search_outcome = fit_bivariate_binomial_scoregrid(&[&h2h, &goals_ou], &init_estimates);
     // let search_outcome = fit_scoregrid(&[&correct_score]);
     let elapsed = start.elapsed();
     println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
@@ -540,15 +122,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
         search_outcome.optimal_values[0],
         search_outcome.optimal_values[1],
         search_outcome.optimal_values[2],
-        &mut scoregrid
+        &mut scoregrid,
     );
     // let scoregrid = correct_score_scoregrid(&correct_score);
+    let home_away_expectations = home_away_expectations(&scoregrid);
+    println!(
+        "p(0, 0)={}, home + away expectations: ({} + {} = {})",
+        scoregrid[(0, 0)],
+        home_away_expectations.0,
+        home_away_expectations.1,
+        home_away_expectations.0 + home_away_expectations.1
+    );
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
-    let home_ratio = (search_outcome.optimal_values[0] + search_outcome.optimal_values[2]/2.0)/search_outcome.optimal_values.sum()*(1.0 - scoregrid[(0, 0)]);
-    let away_ratio = (search_outcome.optimal_values[1] + search_outcome.optimal_values[2]/2.0)/search_outcome.optimal_values.sum()*(1.0 - scoregrid[(0, 0)]);
+    let home_ratio = (search_outcome.optimal_values[0] + search_outcome.optimal_values[2] / 2.0)
+        / search_outcome.optimal_values.sum()
+        * (1.0 - scoregrid[(0, 0)]);
+    let away_ratio = (search_outcome.optimal_values[1] + search_outcome.optimal_values[2] / 2.0)
+        / search_outcome.optimal_values.sum()
+        * (1.0 - scoregrid[(0, 0)]);
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
-    // let away_ratio = 1.0 - home_ratio;
     let mut fitted_goalscorer_probs = BTreeMap::new();
     let start = Instant::now();
     for (index, outcome) in first_gs.outcomes.iter().enumerate() {
@@ -558,8 +151,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Named(side, _) => match side {
                         Side::Home => home_ratio,
                         Side::Away => away_ratio,
-                    }
-                    Player::Other => unreachable!()
+                    },
+                    Player::Other => unreachable!(),
                 };
                 let init_estimate = first_gs.market.probs[index] / side_ratio;
                 let player_search_outcome = fit_first_goalscorer(
@@ -569,10 +162,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     first_gs.market.probs[index],
                 );
                 // println!("for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", first_gs.market.probs[index]);
-                fitted_goalscorer_probs
-                    .insert(player.clone(), player_search_outcome.optimal_value);
-                // fitted_goalscorer_probs
-                //     .insert(player.clone(), first_gs.market.probs[index] / side_ratio);
+                fitted_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_value);
             }
             OutcomeType::None => {}
             _ => unreachable!(),
@@ -601,8 +191,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
     }
     fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
-    // fitted_first_goalscorer_probs.push(scoregrid[(0, 0)]);
-    // fitted_first_goalscorer_probs.normalise(1.0);
+
     let fitted_first_goalscorer = LabelledMarket {
         market_type: MarketType::FirstGoalscorer,
         outcomes: first_gs.outcomes.clone(),
@@ -641,10 +230,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // println!("anytime scorer {player:?}, prob: {isolated_prob:.3}");
     }
     fitted_anytime_goalscorer_outcomes.push(OutcomeType::None);
+    // fitted_anytime_goalscorer_probs.normalise(home_away_expectations.0 + home_away_expectations.1);
     fitted_anytime_goalscorer_probs.push(scoregrid[(0, 0)]);
 
-    // println!("anytime scorer {:?}, prob: {:.3}", OutcomeType::None, scoregrid[(0, 0)]);
-    // fitted_anytime_goalscorer_probs.scale(1.0 / (1.0 - scoregrid[(0, 0)]));
     let anytime_goalscorer_booksum = fitted_anytime_goalscorer_probs.sum();
     let anytime_goalscorer_overround = Market::fit(
         &OVERROUND_METHOD,
@@ -666,8 +254,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_anytime_goalscorer.market.probs.sum(),
         Console::default().render(&table_anytime_goalscorer)
     );
-    // let draw_prob = scoregrid[(0, 0)];
-    // anytime_goalscorer_probs.push(draw_prob);
 
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
     let fitted_h2h = LabelledMarket {
@@ -676,7 +262,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         market: fitted_h2h,
     };
     let table_h2h = print_market(&fitted_h2h);
-    println!("H2H: [Σ={:.3}]\n{}", fitted_h2h.market.probs.sum(), Console::default().render(&table_h2h));
+    println!(
+        "H2H: [Σ={:.3}]\n{}",
+        fitted_h2h.market.probs.sum(),
+        Console::default().render(&table_h2h)
+    );
 
     let fitted_goals_ou = frame_prices(&scoregrid, &goals_ou.outcomes, &goals_ou.market.overround);
     let fitted_goals_ou = LabelledMarket {
@@ -685,7 +275,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         market: fitted_goals_ou,
     };
     let table_goals_ou = print_market(&fitted_goals_ou);
-    println!("Goals O/U: [Σ={:.3}]\n{}", fitted_goals_ou.market.probs.sum(), Console::default().render(&table_goals_ou));
+    println!(
+        "Goals O/U: [Σ={:.3}]\n{}",
+        fitted_goals_ou.market.probs.sum(),
+        Console::default().render(&table_goals_ou)
+    );
 
     let fitted_correct_score = frame_prices(
         &scoregrid,
@@ -719,7 +313,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .map(|(key, sample, fitted)| {
         (
             *key,
-            compute_error(&sample.market.prices, &fitted.market.prices),
+            MarketErrors {
+                rmse: compute_error(
+                    &sample.market.prices,
+                    &fitted.market.prices,
+                    &ErrorType::SquaredAbsolute,
+                ),
+                rmsre: compute_error(
+                    &sample.market.prices,
+                    &fitted.market.prices,
+                    &ErrorType::SquaredRelative,
+                ),
+            },
         )
     })
     .collect::<Vec<_>>();
@@ -767,37 +372,32 @@ pub struct LabelledMarket {
     market: Market,
 }
 
-fn fit_binomial_scoregrid(markets: &[&LabelledMarket], init_estimates: &Vec<f64>) -> HypergridSearchOutcome {
+fn fit_bivariate_binomial_scoregrid(
+    markets: &[&LabelledMarket],
+    init_estimates: &[f64],
+) -> HypergridSearchOutcome {
     let mut scoregrid = allocate_scoregrid();
-    let bounds = init_estimates.iter().map(|&estimate| (estimate * 0.75)..=(estimate * 1.33)).collect::<Vec<_>>();
+    let bounds = init_estimates
+        .iter()
+        .map(|&estimate| (estimate * 0.75)..=(estimate * 1.33))
+        .collect::<Vec<_>>();
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
-            // bounds: vec![0.0001..=0.5, 0.0001..=0.5, 0.00..=0.05].into(),
             bounds: bounds.into(),
             resolution: 10,
         },
         |values| values.sum() <= 1.0,
         |values| {
-            // interval_scoregrid(values[0], values[1], values[2], &mut scoregrid);
-            // let interval_error = scoregrid_error(&markets, &scoregrid);
-            // println!("values: : {values:?}");
-            // println!("  interval_error: {interval_error}");
-            // println!(
-            //     "  interval:\n{}  sum: {}",
-            //     scoregrid.verbose(),
-            //     scoregrid.flatten().sum()
-            // );
-            bivariate_binomial_scoregrid(INTERVALS as u8, values[0], values[1], values[2], &mut scoregrid);
-            // let binomial_error = scoregrid_error(&markets, &scoregrid);
-            // println!("  binomial_error: {binomial_error}");
-            // println!(
-            //     "  binomial:\n{}  sum: {}",
-            //     scoregrid.verbose(),
-            //     scoregrid.flatten().sum()
-            // );
-            scoregrid_error(&markets, &scoregrid)
+            bivariate_binomial_scoregrid(
+                INTERVALS as u8,
+                values[0],
+                values[1],
+                values[2],
+                &mut scoregrid,
+            );
+            scoregrid_error(markets, &scoregrid)
         },
     )
 }
@@ -814,7 +414,7 @@ fn fit_bivariate_poisson_scoregrid(markets: &[&LabelledMarket]) -> HypergridSear
         |_| true,
         |values| {
             bivariate_poisson_scoregrid(values[0], values[1], values[2], &mut scoregrid);
-            scoregrid_error(&markets, &scoregrid)
+            scoregrid_error(markets, &scoregrid)
         },
     )
 }
@@ -823,7 +423,7 @@ fn scoregrid_error(markets: &[&LabelledMarket], scoregrid: &Matrix<f64>) -> f64 
     let mut residual = 0.0;
     for market in markets {
         for (index, outcome) in market.outcomes.iter().enumerate() {
-            let fitted_prob = outcome.gather(&scoregrid);
+            let fitted_prob = outcome.gather(scoregrid);
             let sample_prob = market.market.probs[index];
             residual += ERROR_TYPE.calculate(sample_prob, fitted_prob);
         }
@@ -831,69 +431,38 @@ fn scoregrid_error(markets: &[&LabelledMarket], scoregrid: &Matrix<f64>) -> f64 
     residual
 }
 
-// fn fit_first_goalscorer(
-//     optimal_scoring_probs: &[f64],
-//     player: &Player,
-//     init_estimate: f64,
-//     expected_prob: f64,
-// ) -> HypergridSearchOutcome {
-//     hypergrid_search(
-//         &HypergridSearchConfig {
-//             max_steps: 10,
-//             acceptable_residual: 1e-9,
-//             bounds: vec![0.83 * init_estimate..=1.2 * init_estimate].into(),
-//             resolution: 10,
-//         },
-//         |_| true,
-//         |values| {
-//             let exploration = explore(&IntervalConfig {
-//                 intervals: INTERVALS as u8,
-//                 home_prob: optimal_scoring_probs[0],
-//                 away_prob: optimal_scoring_probs[1],
-//                 common_prob: optimal_scoring_probs[2],
-//                 max_total_goals: MAX_TOTAL_GOALS,
-//                 players: vec![(player.clone(), values[0])],
-//             });
-//             let isolated_prob = isolate(
-//                 &MarketType::FirstGoalscorer,
-//                 &OutcomeType::Player(player.clone()),
-//                 &exploration.prospects,
-//                 &exploration.player_lookup,
-//             );
-//             ERROR_TYPE.calculate(expected_prob, isolated_prob)
-//         },
-//     )
-// }
-
 fn fit_first_goalscorer(
     optimal_scoring_probs: &[f64],
     player: &Player,
     init_estimate: f64,
     expected_prob: f64,
 ) -> UnivariateDescentOutcome {
-    univariate_descent(&UnivariateDescentConfig {
-        init_value: init_estimate,
-        init_step: init_estimate * 0.1,
-        min_step: init_estimate * 0.001,
-        max_steps: 100,
-        acceptable_residual: 1e-9,
-    }, |value| {
-        let exploration = explore(&IntervalConfig {
-            intervals: INTERVALS as u8,
-            home_prob: optimal_scoring_probs[0],
-            away_prob: optimal_scoring_probs[1],
-            common_prob: optimal_scoring_probs[2],
-            max_total_goals: MAX_TOTAL_GOALS,
-            players: vec![(player.clone(), value)],
-        });
-        let isolated_prob = isolate(
-            &MarketType::FirstGoalscorer,
-            &OutcomeType::Player(player.clone()),
-            &exploration.prospects,
-            &exploration.player_lookup,
-        );
-        ERROR_TYPE.calculate(expected_prob, isolated_prob)
-    })
+    univariate_descent(
+        &UnivariateDescentConfig {
+            init_value: init_estimate,
+            init_step: init_estimate * 0.1,
+            min_step: init_estimate * 0.001,
+            max_steps: 100,
+            acceptable_residual: 1e-9,
+        },
+        |value| {
+            let exploration = explore(&IntervalConfig {
+                intervals: INTERVALS as u8,
+                home_prob: optimal_scoring_probs[0],
+                away_prob: optimal_scoring_probs[1],
+                common_prob: optimal_scoring_probs[2],
+                max_total_goals: MAX_TOTAL_GOALS,
+                players: vec![(player.clone(), value)],
+            });
+            let isolated_prob = isolate(
+                &MarketType::FirstGoalscorer,
+                &OutcomeType::Player(player.clone()),
+                &exploration.prospects,
+                &exploration.player_lookup,
+            );
+            ERROR_TYPE.calculate(expected_prob, isolated_prob)
+        },
+    )
 }
 
 enum ErrorType {
@@ -918,7 +487,7 @@ fn interval_scoregrid(
     interval_home_prob: f64,
     interval_away_prob: f64,
     interval_common_prob: f64,
-    scoregrid: &mut Matrix<f64>
+    scoregrid: &mut Matrix<f64>,
 ) {
     scoregrid.fill(0.0);
     scoregrid::from_interval(
@@ -933,7 +502,12 @@ fn interval_scoregrid(
 }
 
 /// Binomial.
-fn binomial_scoregrid(intervals: u8, interval_home_prob: f64, interval_away_prob: f64, scoregrid: &mut Matrix<f64>) {
+fn binomial_scoregrid(
+    intervals: u8,
+    interval_home_prob: f64,
+    interval_away_prob: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
     scoregrid.fill(0.0);
     scoregrid::from_binomial(intervals, interval_home_prob, interval_away_prob, scoregrid);
     // scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -945,7 +519,7 @@ fn bivariate_binomial_scoregrid(
     interval_home_prob: f64,
     interval_away_prob: f64,
     interval_common_prob: f64,
-    scoregrid: &mut Matrix<f64>
+    scoregrid: &mut Matrix<f64>,
 ) {
     scoregrid.fill(0.0);
     scoregrid::from_bivariate_binomial(
@@ -965,7 +539,12 @@ fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64, scoregrid: &mut 
 }
 
 /// Bivariate Poisson.
-fn bivariate_poisson_scoregrid(home_rate: f64, away_rate: f64, common: f64, scoregrid: &mut Matrix<f64>) {
+fn bivariate_poisson_scoregrid(
+    home_rate: f64,
+    away_rate: f64,
+    common: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
     scoregrid.fill(0.0);
     scoregrid::from_bivariate_poisson(home_rate, away_rate, common, scoregrid);
     // scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -999,7 +578,12 @@ fn frame_prices(
     Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
 }
 
-fn compute_error(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
+struct MarketErrors {
+    rmse: f64,
+    rmsre: f64,
+}
+
+fn compute_error(sample_prices: &[f64], fitted_prices: &[f64], error_type: &ErrorType) -> f64 {
     let mut error_sum = 0.0;
     let mut counted = 0;
     for (index, sample_price) in sample_prices.iter().enumerate() {
@@ -1007,11 +591,11 @@ fn compute_error(sample_prices: &[f64], fitted_prices: &[f64]) -> f64 {
         if fitted_price.is_finite() {
             counted += 1;
             let (sample_prob, fitted_prob) = (1.0 / sample_price, 1.0 / fitted_price);
-            error_sum += ERROR_TYPE.calculate(sample_prob, fitted_prob);
+            error_sum += error_type.calculate(sample_prob, fitted_prob);
         }
     }
     let mean_error = error_sum / counted as f64;
-    ERROR_TYPE.reverse(mean_error)
+    error_type.reverse(mean_error)
 }
 
 fn print_market(market: &LabelledMarket) -> Table {
@@ -1031,15 +615,25 @@ fn print_market(market: &LabelledMarket) -> Table {
     table
 }
 
-fn print_errors(errors: &[(&str, f64)]) -> Table {
+fn print_errors(errors: &[(&str, MarketErrors)]) -> Table {
     let mut table = Table::default().with_cols(vec![
         Col::new(Styles::default().with(MinWidth(10)).with(Left)),
         Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
-    ]);
+        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+    ]).with_row(
+        Row::new(
+            Styles::default().with(Header(true)),
+            vec![
+                "Market".into(),
+                "RMSRE".into(),
+                "RMSE".into()
+            ],
+        )
+    );
     for (key, error) in errors {
         table.push_row(Row::new(
             Styles::default(),
-            vec![key.to_string().into(), format!("{error:.3}").into()],
+            vec![key.to_string().into(), format!("{:.3}", error.rmsre).into(), format!("{:.3}", error.rmse).into()],
         ));
     }
     table
