@@ -1,5 +1,6 @@
 //! Combinatorics.
 
+#[inline]
 pub fn pick(cardinalities: &[usize], combination: u64, ordinals: &mut [usize]) {
     let mut residual = combination;
     for (index, &cardinality) in cardinalities.iter().enumerate() {
@@ -10,8 +11,9 @@ pub fn pick(cardinalities: &[usize], combination: u64, ordinals: &mut [usize]) {
     }
 }
 
+#[inline]
 pub fn count_combinations(cardinalities: &[usize]) -> u64 {
-    cardinalities.iter().product::<usize>() as u64
+    cardinalities.iter().fold(1u64, |acc, &num| acc * num as u64)
 }
 
 pub struct Combinator<'a> {
@@ -63,6 +65,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+#[inline]
 pub fn is_unique_quadratic(elements: &[usize]) -> bool {
     for (index, element) in elements.iter().enumerate() {
         for other in &elements[index + 1..] {
@@ -74,6 +77,7 @@ pub fn is_unique_quadratic(elements: &[usize]) -> bool {
     true
 }
 
+#[inline]
 pub fn is_unique_linear(elements: &[usize], bitmap: &mut [bool]) -> bool {
     bitmap.fill(false);
     for &element in elements {
