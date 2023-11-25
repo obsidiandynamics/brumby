@@ -27,9 +27,9 @@ use brumby::probs::SliceExt;
 use brumby::scoregrid::{from_correct_score, home_away_expectations};
 use brumby::soccer_data::{ContestSummary, download_by_id};
 
-const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Power;
+const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
-// const ZERO_INFLATION: f64 = 0.0;
+const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
 const MAX_TOTAL_GOALS: u16 = 8;
 const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
@@ -43,6 +43,10 @@ struct Args {
     /// download contest data by ID
     #[clap(short = 'd', long)]
     download: Option<String>,
+
+    /// print player markets
+    #[clap(short = 'p', long = "players")]
+    print_players: bool,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -78,16 +82,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let first_gs = contest.offerings[&MarketType::FirstGoalscorer].clone();
     let anytime_gs = contest.offerings[&MarketType::AnytimeGoalscorer].clone();
 
-    let h2h = fit_market(MarketType::HeadToHead, &h2h_prices);
-    // println!("h2h: {h2h:?}");
-    let goals_ou = fit_market(MarketType::TotalGoalsOverUnder(Over(2)), &goals_ou_prices);
-    // println!("goals_ou: {goals_ou:?}");
-    let correct_score = fit_market(MarketType::CorrectScore, &correct_score_prices);
-    // println!("correct_score: {correct_score:?}");
-    let first_gs = fit_market(MarketType::FirstGoalscorer, &first_gs);
-    // println!("first_gs: {first_gs:?}");
-    let anytime_gs = fit_market(MarketType::AnytimeGoalscorer, &anytime_gs);
-    // println!("anytime_gs: {anytime_gs:?}");
+    let h2h = fit_market(MarketType::HeadToHead, &h2h_prices, 1.0);
+    let goals_ou = fit_market(MarketType::TotalGoalsOverUnder(Over(2)), &goals_ou_prices, 1.0);
+    let correct_score = fit_market(MarketType::CorrectScore, &correct_score_prices, 1.0);
 
     let init_estimates = {
         println!("*** fitting bivariate poisson scoregrid ***");
@@ -133,6 +130,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         home_away_expectations.1,
         home_away_expectations.0 + home_away_expectations.1
     );
+
+    let first_gs = fit_market(MarketType::FirstGoalscorer, &first_gs, FIRST_GOALSCORER_BOOKSUM);
+    let anytime_gs = fit_market(MarketType::AnytimeGoalscorer, &anytime_gs, 1.0);
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
     let home_ratio = (search_outcome.optimal_values[0] + search_outcome.optimal_values[2] / 2.0)
@@ -190,7 +190,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_first_goalscorer_probs.push(isolated_prob);
         // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
     }
-    fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
+    fitted_first_goalscorer_probs.push(scoregrid[(0, 0)]);
+    fitted_first_goalscorer_probs.normalise(FIRST_GOALSCORER_BOOKSUM);
+    // fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
 
     let fitted_first_goalscorer = LabelledMarket {
         market_type: MarketType::FirstGoalscorer,
@@ -201,12 +203,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &SINGLE_PRICE_BOUNDS,
         ),
     };
-    let table_first_goalscorer = print_market(&fitted_first_goalscorer);
-    println!(
-        "First Goalscorer: [Σ={:.3}]\n{}",
-        fitted_first_goalscorer.market.probs.sum(),
-        Console::default().render(&table_first_goalscorer)
-    );
+
+    if args.print_players {
+        println!("sample first goalscorer σ={:.3}", implied_booksum(&first_gs.market.prices));
+        let table_first_goalscorer = print_market(&fitted_first_goalscorer);
+        println!(
+            "First Goalscorer: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            fitted_first_goalscorer.market.probs.sum(),
+            implied_booksum(&fitted_first_goalscorer.market.prices),
+            fitted_first_goalscorer.market.probs.len(),
+            Console::default().render(&table_first_goalscorer)
+        );
+    }
 
     let mut fitted_anytime_goalscorer_outcomes = vec![];
     let mut fitted_anytime_goalscorer_probs = vec![];
@@ -248,12 +256,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &SINGLE_PRICE_BOUNDS,
         ),
     };
-    let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
-    println!(
-        "Anytime Goalscorer: [Σ={:.3}]\n{}",
-        fitted_anytime_goalscorer.market.probs.sum(),
-        Console::default().render(&table_anytime_goalscorer)
-    );
+
+    if args.print_players {
+        println!("sample anytime goalscorer σ={:.3}", implied_booksum(&anytime_gs.market.prices));
+        let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
+        println!(
+            "Anytime Goalscorer: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            fitted_anytime_goalscorer.market.probs.sum(),
+            implied_booksum(&fitted_anytime_goalscorer.market.prices),
+            fitted_first_goalscorer.market.probs.len(),
+            Console::default().render(&table_anytime_goalscorer)
+        );
+    }
 
     let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
     let fitted_h2h = LabelledMarket {
@@ -349,7 +363,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>) -> LabelledMarket {
+fn implied_booksum(prices: &[f64]) -> f64 {
+    prices.invert().sum()
+}
+
+fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>, normal: f64) -> LabelledMarket {
     let mut entries = map.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let outcomes = entries
@@ -357,7 +375,7 @@ fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>) -> Label
         .map(|(outcome, _)| (*outcome).clone())
         .collect::<Vec<_>>();
     let prices = entries.iter().map(|(_, &price)| price).collect();
-    let market = Market::fit(&OVERROUND_METHOD, prices, 1.0);
+    let market = Market::fit(&OVERROUND_METHOD, prices, normal);
     LabelledMarket {
         market_type,
         outcomes,
