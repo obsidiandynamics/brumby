@@ -1,4 +1,4 @@
-use crate::entity::{MarketType, OutcomeType, Over, Player, Score, Side};
+use crate::entity::{MarketType, OutcomeType, Over, Period, Player, Score, Side};
 use racing_scraper::get_sports_contest;
 use racing_scraper::sports::soccer::contest_model::ContestModel;
 use racing_scraper::sports::soccer::market_model::{HomeAway, Scorer, SoccerMarket};
@@ -20,7 +20,7 @@ impl From<ContestModel> for ContestSummary {
             match market {
                 SoccerMarket::CorrectScore(markets) => {
                     offerings.insert(
-                        MarketType::CorrectScore,
+                        MarketType::CorrectScore(Period::FullTime),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
                                 OutcomeType::Score(Score {
@@ -35,16 +35,16 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::TotalGoalsOverUnder(market, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
-                        MarketType::TotalGoalsOverUnder(Over(over)),
+                        MarketType::TotalGoalsOverUnder(Period::FullTime, Over(over)),
                         HashMap::from([
-                            (OutcomeType::Over(over), market.over),
-                            (OutcomeType::Under(under), market.under),
+                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
                 SoccerMarket::H2H(h2h) => {
                     offerings.insert(
-                        MarketType::HeadToHead,
+                        MarketType::HeadToHead(Period::FullTime),
                         HashMap::from([
                             (OutcomeType::Win(Side::Home), h2h.home),
                             (OutcomeType::Win(Side::Away), h2h.away),
@@ -70,11 +70,33 @@ impl From<ContestModel> for ContestSummary {
                         })),
                     );
                 }
-                SoccerMarket::CorrectScoreFirstHalf(_) => {
-                    //TODO
+                SoccerMarket::CorrectScoreFirstHalf(markets) => {
+                    offerings.insert(
+                        MarketType::CorrectScore(Period::FirstHalf),
+                        HashMap::from_iter(markets.iter().map(|market| {
+                            (
+                                OutcomeType::Score(Score {
+                                    home: market.score.home as u8,
+                                    away: market.score.away as u8,
+                                }),
+                                market.odds,
+                            )
+                        })),
+                    );
                 }
-                SoccerMarket::CorrectScoreSecondHalf(_) => {
-                    //TODO
+                SoccerMarket::CorrectScoreSecondHalf(markets) => {
+                    offerings.insert(
+                        MarketType::CorrectScore(Period::SecondHalf),
+                        HashMap::from_iter(markets.iter().map(|market| {
+                            (
+                                OutcomeType::Score(Score {
+                                    home: market.score.home as u8,
+                                    away: market.score.away as u8,
+                                }),
+                                market.odds,
+                            )
+                        })),
+                    );
                 }
                 SoccerMarket::TotalGoalsOddEven(_) => {
                     //TODO
@@ -87,6 +109,46 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::Score2GoalsOrMore(_) => {
                     //TODO
+                }
+                SoccerMarket::FirstHalfGoalsOverUnder(market, line) => {
+                    let (over, under) = (line.floor() as u8, line.ceil() as u8);
+                    offerings.insert(
+                        MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(over)),
+                        HashMap::from([
+                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                        ]),
+                    );
+                }
+                SoccerMarket::FirstHalfH2H(h2h) => {
+                    offerings.insert(
+                        MarketType::HeadToHead(Period::FirstHalf),
+                        HashMap::from([
+                            (OutcomeType::Win(Side::Home), h2h.home),
+                            (OutcomeType::Win(Side::Away), h2h.away),
+                            (OutcomeType::Draw, h2h.draw),
+                        ]),
+                    );
+                }
+                SoccerMarket::SecondHalfGoalsOverUnder(market, line) => {
+                    let (over, under) = (line.floor() as u8, line.ceil() as u8);
+                    offerings.insert(
+                        MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(over)),
+                        HashMap::from([
+                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                        ]),
+                    );
+                }
+                SoccerMarket::SecondHalfH2H(h2h) => {
+                    offerings.insert(
+                        MarketType::HeadToHead(Period::SecondHalf),
+                        HashMap::from([
+                            (OutcomeType::Win(Side::Home), h2h.home),
+                            (OutcomeType::Win(Side::Away), h2h.away),
+                            (OutcomeType::Draw, h2h.draw),
+                        ]),
+                    );
                 }
             }
         }

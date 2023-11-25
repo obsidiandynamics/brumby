@@ -27,10 +27,17 @@ pub struct Over(pub u8);
 pub struct Under(pub u8);
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Period {
+    FirstHalf,
+    SecondHalf,
+    FullTime
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MarketType {
-    HeadToHead,
-    TotalGoalsOverUnder(Over),
-    CorrectScore,
+    HeadToHead(Period),
+    TotalGoalsOverUnder(Period, Over),
+    CorrectScore(Period),
     DrawNoBet,
     AnytimeGoalscorer,
     FirstGoalscorer,

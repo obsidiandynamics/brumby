@@ -1,15 +1,16 @@
+use std::ops::Range;
 use ordinalizer::Ordinal;
 use strum_macros::{EnumCount, EnumIter};
 
 use multinomial::binomial;
 
-use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
 use crate::entity::{OutcomeType, Score, Side};
-use crate::interval::{explore, IntervalConfig};
+use crate::interval::{explore, IntervalConfig, ModelParams};
 use crate::linear::matrix::Matrix;
 use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
+use crate::{factorial, multinomial, poisson};
 
 #[derive(Debug, Ordinal, EnumCount, EnumIter)]
 pub enum GoalEvent {
@@ -62,7 +63,8 @@ pub struct Iter<'a> {
 }
 impl<'a> Iter<'a> {
     pub fn new(space: &'a ScoreOutcomeSpace, fixtures: &'a mut IterFixtures) -> Self {
-        let interval_neither_prob = 1.0 - space.interval_home_prob - space.interval_away_prob - space.interval_common_prob;
+        let interval_neither_prob =
+            1.0 - space.interval_home_prob - space.interval_away_prob - space.interval_common_prob;
         Self {
             space,
             fixtures,
@@ -166,21 +168,23 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
 // }
 pub fn from_interval(
     intervals: u8,
+    explore_intervals: Range<u8>,
     max_total_goals: u16,
-    home_prob: f64,
-    away_prob: f64,
-    common_prob: f64,
+    h1_params: ModelParams,
+    h2_params: ModelParams,
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
-    let exploration = explore(&IntervalConfig {
-        intervals,
-        home_prob,
-        away_prob,
-        common_prob,
-        max_total_goals,
-        players: vec![],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals,
+            h1_params,
+            h2_params,
+            max_total_goals,
+            players: vec![],
+        },
+        explore_intervals,
+    );
     for (scenario, prob) in exploration.prospects {
         scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
     }
@@ -227,10 +231,8 @@ pub fn from_binomial(
     let factorial = factorial::Calculator;
     for home_goals in 0..=u8::min(intervals, (scoregrid.rows() - 1) as u8) {
         for away_goals in 0..=u8::min(intervals, (scoregrid.cols() - 1) as u8) {
-            let home_prob =
-                binomial(intervals, home_goals, interval_home_prob, &factorial);
-            let away_prob =
-                binomial(intervals, away_goals, interval_away_prob, &factorial);
+            let home_prob = binomial(intervals, home_goals, interval_home_prob, &factorial);
+            let away_prob = binomial(intervals, away_goals, interval_away_prob, &factorial);
             scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
         }
     }
@@ -247,7 +249,15 @@ pub fn from_bivariate_binomial(
     let factorial = factorial::Calculator;
     for home_goals in 0..=u8::min(intervals, (scoregrid.rows() - 1) as u8) {
         for away_goals in 0..=u8::min(intervals, (scoregrid.cols() - 1) as u8) {
-            scoregrid[(home_goals as usize, away_goals as usize)] = bivariate_binomial(intervals, home_goals, away_goals, interval_home_prob, interval_away_prob, interval_common_prob, &factorial);
+            scoregrid[(home_goals as usize, away_goals as usize)] = bivariate_binomial(
+                intervals,
+                home_goals,
+                away_goals,
+                interval_home_prob,
+                interval_away_prob,
+                interval_common_prob,
+                &factorial,
+            );
         }
     }
 }
@@ -256,11 +266,13 @@ pub fn from_correct_score(outcomes: &[OutcomeType], probs: &[f64], scoregrid: &m
     for (index, outcome) in outcomes.iter().enumerate() {
         match outcome {
             OutcomeType::Score(score) => {
-                if (score.home as usize) < scoregrid.rows() && (score.away as usize) < scoregrid.cols() {
+                if (score.home as usize) < scoregrid.rows()
+                    && (score.away as usize) < scoregrid.cols()
+                {
                     scoregrid[(score.home as usize, score.away as usize)] += probs[index];
                 }
             }
-            _ => panic!("unexpected {outcome:?}")
+            _ => panic!("unexpected {outcome:?}"),
         }
     }
 }
@@ -279,6 +291,40 @@ pub fn home_away_expectations(scoregrid: &Matrix<f64>) -> (f64, f64) {
     (home_expectation, away_expectation)
 }
 
+pub fn subtract(future: &Matrix<f64>, past: &Matrix<f64>) -> Matrix<f64> {
+    assert_eq!(future.rows(), past.rows());
+    assert_eq!(future.cols(), past.cols());
+    let (home_goals, away_goals) = (future.rows(), future.cols());
+    let mut diff = Matrix::allocate(home_goals, away_goals);
+
+    for past_home_goals in 0..past.rows() {
+        for past_away_goals in 0..past.cols() {
+            let past_prob = past[(past_home_goals, past_away_goals)];
+            // println!("{past_home_goals}:{past_away_goals} => past_prob={past_prob}");
+            let mut remaining_prob = 0.0;
+            for future_home_goals in past_home_goals..future.rows() {
+                for future_away_goals in past_away_goals..future.cols() {
+                    let future_prob = future[(future_home_goals, future_away_goals)];
+                    remaining_prob += future_prob;
+                }
+            }
+            // println!("  {past_home_goals}:{past_away_goals} remaining_prob={remaining_prob}");
+            if remaining_prob > 0.0 {
+                for future_home_goals in past_home_goals..future.rows() {
+                    for future_away_goals in past_away_goals..future.cols() {
+                        let future_prob = future[(future_home_goals, future_away_goals)];
+                        let past_to_future_prob = past_prob * future_prob / remaining_prob;
+                        // println!("  {future_home_goals}:{future_away_goals} future_prob={future_prob}, past_to_future_prob={past_to_future_prob}");
+                        diff[(future_home_goals - past_home_goals, future_away_goals - past_away_goals)] += past_to_future_prob;
+                    }
+                }
+            }
+        }
+    }
+
+    diff
+}
+
 pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid[(0, 0)] += additive;
     scoregrid.flatten_mut().normalise(1.0);
@@ -292,7 +338,7 @@ impl OutcomeType {
             OutcomeType::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
             OutcomeType::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
             OutcomeType::Score(score) => Self::gather_correct_score(score, scoregrid),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 

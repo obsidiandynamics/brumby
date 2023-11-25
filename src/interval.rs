@@ -1,3 +1,4 @@
+use std::ops::Range;
 use rustc_hash::FxHashMap;
 
 use crate::entity::{MarketType, OutcomeType, Player, Score, Side};
@@ -26,11 +27,17 @@ pub fn init_prospects(capacity: usize) -> Prospects {
 }
 
 #[derive(Debug)]
-pub struct IntervalConfig {
-    pub intervals: u8,
+pub struct ModelParams {
     pub home_prob: f64,
     pub away_prob: f64,
     pub common_prob: f64,
+}
+
+#[derive(Debug)]
+pub struct IntervalConfig {
+    pub intervals: u8,
+    pub h1_params: ModelParams,
+    pub h2_params: ModelParams,
     pub max_total_goals: u16,
     pub players: Vec<(Player, f64)>,
 }
@@ -55,7 +62,7 @@ pub struct PlayerStats {
     pub goals: u8,
 }
 
-pub fn explore(config: &IntervalConfig) -> Exploration {
+pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Exploration {
     let mut player_lookup = Vec::with_capacity(config.players.len() + 1);
     let mut home_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut away_scorers = Vec::with_capacity(config.players.len() + 1);
@@ -83,21 +90,20 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
 
     let mut current_prospects = init_prospects(1);
     current_prospects.insert(Prospect::init(player_lookup.len()), 1.0);
-    let neither_prob = 1.0 - config.home_prob - config.away_prob - config.common_prob;
     let mut pruned = 0.0;
 
-    for _ in 0..config.intervals {
-        let mut next_prospects = init_prospects(current_prospects.len() * 4);
+    for interval in explore_intervals {
+        let params = if interval < config.intervals / 2 {
+            &config.h1_params
+        } else {
+            &config.h1_params
+        };
+
+        let neither_prob = 1.0 - params.home_prob - params.away_prob - params.common_prob;
+        
+        let mut next_prospects = init_prospects((current_prospects.len() as f64 * 1.1) as usize);
 
         for (current_prospect, current_prob) in current_prospects {
-            // let partial_goals = if partial.home_scorer.is_some() { 1 } else { 0 }
-            //     + if partial.away_scorer.is_some() { 1 } else { 0 };
-            // // let partial_goals = partial.home_scorer.map(|_| 1).unwrap_or(0)
-            // //     + partial.away_scorer.map(|_| 1).unwrap_or(0);
-            // if current_prospect.score.total() + partial_goals > config.max_total_goals {
-            //     continue;
-            // }
-
             // neither team scores
             let partial = PartialProspect {
                 home_scorer: None,
@@ -115,7 +121,7 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
                         home_scorer: Some(*player_index),
                         away_scorer: None,
                         first_scoring_side: Some(&Side::Home),
-                        prob: config.home_prob * player_prob,
+                        prob: params.home_prob * player_prob,
                     };
                     merge(&current_prospect, current_prob, partial, &mut next_prospects);
                 }
@@ -126,12 +132,12 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
                         home_scorer: None,
                         away_scorer: Some(*player_index),
                         first_scoring_side: Some(&Side::Away),
-                        prob: config.away_prob * player_prob,
+                        prob: params.away_prob * player_prob,
                     };
                     merge(&current_prospect, current_prob, partial, &mut next_prospects);
                 }
             } else {
-                pruned += current_prob * (config.home_prob + config.away_prob);
+                pruned += current_prob * (params.home_prob + params.away_prob);
             }
 
             // at least two more goals allowed before pruning
@@ -144,14 +150,14 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
                                 home_scorer: Some(*home_player_index),
                                 away_scorer: Some(*away_player_index),
                                 first_scoring_side: Some(first_scoring_side),
-                                prob: config.common_prob * home_player_prob * away_player_prob * 0.5,
+                                prob: params.common_prob * home_player_prob * away_player_prob * 0.5,
                             };
                             merge(&current_prospect, current_prob, partial, &mut next_prospects);
                         }
                     }
                 }
             } else {
-                pruned += current_prob * config.common_prob;
+                pruned += current_prob * params.common_prob;
             }
         }
 
@@ -202,9 +208,9 @@ pub fn isolate(
     player_lookup: &[Player],
 ) -> f64 {
     match market_type {
-        MarketType::HeadToHead => unimplemented!(),
-        MarketType::TotalGoalsOverUnder(_) => unimplemented!(),
-        MarketType::CorrectScore => unimplemented!(),
+        MarketType::HeadToHead(_) => unimplemented!(),
+        MarketType::TotalGoalsOverUnder(_, _) => unimplemented!(),
+        MarketType::CorrectScore(_) => unimplemented!(),
         MarketType::DrawNoBet => unimplemented!(),
         MarketType::AnytimeGoalscorer => {
             isolate_anytime_goalscorer(outcome_type, prospects, player_lookup)
@@ -231,7 +237,6 @@ fn isolate_first_goalscorer(
                     .first_scorer
                     .map(|scorer| &player_lookup[scorer] == player)
                     .unwrap_or(false)
-                // prospect.first_scorer.filter(|scorer| &player_lookup[*scorer] == player).iter().count() == 1
             })
             .map(|(_, prob)| prob)
             .sum(),
