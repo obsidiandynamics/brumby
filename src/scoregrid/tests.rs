@@ -1,5 +1,5 @@
 use super::*;
-use crate::entity::Side;
+use crate::domain::Side;
 use crate::opt::{hypergrid_search, HypergridSearchConfig};
 use crate::probs::SliceExt;
 
@@ -74,12 +74,12 @@ pub fn interval() {
         INTERVALS as u8,
         0..INTERVALS as u8,
         u16::MAX,
-        ModelParams {
+        ScoringProbs {
             home_prob: 0.25,
             away_prob: 0.25,
             common_prob: 0.25,
         },
-        ModelParams {
+        ScoringProbs {
             home_prob: 0.25,
             away_prob: 0.25,
             common_prob: 0.25,
@@ -240,12 +240,12 @@ pub fn bivariate_binomial_interval_equivalence() {
         INTERVALS as u8,
         0..INTERVALS as u8,
         u16::MAX,
-        ModelParams {
+        ScoringProbs {
             home_prob: INTERVAL_HOME_PROB,
             away_prob: INTERVAL_AWAY_PROB,
             common_prob: INTERVAL_COMMON_PROB,
         },
-        ModelParams {
+        ScoringProbs {
             home_prob: INTERVAL_HOME_PROB,
             away_prob: INTERVAL_AWAY_PROB,
             common_prob: INTERVAL_COMMON_PROB,

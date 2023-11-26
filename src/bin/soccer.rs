@@ -7,32 +7,33 @@ use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
+use HAlign::Left;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
-use HAlign::Left;
 
-use brumby::entity::Player::Named;
-use brumby::entity::{MarketType, OutcomeType, Over, Period, Player, Side};
-use brumby::interval::{explore, isolate, IntervalConfig, ModelParams};
+use brumby::{factorial, poisson, scoregrid};
+use brumby::domain::{MarketType, OutcomeType, Over, Period, Player, Side};
+use brumby::domain::Player::Named;
+use brumby::interval::{explore, IntervalConfig, isolate, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
-    hypergrid_search, univariate_descent, HypergridSearchConfig, HypergridSearchOutcome,
+    hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent,
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
-use brumby::scoregrid::{from_correct_score, home_away_expectations, subtract};
-use brumby::soccer_data::{download_by_id, ContestSummary};
-use brumby::{factorial, poisson, scoregrid};
+use brumby::scoregrid::{from_correct_score, home_away_expectations};
+use brumby::soccer_data::{ContestSummary, download_by_id};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
-const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
+const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
 const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
-const MAX_TOTAL_GOALS: u16 = 8;
+const MAX_TOTAL_GOALS_HALF: u16 = 4;
+const MAX_TOTAL_GOALS_FULL: u16 = 8;
 const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -127,43 +128,84 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // first half
-    let h1_search_outcome = {
+    println!("*** fitting H1 ***");
+    let h1_search_outcome = fit_scoregrid_half(&[&h1_h2h, &h1_goals_ou]);
+
+    // second half
+    println!("*** fitting H2 ***");
+    let h2_search_outcome = fit_scoregrid_half(&[&h2_h2h, &h2_goals_ou]);
+
+    let ft_search_outcome = {
         let init_estimates = {
-            println!("*** H1: fitting bivariate poisson scoregrid ***");
+            println!("*** F/T: fitting bivariate poisson scoregrid ***");
             let start = Instant::now();
-            let search_outcome = fit_bivariate_poisson_scoregrid(&[&h1_h2h, &h1_goals_ou]);
+            let search_outcome = fit_bivariate_poisson_scoregrid(&[&ft_h2h, &ft_goals_ou], MAX_TOTAL_GOALS_FULL);
             let elapsed = start.elapsed();
-            println!("H1: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+            println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}", expectation_from_lambdas(&search_outcome.optimal_values));
             search_outcome
                 .optimal_values
                 .iter()
                 .map(|optimal_value| {
                     1.0 - poisson::univariate(
                         0,
-                        optimal_value / INTERVALS as f64 * 2.0,
+                        optimal_value / INTERVALS as f64,
                         &factorial::Calculator,
                     )
-                    // poisson::univariate(1, optimal_value / INTERVALS as f64, &factorial::Calculator)
                 })
                 .collect::<Vec<_>>()
         };
-        println!("H1: initial estimates: {init_estimates:?}");
+        println!("F/T: initial estimates: {init_estimates:?}");
 
-        println!("*** H1: fitting bivariate binomial scoregrid ***");
+        println!("*** F/T: fitting bivariate binomial scoregrid ***");
         let start = Instant::now();
         let search_outcome =
-            fit_bivariate_binomial_scoregrid(&[&h1_h2h, &h1_goals_ou], &init_estimates, (INTERVALS / 2) as u8);
+            fit_bivariate_binomial_scoregrid(&[&ft_h2h, &ft_goals_ou], &init_estimates, INTERVALS as u8, MAX_TOTAL_GOALS_FULL);
         // let search_outcome = fit_scoregrid(&[&correct_score]);
         let elapsed = start.elapsed();
-        println!("H1: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
         search_outcome
     };
 
-    let mut h1_scoregrid = allocate_scoregrid();
+    let mut adj_optimal_h1 = [0.0; 3];
+    let mut adj_optimal_h2 = [0.0; 3];
+    for (i, orig_h1) in h1_search_outcome.optimal_values.iter().enumerate() {
+        let orig_h2 = h2_search_outcome.optimal_values[i];
+        let ft = ft_search_outcome.optimal_values[i];
+        let avg_h1_h2 = (orig_h1 + orig_h2) / 2.0;
+        adj_optimal_h1[i] = orig_h1 / (avg_h1_h2 / ft);
+        adj_optimal_h2[i] = orig_h2 / (avg_h1_h2 / ft);
+    }
+    println!("adjusted optimal_h1={adj_optimal_h1:?}, optimal_h2={adj_optimal_h2:?}");
+    // let optimal_h1 = h1_search_outcome.optimal_values;
+    // let optimal_h2 = h2_search_outcome.optimal_values;
+
+    // let ft_gamma_sum = ft_search_outcome.optimal_values.sum();
+    // h1_search_outcome.optimal_values.normalise(ft_gamma_sum * 1.0);
+    // h2_search_outcome.optimal_values.normalise(ft_gamma_sum * 1.0);
+
+    let mut ft_scoregrid = allocate_scoregrid(MAX_TOTAL_GOALS_FULL);
+    // interval_scoregrid(
+    //     0..INTERVALS as u8,
+    //     ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+    //     ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+    //     &mut ft_scoregrid,
+    // );
+    interval_scoregrid(
+        0..INTERVALS as u8,
+        MAX_TOTAL_GOALS_FULL,
+        ScoringProbs::from(adj_optimal_h1.as_slice()),
+        ScoringProbs::from(adj_optimal_h2.as_slice()),
+        &mut ft_scoregrid,
+    );
+    // correct_score_scoregrid(&ft_correct_score, &mut ft_scoregrid);
+
+
+    let mut h1_scoregrid = allocate_scoregrid(MAX_TOTAL_GOALS_HALF);
     interval_scoregrid(
         0..(INTERVALS / 2) as u8,
-        ModelParams { home_prob: h1_search_outcome.optimal_values[0], away_prob: h1_search_outcome.optimal_values[1], common_prob: h1_search_outcome.optimal_values[2] },
-        ModelParams { home_prob: 0.0, away_prob: 0.0, common_prob: 0.0 },
+        MAX_TOTAL_GOALS_HALF,
+        ScoringProbs::from(adj_optimal_h1.as_slice()),
+        ScoringProbs { home_prob: 0.0, away_prob: 0.0, common_prob: 0.0 },
         &mut h1_scoregrid,
     );
 
@@ -199,45 +241,52 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Console::default().render(&h1_goals_ou_table)
     );
 
-    let ft_search_outcome = {
-        let init_estimates = {
-            println!("*** F/T: fitting bivariate poisson scoregrid ***");
-            let start = Instant::now();
-            let search_outcome = fit_bivariate_poisson_scoregrid(&[&ft_h2h, &ft_goals_ou]);
-            let elapsed = start.elapsed();
-            println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-            search_outcome
-                .optimal_values
-                .iter()
-                .map(|optimal_value| {
-                    1.0 - poisson::univariate(
-                        0,
-                        optimal_value / INTERVALS as f64,
-                        &factorial::Calculator,
-                    )
-                })
-                .collect::<Vec<_>>()
-        };
-        println!("F/T: initial estimates: {init_estimates:?}");
-
-        println!("*** F/T: fitting bivariate binomial scoregrid ***");
-        let start = Instant::now();
-        let search_outcome =
-            fit_bivariate_binomial_scoregrid(&[&ft_h2h, &ft_goals_ou], &init_estimates, INTERVALS as u8);
-        // let search_outcome = fit_scoregrid(&[&correct_score]);
-        let elapsed = start.elapsed();
-        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-        search_outcome
-    };
-
-    let mut ft_scoregrid = allocate_scoregrid();
+    let mut h2_scoregrid = allocate_scoregrid(MAX_TOTAL_GOALS_HALF);
+    // interval_scoregrid(
+    //     0..(INTERVALS / 2) as u8,
+    //     ModelParams { home_prob: h2_search_outcome.optimal_values[0], away_prob: h2_search_outcome.optimal_values[1], common_prob: h2_search_outcome.optimal_values[2] },
+    //     ModelParams { home_prob: 0.0, away_prob: 0.0, common_prob: 0.0 },
+    //     &mut h2_scoregrid,
+    // );
     interval_scoregrid(
-        0..INTERVALS as u8,
-        ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-        ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-        &mut ft_scoregrid,
+        (INTERVALS / 2) as u8..INTERVALS as u8,
+        MAX_TOTAL_GOALS_HALF,
+        ScoringProbs { home_prob: 0.0, away_prob: 0.0, common_prob: 0.0 },
+        ScoringProbs::from(adj_optimal_h2.as_slice()),
+        &mut h2_scoregrid,
     );
-    // let scoregrid = correct_score_scoregrid(&correct_score);
+
+    let fitted_h2_h2h = frame_prices(&h2_scoregrid, &h2_h2h.outcomes, &h2_h2h.market.overround);
+    let fitted_h2_h2h = LabelledMarket {
+        market_type: MarketType::HeadToHead(Period::SecondHalf),
+        outcomes: h2_h2h.outcomes.clone(),
+        market: fitted_h2_h2h,
+    };
+    let h2_h2h_table = print_market(&fitted_h2_h2h);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h2_h2h.market_type,
+        fitted_h2_h2h.market.probs.sum(),
+        Console::default().render(&h2_h2h_table)
+    );
+
+    let fitted_h2_goals_ou = frame_prices(
+        &h2_scoregrid,
+        &h2_goals_ou.outcomes,
+        &h2_goals_ou.market.overround,
+    );
+    let fitted_h2_goals_ou = LabelledMarket {
+        market_type: MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
+        outcomes: h2_goals_ou.outcomes.clone(),
+        market: fitted_h2_goals_ou,
+    };
+    let h2_goals_ou_table = print_market(&fitted_h2_goals_ou);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h2_goals_ou.market_type,
+        fitted_h2_goals_ou.market.probs.sum(),
+        Console::default().render(&h2_goals_ou_table)
+    );
 
     let fitted_ft_h2h = frame_prices(&ft_scoregrid, &ft_h2h.outcomes, &ft_h2h.market.overround);
     let fitted_ft_h2h = LabelledMarket {
@@ -289,44 +338,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Console::default().render(&ft_correct_score_table),
     );
 
-    let mut future_scoregrid = allocate_scoregrid();
-    correct_score_scoregrid(&ft_correct_score, &mut future_scoregrid);
-    let h2_scoregrid = subtract(&ft_scoregrid, &h1_scoregrid);
+    // let mut future_scoregrid = allocate_scoregrid();
+    // correct_score_scoregrid(&ft_correct_score, &mut future_scoregrid);
+    // let h2_scoregrid = subtract(&ft_scoregrid, &h1_scoregrid);
     // println!("ft_scoregrid.sum={}", ft_scoregrid.flatten().sum());
     // println!("h1_scoregrid.sum={}", h1_scoregrid.flatten().sum());
     // println!("h2_scoregrid.sum={}", h2_scoregrid.flatten().sum());
-    //TODO replace ht with h2
-    let fitted_h2_h2h = frame_prices(&h2_scoregrid, &h2_h2h.outcomes, &h2_h2h.market.overround);
-    let fitted_h2_h2h = LabelledMarket {
-        market_type: MarketType::HeadToHead(Period::SecondHalf),
-        outcomes: h2_h2h.outcomes.clone(),
-        market: fitted_h2_h2h,
-    };
-    let h2_h2h_table = print_market(&fitted_h2_h2h);
-    println!(
-        "{:?}: [Σ={:.3}]\n{}",
-        fitted_h2_h2h.market_type,
-        fitted_h2_h2h.market.probs.sum(),
-        Console::default().render(&h2_h2h_table)
-    );
 
-    let fitted_h2_goals_ou = frame_prices(
-        &h2_scoregrid,
-        &h2_goals_ou.outcomes,
-        &h2_goals_ou.market.overround,
-    );
-    let fitted_h2_goals_ou = LabelledMarket {
-        market_type: MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
-        outcomes: h2_goals_ou.outcomes.clone(),
-        market: fitted_h2_goals_ou,
-    };
-    let h2_goals_ou_table = print_market(&fitted_h2_goals_ou);
-    println!(
-        "{:?}: [Σ={:.3}]\n{}",
-        fitted_h2_goals_ou.market_type,
-        fitted_h2_goals_ou.market.probs.sum(),
-        Console::default().render(&h2_goals_ou_table)
-    );
 
     let home_away_expectations = home_away_expectations(&ft_scoregrid);
     println!(
@@ -366,7 +384,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 };
                 let init_estimate = first_gs.market.probs[index] / side_ratio;
                 let player_search_outcome = fit_first_goalscorer(
-                    &ft_search_outcome.optimal_values,
+                    // &ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                    //  &ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                    &ScoringProbs { home_prob: adj_optimal_h1[0], away_prob: adj_optimal_h1[1], common_prob: adj_optimal_h1[2] },
+                    &ScoringProbs { home_prob: adj_optimal_h2[0], away_prob: adj_optimal_h2[1], common_prob: adj_optimal_h2[2] },
                     player,
                     init_estimate,
                     first_gs.market.probs[index],
@@ -386,9 +407,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                h1_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                h2_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                max_total_goals: MAX_TOTAL_GOALS,
+                // h1_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                h1_probs: ScoringProbs { home_prob: adj_optimal_h1[0], away_prob: adj_optimal_h1[1], common_prob: adj_optimal_h1[2] },
+                h2_probs: ScoringProbs { home_prob: adj_optimal_h2[0], away_prob: adj_optimal_h2[1], common_prob: adj_optimal_h2[2] },
+                max_total_goals: MAX_TOTAL_GOALS_FULL,
                 players: vec![(player.clone(), *prob)],
             },
             0..INTERVALS as u8,
@@ -439,9 +462,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                h1_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                h2_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                max_total_goals: MAX_TOTAL_GOALS,
+                // h1_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
+                h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
+                max_total_goals: MAX_TOTAL_GOALS_FULL,
                 players: vec![(player.clone(), *prob)],
             },
             0..INTERVALS as u8,
@@ -494,6 +519,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let market_errors = [
         (&h1_h2h, &fitted_h1_h2h),
         (&h1_goals_ou, &fitted_h1_goals_ou),
+        (&h2_h2h, &fitted_h2_h2h),
+        (&h2_goals_ou, &fitted_h2_goals_ou),
         (&ft_h2h, &fitted_ft_h2h),
         (&ft_goals_ou, &fitted_ft_goals_ou),
         (&ft_correct_score, &fitted_ft_correct_score),
@@ -528,6 +555,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let table_overrounds = print_overrounds(&[
         fitted_h1_h2h,
         fitted_h1_goals_ou,
+        fitted_h2_h2h,
+        fitted_h2_goals_ou,
         fitted_ft_h2h,
         fitted_ft_goals_ou,
         fitted_ft_correct_score,
@@ -573,12 +602,41 @@ pub struct LabelledMarket {
     market: Market,
 }
 
+fn fit_scoregrid_half(markets: &[&LabelledMarket]) -> HypergridSearchOutcome {
+    let init_estimates = {
+        let start = Instant::now();
+        let search_outcome = fit_bivariate_poisson_scoregrid(markets, MAX_TOTAL_GOALS_HALF);
+        let elapsed = start.elapsed();
+        println!("biv-poisson: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}", expectation_from_lambdas(&search_outcome.optimal_values));
+        search_outcome
+            .optimal_values
+            .iter()
+            .map(|optimal_value| {
+                1.0 - poisson::univariate(
+                    0,
+                    optimal_value / INTERVALS as f64 * 2.0,
+                    &factorial::Calculator,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    println!("initial estimates: {init_estimates:?}");
+
+    let start = Instant::now();
+    let search_outcome =
+        fit_bivariate_binomial_scoregrid(markets, &init_estimates, (INTERVALS / 2) as u8, MAX_TOTAL_GOALS_HALF);
+    let elapsed = start.elapsed();
+    println!("biv-binomial: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+    search_outcome
+}
+
 fn fit_bivariate_binomial_scoregrid(
     markets: &[&LabelledMarket],
     init_estimates: &[f64],
     intervals: u8,
+    max_total_goals: u16
 ) -> HypergridSearchOutcome {
-    let mut scoregrid = allocate_scoregrid();
+    let mut scoregrid = allocate_scoregrid(max_total_goals);
     let bounds = init_estimates
         .iter()
         .map(|&estimate| (estimate * 0.67)..=(estimate * 1.5))
@@ -604,8 +662,8 @@ fn fit_bivariate_binomial_scoregrid(
     )
 }
 
-fn fit_bivariate_poisson_scoregrid(markets: &[&LabelledMarket]) -> HypergridSearchOutcome {
-    let mut scoregrid = allocate_scoregrid();
+fn fit_bivariate_poisson_scoregrid(markets: &[&LabelledMarket], max_total_goals: u16) -> HypergridSearchOutcome {
+    let mut scoregrid = allocate_scoregrid(max_total_goals);
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 10,
@@ -634,7 +692,8 @@ fn scoregrid_error(markets: &[&LabelledMarket], scoregrid: &Matrix<f64>) -> f64 
 }
 
 fn fit_first_goalscorer(
-    optimal_scoring_probs: &[f64],
+    h1_probs: &ScoringProbs,
+    h2_probs: &ScoringProbs,
     player: &Player,
     init_estimate: f64,
     expected_prob: f64,
@@ -651,9 +710,9 @@ fn fit_first_goalscorer(
             let exploration = explore(
                 &IntervalConfig {
                     intervals: INTERVALS as u8,
-                    h1_params: ModelParams { home_prob: optimal_scoring_probs[0], away_prob: optimal_scoring_probs[1], common_prob: optimal_scoring_probs[2] },
-                    h2_params: ModelParams { home_prob: optimal_scoring_probs[0], away_prob: optimal_scoring_probs[1], common_prob: optimal_scoring_probs[2] },
-                    max_total_goals: MAX_TOTAL_GOALS,
+                    h1_probs: h1_probs.clone(),
+                    h2_probs: h2_probs.clone(),
+                    max_total_goals: MAX_TOTAL_GOALS_FULL,
                     players: vec![(player.clone(), value)],
                 },
                 0..INTERVALS as u8,
@@ -686,20 +745,26 @@ impl ErrorType {
     }
 }
 
+fn expectation_from_lambdas(lambdas: &[f64]) -> f64 {
+    assert_eq!(3, lambdas.len());
+    lambdas[0] + lambdas[1] + 2.0 * lambdas[2]
+}
+
 /// Intervals.
 fn interval_scoregrid(
     explore_intervals: Range<u8>,
-    h1_params: ModelParams,
-    h2_params: ModelParams,
+    max_total_goals: u16,
+    h1_probs: ScoringProbs,
+    h2_probs: ScoringProbs,
     scoregrid: &mut Matrix<f64>,
 ) {
     scoregrid.fill(0.0);
     scoregrid::from_interval(
         INTERVALS as u8,
         explore_intervals,
-        MAX_TOTAL_GOALS,
-        h1_params,
-        h2_params,
+        max_total_goals,
+        h1_probs,
+        h2_probs,
         scoregrid,
     );
     // scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -763,8 +828,8 @@ fn correct_score_scoregrid(correct_score: &LabelledMarket, scoregrid: &mut Matri
     );
 }
 
-fn allocate_scoregrid() -> Matrix<f64> {
-    let dim = usize::min(MAX_TOTAL_GOALS as usize, INTERVALS) + 1;
+fn allocate_scoregrid(max_total_goals: u16) -> Matrix<f64> {
+    let dim = usize::min(max_total_goals as usize, INTERVALS) + 1;
     Matrix::allocate(dim, dim)
 }
 

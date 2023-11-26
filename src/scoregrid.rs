@@ -5,8 +5,8 @@ use strum_macros::{EnumCount, EnumIter};
 use multinomial::binomial;
 
 use crate::comb::{count_permutations, pick};
-use crate::entity::{OutcomeType, Score, Side};
-use crate::interval::{explore, IntervalConfig, ModelParams};
+use crate::domain::{OutcomeType, Score, Side};
+use crate::interval::{explore, IntervalConfig, ScoringProbs};
 use crate::linear::matrix::Matrix;
 use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
@@ -170,16 +170,16 @@ pub fn from_interval(
     intervals: u8,
     explore_intervals: Range<u8>,
     max_total_goals: u16,
-    h1_params: ModelParams,
-    h2_params: ModelParams,
+    h1_params: ScoringProbs,
+    h2_params: ScoringProbs,
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
     let exploration = explore(
         &IntervalConfig {
             intervals,
-            h1_params,
-            h2_params,
+            h1_probs: h1_params,
+            h2_probs: h2_params,
             max_total_goals,
             players: vec![],
         },
