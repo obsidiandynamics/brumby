@@ -1,6 +1,6 @@
 //! Combinatorics.
 
-#[inline]
+#[inline(always)]
 pub fn pick(cardinalities: &[usize], permutation: u64, ordinals: &mut [usize]) {
     let mut residual = permutation;
     for (index, &cardinality) in cardinalities.iter().enumerate() {
@@ -65,7 +65,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn is_unique_quadratic(elements: &[usize]) -> bool {
     for (index, element) in elements.iter().enumerate() {
         for other in &elements[index + 1..] {
@@ -77,7 +77,7 @@ pub fn is_unique_quadratic(elements: &[usize]) -> bool {
     true
 }
 
-#[inline]
+#[inline(always)]
 pub fn is_unique_linear(elements: &[usize], bitmap: &mut [bool]) -> bool {
     bitmap.fill(false);
     for &element in elements {
