@@ -32,10 +32,23 @@ impl From<usize> for GoalEvent {
     }
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Score {
+    pub home: u8,
+    pub away: u8,
+}
+impl Score {
+    pub fn new(home: u8, away: u8) -> Self {
+        Self {
+            home,
+            away,
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct ScoreOutcome {
-    pub home_goals: usize,
-    pub away_goals: usize,
+pub struct ProbableScoreOutcome {
+    pub score: Score,
     pub probability: f64
 }
 
@@ -71,7 +84,7 @@ impl<'a> Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = ScoreOutcome;
+    type Item = ProbableScoreOutcome;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.permutation < self.fixtures.permutations {
@@ -100,9 +113,11 @@ impl<'a> Iterator for Iter<'a> {
                 }
             }
             self.permutation += 1;
-            Some(ScoreOutcome {
-                home_goals,
-                away_goals,
+            Some(ProbableScoreOutcome {
+                score: Score {
+                    home: home_goals,
+                    away: away_goals,
+                },
                 probability,
             })
         } else {
@@ -129,57 +144,103 @@ impl IterFixtures {
     }
 }
 
-pub fn populate_matrix(iter: Iter, scoregrid: &mut Matrix<f64>) {
+pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     debug_assert_eq!(iter.fixtures.cardinalities.len() + 1, scoregrid.rows());
     debug_assert_eq!(iter.fixtures.cardinalities.len() + 1, scoregrid.cols());
 
     for outcome in iter {
-        scoregrid[(outcome.home_goals, outcome.away_goals)] += outcome.probability;
+        scoregrid[(outcome.score.home as usize, outcome.score.away as usize)] += outcome.probability;
     }
 }
 
-// pub fn enumerate_score_outcomes(intervals: usize, interval_home_prob: f64, interval_away_prob: f64) -> Vec<ScoreOutcome> {
-//     let cardinalities = vec![4; intervals];
-//     let permutations = count_permutations(&cardinalities);
-//     let mut ordinals = cardinalities.clone();
-//     let mut outcomes = Vec::with_capacity(permutations as usize);
+// pub fn from_independent_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
 //
-//     let both_prob = interval_home_prob * interval_away_prob;
-//     let neither_prob = 1.0 - interval_home_prob - interval_away_prob - both_prob;
-//     for permutation in 0..permutations {
-//         pick(&cardinalities, permutation, &mut ordinals);
-//         let mut probability = 1.0;
-//         let (mut home_goals, mut away_goals) = (0, 0);
-//         for &ordinal in ordinals.iter() {
-//             let goal_event = GoalEvent::from(ordinal);
-//             match goal_event {
-//                 GoalEvent::Neither => {
-//                     probability *= neither_prob;
-//                 }
-//                 GoalEvent::Home => {
-//                     probability *= interval_home_prob;
-//                     home_goals += 1;
-//                 }
-//                 GoalEvent::Away => {
-//                     probability *= interval_away_prob;
-//                     away_goals += 1;
-//                 }
-//                 GoalEvent::Both => {
-//                     probability *= both_prob;
-//                     home_goals += 1;
-//                     away_goals += 1;
-//                 }
-//             }
-//         }
-//         outcomes.push(ScoreOutcome {
-//             home_goals,
-//             away_goals,
-//             probability,
-//         })
-//     }
-//
-//     outcomes
 // }
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Outcome {
+    Win(Side),
+    Draw,
+    GoalsUnder(u8),
+    GoalsOver(u8),
+    CorrectScore(Score)
+}
+impl Outcome {
+    pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
+        match self {
+            Outcome::Win(side) => Self::gather_win(side, scoregrid),
+            Outcome::Draw => Self::gather_draw(scoregrid),
+            Outcome::GoalsUnder(goals) => Self::gather_goals_under(*goals, scoregrid),
+            Outcome::GoalsOver(goals) => Self::gather_goals_over(*goals, scoregrid),
+            Outcome::CorrectScore(score) => Self::gather_correct_score(score, scoregrid),
+        }
+    }
+
+    fn gather_win(side: &Side, scoregrid: &Matrix<f64>) -> f64 {
+        let mut prob = 0.0;
+        match side {
+            Side::Home => {
+                for row in 1..scoregrid.rows() {
+                    for col in 0..row {
+                        prob += scoregrid[(row, col)];
+                    }
+                }
+            }
+            Side::Away => {
+                for col in 1..scoregrid.cols() {
+                    for row in 0..col {
+                        prob += scoregrid[(row, col)];
+                    }
+                }
+            }
+        }
+        prob
+    }
+
+    fn gather_draw(scoregrid: &Matrix<f64>) -> f64 {
+        let mut prob = 0.0;
+        for index in 0..scoregrid.rows() {
+            prob += scoregrid[(index, index)];
+        }
+        prob
+    }
+
+    fn gather_goals_over(goals: u8, scoregrid: &Matrix<f64>) -> f64 {
+        let goals = goals as usize;
+        let mut prob = 0.0;
+        for row in 0..scoregrid.rows() {
+            for col in 0..scoregrid.cols() {
+                if row + col > goals {
+                    prob += scoregrid[(row, col)];
+                }
+            }
+        }
+        prob
+    }
+
+    fn gather_goals_under(goals: u8, scoregrid: &Matrix<f64>) -> f64 {
+        let goals = goals as usize;
+        let mut prob = 0.0;
+        for row in 0..scoregrid.rows() {
+            for col in 0..scoregrid.cols() {
+                if row + col < goals {
+                    prob += scoregrid[(row, col)];
+                }
+            }
+        }
+        prob
+    }
+
+    fn gather_correct_score(score: &Score, scoregrid: &Matrix<f64>) -> f64 {
+        scoregrid[(score.home as usize, score.away as usize)]
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Side {
+    Home,
+    Away
+}
 
 #[cfg(test)]
 mod tests;

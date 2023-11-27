@@ -1,7 +1,11 @@
 _help:
     @just --list
 
-# produce the prices for a race (singles and multis)
+# produce prices for a soccer match (singles and multis)
+soccer *ARGS:
+    cargo run --release --bin soccer -- {{ARGS}}
+
+# produce prices for a race (singles and multis)
 prices *ARGS:
     cargo run --release --bin prices -- {{ARGS}}
 
