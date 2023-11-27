@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
-use crate::market::{Market, Overround};
+use crate::market::{Market, Overround, PriceBounds};
 use crate::model::cf::Coefficients;
 use crate::model::fit::{FitOptions, PlaceFitOutcome};
 use crate::print::DerivedPrice;
@@ -18,7 +18,12 @@ pub mod cf;
 pub mod fit;
 
 pub const PODIUM: usize = 4;
-pub const LOWEST_PROBABILITY: f64 = 1e-6;
+pub const LOWEST_MULTI_PROBABILITY: f64 = 1e-6;
+pub const MIN_MULTI_PRICE: f64 = 1.04;
+pub const MAX_MULTI_PRICE: f64 = 10001.0;
+
+pub const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=201.0;
+pub const MULTI_PRICE_BOUNDS: PriceBounds = 1.04..=10_001.0;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WinPlace {
@@ -251,6 +256,7 @@ impl Fitter {
                 &weighted_probs,
                 &wp.place,
                 wp.places_paying - 1,
+                &SINGLE_PRICE_BOUNDS
             )?;
             debug!(
                 "calibration complete: optimal MSRE: {}, RMSRE: {}, {} steps took: {:.3}s",
@@ -341,7 +347,7 @@ fn derive_prices(
         .map(|(rank, probs)| {
             let overround = &overrounds[rank];
             let probs = probs.to_vec();
-            Market::frame(overround, probs)
+            Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
         })
         .collect();
     TopN { markets }
@@ -376,8 +382,8 @@ fn derive_multi(
             .with_trials(mc_trials)
             .with_probs(Capture::Borrowed(probs));
         let frac = engine.simulate(selections);
-        let probability = f64::max(LOWEST_PROBABILITY, frac.quotient());
-        let price = market::multiply_capped(1.0 / probability, overround);
+        let probability = f64::max(LOWEST_MULTI_PROBABILITY, frac.quotient());
+        let price = market::multiply_capped(1.0 / probability, overround, &MULTI_PRICE_BOUNDS);
         Ok(DerivedPrice { probability, price })
     })
 }

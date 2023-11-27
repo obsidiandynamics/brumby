@@ -2,6 +2,8 @@ use super::*;
 use crate::testing::assert_slice_f64_relative;
 use assert_float_eq::*;
 
+const BOUNDS: PriceBounds = 1.04..=10_001.0;
+
 #[test]
 fn fit_multiplicative() {
     {
@@ -161,6 +163,7 @@ fn frame_multiplicative() {
                 value: 1.0,
             },
             probs,
+            &BOUNDS
         );
         assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
     }
@@ -172,6 +175,7 @@ fn frame_multiplicative() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         assert_slice_f64_relative(&[9.0909, 4.5454, 3.0303, 2.273], &market.prices, 0.001);
     }
@@ -183,6 +187,7 @@ fn frame_multiplicative() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         assert_slice_f64_relative(
             &[9.0909, 4.5454, 3.0303, 2.273, f64::INFINITY],
@@ -198,6 +203,7 @@ fn frame_multiplicative() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         assert_slice_f64_relative(&[4.5454, 2.2727, 1.5152, 1.1364], &market.prices, 0.001);
     }
@@ -213,6 +219,7 @@ fn frame_power() {
                 value: 1.0,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
@@ -225,6 +232,7 @@ fn frame_power() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[8.4319, 4.4381, 3.0489, 2.3359], &market.prices, 0.001);
@@ -237,6 +245,7 @@ fn frame_power() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(
@@ -253,6 +262,7 @@ fn frame_power() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[4.2159, 2.219, 1.5244, 1.168], &market.prices, 0.001);
@@ -269,6 +279,7 @@ fn frame_odds_ratio() {
                 value: 1.0,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
@@ -281,6 +292,7 @@ fn frame_odds_ratio() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[8.8335, 4.4816, 3.0309, 2.3056], &market.prices, 0.001);
@@ -293,6 +305,7 @@ fn frame_odds_ratio() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(
@@ -309,6 +322,7 @@ fn frame_odds_ratio() {
                 value: 1.1,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(&[4.1132, 2.1675, 1.5189, 1.1946], &market.prices, 0.001);
@@ -321,6 +335,7 @@ fn frame_odds_ratio() {
                 value: 3.6,
             },
             probs,
+            &BOUNDS
         );
         println!("market: {:?}", market);
         assert_slice_f64_relative(

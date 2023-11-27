@@ -11,7 +11,7 @@ use mc::MonteCarloEngine;
 
 use crate::capture::Capture;
 use crate::linear::matrix::Matrix;
-use crate::market::{Market, MarketPrice, Overround};
+use crate::market::{Market, MarketPrice, Overround, PriceBounds};
 use crate::mc::DilatedProbs;
 use crate::model::cf::{Coefficients, Factor};
 use crate::probs::SliceExt;
@@ -76,7 +76,7 @@ pub struct AllFitOutcome {
     pub fitted_probs: Matrix<f64>,
 }
 
-pub fn fit_all(options: &FitOptions, markets: &[Market]) -> Result<AllFitOutcome, anyhow::Error> {
+pub fn fit_all(options: &FitOptions, markets: &[Market], price_bounds: &PriceBounds) -> Result<AllFitOutcome, anyhow::Error> {
     options.validate()?;
     for market in markets {
         market.validate()?;
@@ -103,6 +103,7 @@ pub fn fit_all(options: &FitOptions, markets: &[Market]) -> Result<AllFitOutcome
                 options.open_loop_exponent,
                 &market.overround,
                 &market.prices,
+                price_bounds
             );
             weighted_probs = outcome.optimal_probs.clone();
             outcome
@@ -163,6 +164,7 @@ pub fn fit_place(
     weighted_probs: &Matrix<f64>,
     place_market: &Market,
     place_rank: usize,
+    price_bounds: &PriceBounds
 ) -> Result<PlaceFitOutcome, anyhow::Error> {
     options.validate()?;
     let num_runners = place_market.probs.len();
@@ -178,6 +180,7 @@ pub fn fit_place(
         options.open_loop_exponent,
         &place_market.overround,
         &place_market.prices,
+        price_bounds
     );
     Ok(PlaceFitOutcome {
         stats: outcome.stats,
@@ -227,6 +230,7 @@ fn fit_individual(
     open_loop_exponent: f64,
     overround: &Overround,
     sample_prices: &[f64],
+    price_bounds: &PriceBounds
 ) -> IndividualFitOutcome {
     let start_time = Instant::now();
     let podium_places = weighted_probs.rows();
@@ -251,7 +255,7 @@ fn fit_individual(
             .iter()
             .map(|&count| count as f64 / engine.trials() as f64)
             .collect();
-        let market = Market::frame(overround, fitted_probs);
+        let market = Market::frame(overround, fitted_probs, price_bounds);
         trace!("fitted prices:  {:?}", market.prices);
         trace!("sample prices: {sample_prices:?}");
         let msre = compute_msre(sample_prices, &market.prices, &FITTED_PRICE_RANGES[rank]);

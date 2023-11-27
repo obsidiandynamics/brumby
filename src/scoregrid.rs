@@ -1,6 +1,8 @@
 use ordinalizer::Ordinal;
+
 use crate::comb::{count_permutations, pick};
 use crate::linear::matrix::Matrix;
+use crate::probs::SliceExt;
 
 #[derive(Debug, Ordinal)]
 pub enum GoalEvent {
@@ -32,7 +34,7 @@ impl From<usize> for GoalEvent {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Score {
     pub home: u8,
     pub away: u8,
@@ -157,7 +159,12 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
 //
 // }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
+    scoregrid[(0, 0)] += additive;
+    scoregrid.flatten_mut().normalise(1.0);
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Outcome {
     Win(Side),
     Draw,
@@ -236,7 +243,7 @@ impl Outcome {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {
     Home,
     Away

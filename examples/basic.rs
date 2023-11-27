@@ -1,5 +1,5 @@
 use brumby::capture::Capture;
-use brumby::{market, mc};
+use brumby::{market, mc, model};
 use brumby::mc::DilatedProbs;
 use brumby::probs::SliceExt;
 use brumby::selection::{Rank, Runner};
@@ -59,6 +59,6 @@ fn main() {
         "probability of {selections:?}: {}, fair price: {:.3}, market odds: {:.3}",
         frac.quotient(),
         1.0 / frac.quotient(),
-        market::multiply_capped(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32))
+        market::multiply_capped(1.0 / frac.quotient(), win_overround.powi(selections.len() as i32), &model::MULTI_PRICE_BOUNDS)
     );
 }

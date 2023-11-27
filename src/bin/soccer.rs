@@ -1,17 +1,18 @@
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
-use brumby::market::{Market, Overround, OverroundMethod};
+use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome};
 use brumby::scoregrid;
 use brumby::scoregrid::{Iter, IterFixtures, Outcome, Score, ScoreOutcomeSpace, Side};
+use stanza::renderer::console::Console;
+use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use std::collections::HashMap;
 use HAlign::Left;
-use stanza::renderer::console::Console;
-use stanza::renderer::Renderer;
 
-const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Power;
+const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
+const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=201.0;
 
 pub fn main() {
     let correct_score_prices = HashMap::from([
@@ -65,14 +66,6 @@ pub fn main() {
     let goals_ou_prices =
         HashMap::from([(Outcome::GoalsOver(2), 2.47), (Outcome::GoalsUnder(3), 1.5)]);
 
-    // let h2h_outcomes = h2h_market.keys().cloned().collect::<Vec<_>>();
-    // let h2h_prices = h2h_market.values().copied().collect::<Vec<_>>();
-    // let h2h_probs = Market::fit(&OverroundMethod::OddsRatio, h2h_prices, 1.0);
-    //
-    // let goals_ou_outcomes = goals_ou_market.keys().cloned().collect::<Vec<_>>();
-    // let goals_ou_prices = goals_ou_market.values().copied().collect::<Vec<_>>();
-    // let goals_ou_probs = Market::fit(&OverroundMethod::OddsRatio, goals_ou_prices, 1.0);
-
     let h2h = fit_market(&h2h_prices);
     println!("h2h: {h2h:?}");
     let goals_ou = fit_market(&goals_ou_prices);
@@ -104,21 +97,29 @@ pub fn main() {
     });
     println!("Goals O/U:\n{}", Console::default().render(&table_goals_ou));
 
-    let fitted_correct_score = frame_prices(&scoregrid, &correct_score.outcomes, &correct_score.market.overround);
+    let fitted_correct_score = frame_prices(
+        &scoregrid,
+        &correct_score.outcomes,
+        &correct_score.market.overround,
+    );
     let table_correct_score = print_market(&LabelledMarket {
         outcomes: correct_score.outcomes,
         market: fitted_correct_score,
     });
-    println!("Correct score:\n{}", Console::default().render(&table_correct_score));
+    println!(
+        "Correct score:\n{}",
+        Console::default().render(&table_correct_score)
+    );
 }
 
 fn fit_market(map: &HashMap<Outcome, f64>) -> LabelledMarket {
-    let mut outcomes = Vec::with_capacity(map.len());
-    let mut prices = Vec::with_capacity(map.len());
-    for (outcome, &price) in map {
-        outcomes.push(outcome.clone());
-        prices.push(price);
-    }
+    let mut entries = map.iter().collect::<Vec<_>>();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let outcomes = entries
+        .iter()
+        .map(|(outcome, _)| (*outcome).clone())
+        .collect::<Vec<_>>();
+    let prices = entries.iter().map(|(_, &price)| price).collect::<Vec<_>>();
     let market = Market::fit(&OVERROUND_METHOD, prices, 1.0);
     LabelledMarket { outcomes, market }
 }
@@ -133,7 +134,7 @@ fn fit_scoregrid(h2h: &LabelledMarket, goals_ou: &LabelledMarket) -> HypergridSe
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 10,
-            acceptable_residual: 1e-9,
+            acceptable_residual: 1e-6,
             bounds: Capture::Owned(vec![0.0..=0.5, 0.0..=0.5]),
             resolution: 10,
         },
@@ -164,6 +165,8 @@ fn create_scoregrid(interval_home_prob: f64, interval_away_prob: f64) -> Matrix<
     let iter = Iter::new(&space, &mut fixtures);
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     scoregrid::from_iterator(iter, &mut scoregrid);
+    scoregrid::inflate_zero(0.035, &mut scoregrid);
+    // scoregrid::inflate_zero(0.02, &mut scoregrid);
     scoregrid
 }
 
@@ -171,8 +174,8 @@ fn frame_prices(scoregrid: &Matrix<f64>, outcomes: &[Outcome], overround: &Overr
     let probs = outcomes
         .iter()
         .map(|outcome| outcome.gather(scoregrid))
-        .collect::<Vec<_>>();
-    Market::frame(overround, probs)
+        .collect();
+    Market::frame(overround, probs, &SINGLE_PRICE_BOUNDS)
 }
 
 pub fn print_market(market: &LabelledMarket) -> Table {

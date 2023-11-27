@@ -14,6 +14,7 @@ use tracing::{debug, info};
 use brumby::data::{download_by_id, EventDetailExt, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
+use brumby::model;
 use brumby::model::{fit, PODIUM, TopN};
 use brumby::model::fit::compute_msre;
 use brumby::print::{tabulate_derived_prices, tabulate_prices, tabulate_values};
@@ -83,6 +84,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             / sample_overrounds[0].value,
                     },
                     implied_probs.clone(),
+                    &model::SINGLE_PRICE_BOUNDS
                 )
             })
             .collect()
