@@ -1,6 +1,7 @@
 use ordinalizer::Ordinal;
 
 use crate::comb::{count_permutations, pick};
+use crate::{factorial, poisson};
 use crate::linear::matrix::Matrix;
 use crate::probs::SliceExt;
 
@@ -155,9 +156,38 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     }
 }
 
-// pub fn from_independent_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
-//
-// }
+pub fn from_univariate_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
+    let factorial = factorial::Calculator;
+    for home_goals in 0..scoregrid.rows() {
+        for away_goals in 0..scoregrid.cols() {
+            let home_prob = poisson::univariate(home_goals as u8, home_rate, &factorial);
+            let away_prob = poisson::univariate(away_goals as u8, away_rate, &factorial);
+            scoregrid[(home_goals, away_goals)] = home_prob * away_prob;
+        }
+    }
+}
+
+pub fn from_bivariate_poisson(home_rate: f64, away_rate: f64, common: f64, scoregrid: &mut Matrix<f64>) {
+    let factorial = factorial::Calculator;
+    for home_goals in 0..scoregrid.rows() {
+        for away_goals in 0..scoregrid.cols() {
+            scoregrid[(home_goals, away_goals)] = poisson::bivariate(home_goals as u8, away_goals as u8, home_rate, away_rate, common, &factorial);
+        }
+    }
+}
+
+pub fn from_binomial(interval_home_prob: f64, interval_away_prob: f64, scoregrid: &mut Matrix<f64>) {
+    let factorial = factorial::Calculator;
+    let home_intervals = scoregrid.rows() as u8 - 1;
+    let away_intervals = scoregrid.cols() as u8 - 1;
+    for home_goals in 0..=home_intervals {
+        for away_goals in 0..=away_intervals {
+            let home_prob = factorial::binomial(home_intervals, home_goals, interval_home_prob, &factorial);
+            let away_prob = factorial::binomial(away_intervals, away_goals, interval_away_prob, &factorial);
+            scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
+        }
+    }
+}
 
 pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid[(0, 0)] += additive;
