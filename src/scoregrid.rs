@@ -5,6 +5,7 @@ use multinomial::binomial;
 use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
 use crate::linear::matrix::Matrix;
+use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
 
 #[derive(Debug, Ordinal)]
@@ -58,29 +59,23 @@ pub struct ProbableScoreOutcome {
 pub struct ScoreOutcomeSpace {
     pub interval_home_prob: f64,
     pub interval_away_prob: f64,
+    pub interval_common_prob: f64,
 }
 
 pub struct Iter<'a> {
+    space: &'a ScoreOutcomeSpace,
     fixtures: &'a mut IterFixtures,
     permutation: u64,
-    neither_prob: f64,
-    home_only_prob: f64,
-    away_only_prob: f64,
-    both_prob: f64,
+    interval_neither_prob: f64,
 }
 impl<'a> Iter<'a> {
     pub fn new(space: &'a ScoreOutcomeSpace, fixtures: &'a mut IterFixtures) -> Self {
-        let both_prob = space.interval_home_prob * space.interval_away_prob;
-        let home_only_prob = space.interval_home_prob * (1.0 - space.interval_away_prob);
-        let away_only_prob = space.interval_away_prob * (1.0 - space.interval_home_prob);
-        let neither_prob = 1.0 - home_only_prob - away_only_prob - both_prob;
+        let interval_neither_prob = 1.0 - space.interval_home_prob - space.interval_away_prob - space.interval_common_prob;
         Self {
+            space,
             fixtures,
             permutation: 0,
-            neither_prob,
-            home_only_prob,
-            away_only_prob,
-            both_prob,
+            interval_neither_prob,
         }
     }
 }
@@ -101,18 +96,18 @@ impl<'a> Iterator for Iter<'a> {
                 let goal_event = GoalEvent::from(ordinal);
                 match goal_event {
                     GoalEvent::Neither => {
-                        probability *= self.neither_prob;
+                        probability *= self.interval_neither_prob;
                     }
                     GoalEvent::Home => {
-                        probability *= self.home_only_prob;
+                        probability *= self.space.interval_home_prob;
                         home_goals += 1;
                     }
                     GoalEvent::Away => {
-                        probability *= self.away_only_prob;
+                        probability *= self.space.interval_away_prob;
                         away_goals += 1;
                     }
                     GoalEvent::Both => {
-                        probability *= self.both_prob;
+                        probability *= self.space.interval_common_prob;
                         home_goals += 1;
                         away_goals += 1;
                     }
@@ -160,6 +155,25 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     }
 }
 
+
+pub fn from_interval(
+    interval_home_prob: f64,
+    interval_away_prob: f64,
+    interval_common_prob: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
+    assert_eq!(scoregrid.rows(), scoregrid.cols());
+    let intervals = scoregrid.rows() - 1;
+    let space = ScoreOutcomeSpace {
+        interval_home_prob,
+        interval_away_prob,
+        interval_common_prob,
+    };
+    let mut fixtures = IterFixtures::new(intervals);
+    let iter = Iter::new(&space, &mut fixtures);
+    from_iterator(iter, scoregrid);
+}
+
 pub fn from_univariate_poisson(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
     let factorial = factorial::Calculator;
     for home_goals in 0..scoregrid.rows() {
@@ -192,38 +206,6 @@ pub fn from_bivariate_poisson(
     }
 }
 
-// pub fn from_wierd(home_rate: f64, away_rate: f64, common: f64, scoregrid: &mut Matrix<f64>) {
-//     let lambda_1 = home_rate - common;
-//     let lambda_2 = away_rate - common;
-//     let factorial = factorial::Calculator;
-//     for home_goals in 0..scoregrid.rows() {
-//         for away_goals in 0..scoregrid.cols() {
-//             let home_prob = poisson::univariate(home_goals as u8, lambda_1, &factorial);
-//             let away_prob = poisson::univariate(away_goals as u8, lambda_2, &factorial);
-//             scoregrid[(home_goals, away_goals)] = home_prob * away_prob;
-//         }
-//     }
-//     for both_goals in 1..scoregrid.rows() {
-//         let both_probs =  poisson::univariate(both_goals as u8, common, &factorial);
-//         let mut eligibles = 0;
-//         for home_goals in 0..scoregrid.rows() {
-//             for away_goals in 0..scoregrid.cols() {
-//                 if home_goals >= both_goals && away_goals >= both_goals {
-//                     eligibles += 1;
-//                 }
-//             }
-//         }
-//         for home_goals in 0..scoregrid.rows() {
-//             for away_goals in 0..scoregrid.cols() {
-//                 if home_goals >= both_goals && away_goals >= both_goals {
-//                     scoregrid[(home_goals, away_goals)] += both_probs / eligibles as f64;
-//                 }
-//             }
-//         }
-//     }
-//     scoregrid.flatten_mut().normalise(1.0);
-// }
-
 pub fn from_binomial(
     interval_home_prob: f64,
     interval_away_prob: f64,
@@ -239,6 +221,22 @@ pub fn from_binomial(
             let away_prob =
                 binomial(away_intervals, away_goals, interval_away_prob, &factorial);
             scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
+        }
+    }
+}
+
+pub fn from_bivariate_binomial(
+    interval_home_prob: f64,
+    interval_away_prob: f64,
+    interval_common_prob: f64,
+    scoregrid: &mut Matrix<f64>,
+) {
+    assert_eq!(scoregrid.rows(), scoregrid.cols());
+    let factorial = factorial::Calculator;
+    let intervals = scoregrid.rows() as u8 - 1;
+    for home_goals in 0..=intervals {
+        for away_goals in 0..=intervals {
+            scoregrid[(home_goals as usize, away_goals as usize)] = bivariate_binomial(intervals, home_goals, away_goals, interval_home_prob, interval_away_prob, interval_common_prob, &factorial);
         }
     }
 }

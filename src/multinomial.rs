@@ -36,19 +36,15 @@ pub fn bivariate_binomial(n: u8, r_1: u8, r_2: u8, p_1: f64, p_2: f64, p_3: f64,
     assert!(r_1 <= n, "r_1 ({}) > n ({})", r_1, n);
     assert!(r_2 <= n, "r_2 ({}) > n ({})", r_2, n);
     assert!(p_1 + p_2 + p_3 <= 1.0, "p_1 ({p_1}) + p_2 ({p_2}) + p_3 ({p_3}) > 1.0");
-    let rewind = u8::min(r_1, r_2);
-    let mut prob = 0.0;
-    let excess = if r_1 + r_2 > n { (r_1 + r_2 - n).div_ceil(2) } else { 0 };
-    for i in excess..=rewind {
+    let backtrack = u8::min(r_1, r_2);
+    let zeros = if r_1 + r_2 > n { r_1 + r_2 - n } else { 0 };
+    // println!("zeros={zeros}");
+    (zeros..=backtrack).map(|i| {
         let (k_1, k_2) = (r_1 - i, r_2 - i);
-        // if k_1 + k_2 + i > n {
-        //     continue
-        // }
         let cell_prob = quadranomial(n, k_1, k_2, i, p_1, p_2, p_3, factorial);
-        println!("n={n}, k_1:k_2={k_1}:{k_2}, i={i}, cell_prob={cell_prob}");
-        prob += cell_prob;
-    }
-    prob
+        // println!("n={n}, k_1:k_2={k_1}:{k_2}, i={i}, cell_prob={cell_prob}");
+        cell_prob
+    }).sum()
 }
 
 
@@ -87,18 +83,15 @@ mod tests {
             let p_1 = i_1 * (1.0 - i_2);
             let p_2 = i_2 *(1.0 - i_1);
             let p_3 = i_1 * i_2;
-            println!("n={n}, r_1={r_1}, r_2={r_2}, i_1={i_1}, p_1={p_1}, p_2={p_2}, p_3={p_3}");
+            println!("testing with n={n}, r_1={r_1}, r_2={r_2}, i_1={i_1}, p_1={p_1}, p_2={p_2}, p_3={p_3}");
 
             let independent_prob = binomial(n, r_1, i_1, &Calculator) * binomial(n, r_2, i_2, &Calculator);
             assert_eq!(independent_prob, bivariate_binomial(n, r_1, r_2, p_1, p_2, p_3, &Calculator));
         }
-        for n in 0..4 {
-            for r_1 in 0..n {
-                for r_2 in 0..n {
+        for n in 0..=6 {
+            for r_1 in 0..=n {
+                for r_2 in 0..=n {
                     test(n, r_1, r_2, 0.25);
-                    if r_1 != r_2 {
-                        test(n, r_2, r_1, 0.25);
-                    }
                 }
             }
         }

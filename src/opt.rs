@@ -88,6 +88,7 @@ pub struct HypergridSearchOutcome {
 
 pub fn hypergrid_search(
     config: &HypergridSearchConfig,
+    mut constraint_f: impl FnMut(&[f64]) -> bool,
     mut loss_f: impl FnMut(&[f64]) -> f64) -> HypergridSearchOutcome {
 
     let mut steps = 0;
@@ -118,15 +119,17 @@ pub fn hypergrid_search(
                 let bound = &bounds[dimension];
                 let range = bound.end() - bound.start();
                 values[dimension] = bound.start() + ordinal as f64 * range * inv_resolution;
-                let residual = loss_f(&values);
-                // println!("  values: {values:?}, residual: {residual}");
-                if residual < optimal_residual {
-                    // println!("    new optimal");
-                    optimal_residual = residual;
-                    optimal_values.copy_from_slice(&values);
+                if constraint_f(&values) {
+                    let residual = loss_f(&values);
+                    // println!("  values: {values:?}, residual: {residual}");
+                    if residual < optimal_residual {
+                        // println!("    new optimal");
+                        optimal_residual = residual;
+                        optimal_values.copy_from_slice(&values);
 
-                    if residual <= config.acceptable_residual {
-                        break 'outer;
+                        if residual <= config.acceptable_residual {
+                            break 'outer;
+                        }
                     }
                 }
             }
