@@ -66,6 +66,18 @@ pub fn outcome_correct_score_gather() {
 }
 
 #[test]
+pub fn interval() {
+    const INTERVALS: usize = 2;
+    let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
+    from_interval(0.25, 0.25, 0.25, &mut scoregrid);
+    println!(
+        "scoregrid:\n{}sum: {}",
+        scoregrid.verbose(),
+        scoregrid.flatten().sum()
+    );
+}
+
+#[test]
 pub fn univariate_poisson_binomial_similarity() {
     const HOME_RATE: f64 = 1.2;
     const AWAY_RATE: f64 = 1.8;
@@ -212,16 +224,3 @@ fn compute_mse(sample_probs: &[f64], fitted_probs: &[f64]) -> f64 {
     }
     sq_error / sample_probs.len() as f64
 }
-// #[test]
-// pub fn wierd() {
-//     let home_rate = 0.7;
-//     let away_rate = 0.8;
-//     let common = 0.2;
-//     let mut biv_poisson = Matrix::allocate(4, 4);
-//     from_bivariate_poisson(home_rate, away_rate, common, &mut biv_poisson);
-//     println!("biv_poisson:\n{}sum: {}", biv_poisson.verbose(), biv_poisson.flatten().sum());
-//
-//     let mut weird = Matrix::allocate(4, 4);
-//     from_wierd(home_rate, away_rate, common, &mut weird);
-//     println!("biv_poisson:\n{}sum: {}", weird.verbose(), weird.flatten().sum());
-// }

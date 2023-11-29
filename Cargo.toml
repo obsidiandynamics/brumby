@@ -30,6 +30,7 @@ strum = "0.25.0"
 strum_macros = "0.25.3"
 serde = { version = "1.0.189", features = ["derive"] }
 thiserror = "1.0.50"
+rustc-hash = "1.1.0"
 
 [dev-dependencies]
 assert_float_eq = "1.1.3"

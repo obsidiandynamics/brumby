@@ -12,6 +12,7 @@ pub mod display;
 pub mod factorial;
 pub mod file;
 pub mod harville;
+pub mod interval;
 pub mod linear;
 pub mod market;
 pub mod mc;
