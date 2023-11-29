@@ -1,5 +1,5 @@
-use crate::factorial;
 use crate::factorial::Factorial;
+use crate::multinomial::combinations;
 
 #[inline]
 pub fn univariate(k: u8, lambda: f64, factorial: &impl Factorial) -> f64 {
@@ -17,8 +17,8 @@ pub fn bivariate(
 ) -> f64 {
     let sum = (0..=u8::min(k_1, k_2))
         .map(|i| {
-            (factorial::combinations(k_1, i, factorial)
-                * factorial::combinations(k_2, i, factorial)
+            (combinations(k_1, i, factorial)
+                * combinations(k_2, i, factorial)
                 * factorial.get(i)) as f64
                 * (lambda_3 / lambda_1 / lambda_2).powi(i as i32)
         })
