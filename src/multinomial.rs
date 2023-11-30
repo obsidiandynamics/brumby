@@ -57,6 +57,7 @@ mod tests {
     #[test]
     fn test_combinations() {
         assert_eq!(5, combinations(5, 1, &Calculator));
+        assert_eq!(5, combinations(5, 4, &Calculator));
         assert_eq!(1, combinations(5, 5, &Calculator));
         assert_eq!(10, combinations(5, 3, &Calculator));
         assert_eq!(120, combinations(10, 3, &Calculator));

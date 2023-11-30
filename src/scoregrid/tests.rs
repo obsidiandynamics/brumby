@@ -69,7 +69,7 @@ pub fn outcome_correct_score_gather() {
 pub fn interval() {
     const INTERVALS: usize = 2;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_interval(0.25, 0.25, 0.25, &mut scoregrid);
+    from_interval(INTERVALS as u8, u16::MAX, 0.25, 0.25, 0.25, &mut scoregrid);
     println!(
         "scoregrid:\n{}sum: {}",
         scoregrid.verbose(),
@@ -205,7 +205,7 @@ pub fn bivariate_binomial_interval_equivalence() {
     );
 
     let mut interval = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_interval(INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut interval);
+    from_interval(INTERVALS as u8, u16::MAX, INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut interval);
     println!(
         "interval:\n{}sum: {}",
         interval.verbose(),
