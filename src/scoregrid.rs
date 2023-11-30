@@ -279,21 +279,43 @@ pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Outcome {
+pub struct Over(pub u8);
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Under(pub u8);
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MarketType {
+    HeadToHead,
+    TotalGoalsOverUnder(Over),
+    CorrectScore,
+    DrawNoBet,
+    AnytimeGoalscorer,
+    FirstGoalscorer,
+    PlayerShotsOnTarget(Over),
+    AnytimeAssist
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OutcomeType {
     Win(Side),
     Draw,
-    GoalsUnder(u8),
-    GoalsOver(u8),
-    CorrectScore(Score),
+    Under(u8),
+    Over(u8),
+    Exact(Score),
+    Named(String),
+    Other,
+    None,
 }
-impl Outcome {
+impl OutcomeType {
     pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
         match self {
-            Outcome::Win(side) => Self::gather_win(side, scoregrid),
-            Outcome::Draw => Self::gather_draw(scoregrid),
-            Outcome::GoalsUnder(goals) => Self::gather_goals_under(*goals, scoregrid),
-            Outcome::GoalsOver(goals) => Self::gather_goals_over(*goals, scoregrid),
-            Outcome::CorrectScore(score) => Self::gather_correct_score(score, scoregrid),
+            OutcomeType::Win(side) => Self::gather_win(side, scoregrid),
+            OutcomeType::Draw => Self::gather_draw(scoregrid),
+            OutcomeType::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
+            OutcomeType::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
+            OutcomeType::Exact(score) => Self::gather_correct_score(score, scoregrid),
+            _ => unimplemented!()
         }
     }
 
