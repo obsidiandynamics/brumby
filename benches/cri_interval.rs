@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
 use brumby::interval;
-use brumby::interval::IntervalConfig;
+use brumby::interval::{IntervalConfig, other_player};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn run(intervals: u8) -> usize {
@@ -11,7 +11,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             away_prob: 0.25,
             common_prob: 0.25,
             max_total_goals: u16::MAX,
-        }).scenarios.len()
+            home_scorers: other_player(),
+            away_scorers: other_player(),
+        }).prospects.len()
     }
 
     // sanity check

@@ -1,24 +1,29 @@
+use std::collections::BTreeMap;
+
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
-use crate::scoregrid::{GoalEvent, Score};
+
+use crate::scoregrid::{GoalEvent, Player, Score};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Scenario {
+pub struct Prospect {
     pub score: Score,
+    pub scorers: BTreeMap<Player, u8>
 }
 
-impl Default for Scenario {
+impl Default for Prospect {
     fn default() -> Self {
         Self {
             score: Score { home: 0, away: 0},
+            scorers: Default::default()
         }
     }
 }
 
-pub type Scenarios = FxHashMap<Scenario, f64>;
+pub type Prospects = FxHashMap<Prospect, f64>;
 
-pub fn init_scenarios(capacity: usize) -> Scenarios {
-    Scenarios::with_capacity_and_hasher(capacity, Default::default())
+pub fn init_prospects(capacity: usize) -> Prospects {
+    Prospects::with_capacity_and_hasher(capacity, Default::default())
 }
 
 #[derive(Debug)]
@@ -27,130 +32,166 @@ pub struct IntervalConfig {
     pub home_prob: f64,
     pub away_prob: f64,
     pub common_prob: f64,
-    pub max_total_goals: u16
+    pub max_total_goals: u16,
+    // pub to_score: Option<(Player, f64)>
+    pub home_scorers: Vec<(Player, f64)>,
+    pub away_scorers: Vec<(Player, f64)>
 }
 
-// fn explore_interval(config: &IntervalConfig) -> Scenarios {
-//     let mut scenarios = init_scenarios(4);
-//     scenarios.insert(
-//         Scenario {
-//             score: Score { home: 0, away: 0 },
-//         },
-//         1.0 - config.home_prob - config.away_prob - config.common_prob,
-//     );
-//     scenarios.insert(
-//         Scenario {
-//             score: Score { home: 1, away: 0 },
-//         },
-//         config.home_prob,
-//     );
-//     scenarios.insert(
-//         Scenario {
-//             score: Score { home: 0, away: 1 },
-//         },
-//         config.away_prob,
-//     );
-//     scenarios.insert(
-//         Scenario {
-//             score: Score { home: 1, away: 1 },
-//         },
-//         config.common_prob,
-//     );
-//     scenarios
-// }
-//
-// fn fold_intervals(a: &Scenarios, b: &Scenarios) -> Scenarios {
-//     let mut mutations = init_scenarios(a.len() * b.len());
-//     for (a_scenario, a_prob) in a {
-//         for (b_scenario, b_prob) in b {
-//             let mutation = Scenario {
-//                 score: Score {
-//                     home: a_scenario.score.home + b_scenario.score.home,
-//                     away: a_scenario.score.away + b_scenario.score.away,
-//                 },
-//             };
-//             let mutation_prob = a_prob * b_prob;
-//             mutations
-//                 .entry(mutation)
-//                 .and_modify(|prob| *prob += mutation_prob)
-//                 .or_insert(mutation_prob);
-//         }
-//     }
-//     mutations
-// }
-//
-// pub fn explore_all(config: &IntervalConfig) -> Scenarios {
-//     let mut scenarios = explore_interval(config);
-//     for _ in 1..config.intervals {
-//         let next_scenarios = explore_interval(config);
-//         scenarios = fold_intervals(&scenarios, &next_scenarios);
-//     }
-//     scenarios
-// }
+pub fn other_player() -> Vec<(Player, f64)> {
+    vec![(Player::Other, 1.0)]
+}
 
 #[derive(Debug)]
 pub struct Exploration {
-    pub scenarios: Scenarios,
+    pub prospects: Prospects,
     pub pruned: f64
 }
 
+#[derive(Debug)]
+struct PartialProspect<'a> {
+    home_scorer: Option<&'a Player>,
+    away_scorer: Option<&'a Player>,
+    prob: f64,
+}
+
 pub fn explore_all(config: &IntervalConfig) -> Exploration {
-    let mut current_scenarios = init_scenarios(1);
-    current_scenarios.insert(Scenario::default(), 1.0);
+    let mut current_prospects = init_prospects(1);
+    current_prospects.insert(Prospect::default(), 1.0);
     let neither_prob = 1.0 - config.home_prob - config.away_prob - config.common_prob;
+    // let home_other_prob = 1.0 - config.to_score.filter(|(player, prob)| matches!(player, Player::Named(Side::Home, _))).map(|(_, prob)| prob).unwrap_or(0.0);
+    // let away_other_prob = 1.0 - config.to_score.filter(|(player, prob)| matches!(player, Player::Named(Side::Away, _))).map(|(_, prob)| prob).unwrap_or(0.0);
     let mut pruned = 0.0;
+    // let home_scorers = match &config.to_score {
+    //     None => {
+    //         vec![(&Player::Other, 1.0)]
+    //     },
+    //     Some((player, prob)) => {
+    //         match player {
+    //             Player::Named(Side::Home, _) => {
+    //                 vec![(player, *prob), (&Player::Other, 1.0 - *prob)]
+    //             }
+    //             _ => {
+    //                 vec![(&Player::Other, 1.0)]
+    //             }
+    //         }
+    //     }
+    // };
+    // let away_scorers = match &config.to_score {
+    //     None => {
+    //         vec![(&Player::Other, 1.0)]
+    //     },
+    //     Some((player, prob)) => {
+    //         match player {
+    //             Player::Named(Side::Away, _) => {
+    //                 vec![(player, *prob), (&Player::Other, 1.0 - *prob)]
+    //             }
+    //             _ => {
+    //                 vec![(&Player::Other, 1.0)]
+    //             }
+    //         }
+    //     }
+    // };
 
     for _ in 0..config.intervals {
-        let mut next_scenarios = init_scenarios(current_scenarios.len() * 4);
+        let mut next_prospects = init_prospects(current_prospects.len() * 4);
         for goal_event in GoalEvent::iter() {
-            let (next, next_prob) = match goal_event {
+            match goal_event {
                 GoalEvent::Neither => {
-                    (Scenario {
-                        score: Score { home: 0, away: 0 },
-                    }, neither_prob)
+                    let partial = PartialProspect {
+                        home_scorer: None,
+                        away_scorer: None,
+                        prob: neither_prob
+                    };
+                    pruned += merge(config, &current_prospects, partial, &mut next_prospects);
                 }
                 GoalEvent::Home => {
-                    (Scenario {
-                        score: Score { home: 1, away: 0 },
-                    }, config.home_prob)
+                    for (player, player_prob) in &config.home_scorers {
+                        let partial = PartialProspect {
+                            home_scorer: Some(player),
+                            away_scorer: None,
+                            prob: config.home_prob * player_prob
+                        };
+                        pruned += merge(config, &current_prospects, partial, &mut next_prospects);
+                    }
                 }
                 GoalEvent::Away => {
-                    (Scenario {
-                        score: Score { home: 0, away: 1 },
-                    }, config.away_prob)
+                    for (player, player_prob) in &config.away_scorers {
+                        let partial = PartialProspect {
+                            home_scorer: None,
+                            away_scorer: Some(player),
+                            prob: config.away_prob * player_prob
+                        };
+                        pruned += merge(config, &current_prospects, partial, &mut next_prospects);
+                    }
                 }
                 GoalEvent::Both => {
-                    (Scenario {
-                        score: Score { home: 1, away: 1 },
-                    }, config.common_prob)
+                    for (home_player, home_player_prob) in &config.home_scorers {
+                        for (away_player, away_player_prob) in &config.away_scorers {
+                            let partial = PartialProspect {
+                                home_scorer: Some(home_player),
+                                away_scorer: Some(away_player),
+                                prob: config.common_prob * home_player_prob * away_player_prob
+                            };
+                            pruned += merge(config, &current_prospects, partial, &mut next_prospects);
+                        }
+                    }
                 }
             };
 
-            for (current, current_prob) in &current_scenarios {
-                let merged_prob = current_prob * next_prob;
-                if current.score.total() + next.score.total() > config.max_total_goals {
-                    pruned += merged_prob;
-                    continue;
-                }
-                let merged = Scenario {
-                    score: Score {
-                        home: current.score.home + next.score.home,
-                        away: current.score.away + next.score.away,
-                    },
-                };
-                next_scenarios
-                    .entry(merged)
-                    .and_modify(|prob| *prob += merged_prob)
-                    .or_insert(merged_prob);
-            }
+            // for (current, current_prob) in &current_prospects {
+            //     let merged_prob = current_prob * next_prob;
+            //     if current.score.total() + next.score.total() > config.max_total_goals {
+            //         pruned += merged_prob;
+            //         continue;
+            //     }
+            //     let merged = Prospect {
+            //         score: Score {
+            //             home: current.score.home + next.score.home,
+            //             away: current.score.away + next.score.away,
+            //         },
+            //     };
+            //     next_prospects
+            //         .entry(merged)
+            //         .and_modify(|prob| *prob += merged_prob)
+            //         .or_insert(merged_prob);
+            // }
         }
-        current_scenarios = next_scenarios;
+        current_prospects = next_prospects;
     }
 
     Exploration {
-        scenarios: current_scenarios,
+        prospects: current_prospects,
         pruned
     }
+}
+
+#[must_use]
+fn merge(config: &IntervalConfig, current_prospects: &Prospects, partial: PartialProspect, next_prospects: &mut Prospects) -> f64 {
+    let mut pruned = 0.0;
+    for (current, current_prob) in current_prospects {
+        let merged_prob = *current_prob * partial.prob;
+        let partial_goals = partial.home_scorer.map(|_| 1).unwrap_or(0) + partial.away_scorer.map(|_| 1).unwrap_or(0);
+        if current.score.total() + partial_goals > config.max_total_goals {
+            pruned += merged_prob;
+            continue;
+        }
+
+        let mut merged = current.clone();
+        if let Some(scorer) = partial.home_scorer {
+            merged.scorers.entry(scorer.clone()).and_modify(|count| *count += 1).or_insert(1);
+            merged.score.home += 1;
+        }
+        if let Some(scorer) = partial.away_scorer {
+            merged.scorers.entry(scorer.clone()).and_modify(|count| *count += 1).or_insert(1);
+            merged.score.away += 1;
+        }
+        next_prospects
+            .entry(merged)
+            .and_modify(|prob| *prob += merged_prob)
+            .or_insert(merged_prob);
+    }
+    pruned
 }
 
 #[cfg(test)]
