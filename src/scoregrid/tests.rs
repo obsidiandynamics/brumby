@@ -1,3 +1,4 @@
+use crate::entity::Side;
 use super::*;
 use crate::opt::{hypergrid_search, HypergridSearchConfig};
 use crate::probs::SliceExt;

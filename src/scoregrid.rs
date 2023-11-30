@@ -5,7 +5,8 @@ use multinomial::binomial;
 
 use crate::{factorial, multinomial, poisson};
 use crate::comb::{count_permutations, pick};
-use crate::interval::{explore_all, IntervalConfig, other_player};
+use crate::entity::{OutcomeType, Score, Side};
+use crate::interval::{explore, IntervalConfig};
 use crate::linear::matrix::Matrix;
 use crate::multinomial::bivariate_binomial;
 use crate::probs::SliceExt;
@@ -37,28 +38,6 @@ impl From<usize> for GoalEvent {
             3 => GoalEvent::Both,
             _ => unreachable!(),
         }
-    }
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Score {
-    pub home: u8,
-    pub away: u8,
-}
-impl Score {
-    pub fn new(home: u8, away: u8) -> Self {
-        Self { home, away }
-    }
-
-    pub fn nil_all() -> Self {
-        Self {
-            home: 0,
-            away: 0
-        }
-    }
-
-    pub fn total(&self) -> u16 {
-        (self.home + self.away) as u16
     }
 }
 
@@ -194,14 +173,13 @@ pub fn from_interval(
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
-    let exploration = explore_all(&IntervalConfig {
+    let exploration = explore(&IntervalConfig {
         intervals,
         home_prob,
         away_prob,
         common_prob,
         max_total_goals,
-        home_scorers: other_player(),
-        away_scorers: other_player(),
+        scorers: vec![],
     });
     for (scenario, prob) in exploration.prospects {
         scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
@@ -280,40 +258,6 @@ pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid.flatten_mut().normalise(1.0);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Over(pub u8);
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Under(pub u8);
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MarketType {
-    HeadToHead,
-    TotalGoalsOverUnder(Over),
-    CorrectScore,
-    DrawNoBet,
-    AnytimeGoalscorer,
-    FirstGoalscorer,
-    PlayerShotsOnTarget(Over),
-    AnytimeAssist
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Player {
-    Named(Side, String),
-    Other
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum OutcomeType {
-    Win(Side),
-    Draw,
-    Under(u8),
-    Over(u8),
-    Score(Score),
-    Player(Player),
-    None,
-}
 impl OutcomeType {
     pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
         match self {
@@ -384,12 +328,6 @@ impl OutcomeType {
     fn gather_correct_score(score: &Score, scoregrid: &Matrix<f64>) -> f64 {
         scoregrid[(score.home as usize, score.away as usize)]
     }
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Side {
-    Home,
-    Away,
 }
 
 #[cfg(test)]

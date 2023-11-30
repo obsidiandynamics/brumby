@@ -9,6 +9,7 @@ pub mod comb;
 pub mod csv;
 pub mod data;
 pub mod display;
+pub mod entity;
 pub mod factorial;
 pub mod file;
 pub mod harville;
