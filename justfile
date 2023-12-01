@@ -49,6 +49,10 @@ test:
 clippy:
     cargo clippy -- -D clippy::pedantic -A clippy::must-use-candidate -A clippy::struct-excessive-bools -A clippy::single-match-else -A clippy::inline-always -A clippy::cast-possible-truncation -A clippy::cast-precision-loss -A clippy::items-after-statements
 
+# update internal package versions
+set-version VERSION:
+    cargo set-version {{VERSION}}
+
 # publish packages
 publish:
     cargo publish -p brumby
