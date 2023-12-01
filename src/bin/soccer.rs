@@ -296,9 +296,9 @@ pub fn main() {
             away_prob: search_outcome.optimal_values[1],
             common_prob: search_outcome.optimal_values[2],
             max_total_goals: MAX_TOTAL_GOALS,
-            scorers: vec![(player.clone(), *prob)],
+            players: vec![(player.clone(), *prob)],
         });
-        let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+        let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects, &exploration.player_lookup);
         fitted_first_goalscorer_probs.push(isolated_prob);
         // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
     }
@@ -324,9 +324,9 @@ pub fn main() {
             away_prob: search_outcome.optimal_values[1],
             common_prob: search_outcome.optimal_values[2],
             max_total_goals: MAX_TOTAL_GOALS,
-            scorers: vec![(player.clone(), *prob)],
+            players: vec![(player.clone(), *prob)],
         });
-        let isolated_prob = isolate(&MarketType::AnytimeGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+        let isolated_prob = isolate(&MarketType::AnytimeGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects, &exploration.player_lookup);
         fitted_anytime_goalscorer_probs.push(isolated_prob);
         // println!("anytime scorer {player:?}, prob: {isolated_prob:.3}");
     }
@@ -475,9 +475,9 @@ fn fit_first_goalscorer(optimal_scoring_probs: &[f64], player: &Player, expected
                 away_prob: optimal_scoring_probs[1],
                 common_prob: optimal_scoring_probs[2],
                 max_total_goals: MAX_TOTAL_GOALS,
-                scorers: vec![(player.clone(), values[0])],
+                players: vec![(player.clone(), values[0])],
             });
-            let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects);
+            let isolated_prob = isolate(&MarketType::FirstGoalscorer, &OutcomeType::Player(player.clone()), &exploration.prospects, &exploration.player_lookup);
             ((isolated_prob - expected_prob)/expected_prob).powi(2)
         },
     )

@@ -41,9 +41,8 @@ pub fn bivariate_binomial(n: u8, r_1: u8, r_2: u8, p_1: f64, p_2: f64, p_3: f64,
     // println!("zeros={zeros}");
     (zeros..=backtrack).map(|i| {
         let (k_1, k_2) = (r_1 - i, r_2 - i);
-        let cell_prob = quadranomial(n, k_1, k_2, i, p_1, p_2, p_3, factorial);
+        quadranomial(n, k_1, k_2, i, p_1, p_2, p_3, factorial)
         // println!("n={n}, k_1:k_2={k_1}:{k_2}, i={i}, cell_prob={cell_prob}");
-        cell_prob
     }).sum()
 }
 
