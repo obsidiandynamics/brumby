@@ -11,12 +11,12 @@ use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::racing_data::{download_by_id, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
+use brumby_racing::data::{download_by_id, RaceSummary};
 use brumby_racing::model;
-use brumby_racing::model::{fit, PODIUM, TopN};
 use brumby_racing::model::fit::compute_msre;
+use brumby_racing::model::{fit, TopN, PODIUM};
 use brumby_racing::print::{tabulate_derived_prices, tabulate_prices, tabulate_values};
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -70,10 +70,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     let sample_overrounds = sample_top_n.overrounds()?;
 
-    let implied_probs: Vec<_> = race.prices[0]
-        .iter()
-        .map(|price| 1. / price)
-        .collect();
+    let implied_probs: Vec<_> = race.prices[0].iter().map(|price| 1. / price).collect();
     let fitted_top_n = TopN {
         markets: (0..PODIUM)
             .map(|rank| {
@@ -84,27 +81,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             / sample_overrounds[0].value,
                     },
                     implied_probs.clone(),
-                    &model::SINGLE_PRICE_BOUNDS
+                    &model::SINGLE_PRICE_BOUNDS,
                 )
             })
-            .collect()
+            .collect(),
     };
-
-    // for (rank, fractional_market) in fitted_top_n.markets.iter().enumerate() {
-    //     let booksum: f64 = fractional_market.prices.iter().map(|price| 1. / price).sum();
-    //     let rmsre = compute_msre(
-    //         &sample_top_n.markets[rank].prices,
-    //         &fractional_market.prices,
-    //         &fit::FITTED_PRICE_RANGES[rank],
-    //     )
-    //     .sqrt();
-    //     debug!(
-    //         "fractional: {}, booksum: {:.6}, rmsre: {:.6}",
-    //         DisplaySlice::from(&*fractional_market.prices),
-    //         booksum,
-    //         rmsre,
-    //     );
-    // }
 
     let derived_prices = fitted_top_n.as_price_matrix();
     let table = tabulate_derived_prices(&derived_prices);
@@ -117,7 +98,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 &derived_prices[rank],
                 &fit::FITTED_PRICE_RANGES[rank],
             )
-                .sqrt()
+            .sqrt()
         })
         .collect();
 
@@ -156,21 +137,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ));
     info!("\n{}", Console::default().render(&summary_table));
 
-    // if let Some(selections) = args.selections {
-    //     let price = model.derive_multi(&selections)?;
-    //     info!(
-    //         "probability of {}: {}, fair price: {:.3}, overround: {:.3}, market odds: {:.3}",
-    //         DisplaySlice::from(&*selections),
-    //         price.value.probability,
-    //         price.value.fair_price(),
-    //         price.value.fair_price() / price.value.price,
-    //         price.value.price
-    //     );
-    //     debug!(
-    //         "price generation took {:.3}s",
-    //         price.elapsed.as_millis() as f64 / 1_000.
-    //     );
-    // }
     Ok(())
 }
 

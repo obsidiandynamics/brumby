@@ -11,7 +11,7 @@ use stanza::style::{HAlign, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::racing_data::{download_by_id, RaceSummary};
+use brumby_racing::data::{download_by_id, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
@@ -86,8 +86,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let coefficients_file = match race.race_type {
-        EventType::Thoroughbred => "config/thoroughbred.cf.json",
-        EventType::Greyhound => "config/greyhound.cf.json",
+        EventType::Thoroughbred => "brumby-racing/config/thoroughbred.cf.json",
+        EventType::Greyhound => "brumby-racing/config/greyhound.cf.json",
         EventType::Harness => unimplemented!(),
     };
     debug!("loading coefficients from {coefficients_file:?}");

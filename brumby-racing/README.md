@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // load coefficients from a file and create a fitter
-    let coefficients = Coefficients::read_json_file(PathBuf::from("../config/thoroughbred.cf.json"))?;
+    let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
     let config = FitterConfig {
         coefficients,
         fit_options: FitOptions::fast() // use the default presents in production; fast presets are used for testing
@@ -226,7 +226,7 @@ Exactly one constant term must be supplied: either `Intercept` or `Origin`. This
 Here we describe the offline fitting process. It comprises three steps: 1) extracting a suitable training dataset, 2) selecting and fitting the regressor coefficients, and 3) evaluating the model's performance against a test set. The steps are decoupled. And while Brumby has the tooling to perform all steps, one may equally use statistical packages, such as _R_, to fit the coefficients. The `linear.regression` module of Brumby mirrors the behaviour of R_'s `lm` function.
 
 ## Dataset extraction
-Use the `datadump` binary to produce a training set.
+Use the `rac_datadump` binary to produce a training set.
 
 A training set is produced by iterating over historical race data snapshots, optimising the weighted MC probabilities until the derived (singles) prices match the snapshot prices within some margin of error. Brumby uses the [racing-scraper](https://github.com/anil0906/racing-scraper) format, which may be tailored to a range of market feed providers.
 
@@ -239,20 +239,21 @@ Brumby's dataset extractor has a basic quality control filter — the _departure
 The following example extracts a thoroughbred dataset from historical data residing in `~/archive`, writing the output to `data/thoroughbred.csv`. A departure cutoff filter of 0.3 is used.
 
 ```shell
-just datadump -d 0.3 -r thoroughbred ~/archive data/thoroughbred.csv
+just rac_datadump -d 0.3 -r thoroughbred ~/archive data/thoroughbred.csv
 ```
+
 ## Selecting and fitting regressors
-Use the `backfit` binary to fit the regressor coefficients to the dataset produced by `datadump`.
+Use the `rac_backfit` binary to fit the regressor coefficients to the dataset produced by `rac_datadump`.
 
 The application takes as input the training dataset and the regressor formulas defined in a `.r.json` file. There are three formulas — one for each non-winning rank in the podium. By default, the regression coefficients and summary statistics are outputted to the console. The output format is, again, similar to _R_'s `summary` function. Outputting to the console lets you perform a dry-run without saving the coefficients to file, perhaps going back and trying a different combination of regressors.
 
 Once the appropriate regressors have been selected, use the `-o` (output) flag to save both regressors and their corresponding coefficients to a `.cf.json` file.
 
 ```shell
-just backfit data/thoroughbred.csv config/thoroughbred.r.json -o config/thoroughbred.cf.json
+just rac_backfit data/thoroughbred.csv brumby-racing/config/thoroughbred.r.json -o brumby-racing/config/thoroughbred.cf.json
 ```
 
-The above example persists the fitted coefficients to `config/thoroughbred.cf.json` and prints the summary statistics, including the standard errors, p-values and R-squared values for each of the three predictors. Below is an output sample for one predictor.
+The above example persists the fitted coefficients to `brumby-racing/config/thoroughbred.cf.json` and prints the summary statistics, including the standard errors, p-values and R-squared values for each of the three predictors. Below is an output sample for one predictor.
 
 ```txt
 ╔═══════════════════════════════╤════════════╤═══════════╤═════════╤═════╗
@@ -279,10 +280,10 @@ r_squared_adj: 0.991741
 The asterisks mimic _R_'s significance codes: 0 ‘&ast;&ast;&ast;’ 0.001 ‘&ast;&ast;’ 0.01 ‘&ast;’ 0.05 ‘.’ 0.1 ‘ ’ 1.
 
 ## Evaluating the model
-Use the `evaluate` binary to assess the model's predictive power against a historical test set.
+Use the `rac_evaluate` binary to assess the model's predictive power against a historical test set.
 
-Like its `datadump` counterpart, `evaluate` takes an optional departure cutoff flag to ignore incohesive data. The result is a set of ranked RMSRE (root mean squared relative error) scores, summarised by quantile. More detailed statistics are provided for the top and bottom 25 ranked races.
+Like its `rac_datadump` counterpart, `rac_evaluate` takes an optional departure cutoff flag to ignore incohesive data. The result is a set of ranked RMSRE (root mean squared relative error) scores, summarised by quantile. More detailed statistics are provided for the top and bottom 25 ranked races.
 
 ```shell
-just evaluate -d 0.3 ~/archive
+just rac_evaluate -d 0.3 ~/archive
 ```

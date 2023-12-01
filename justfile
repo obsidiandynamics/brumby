@@ -2,34 +2,34 @@ _help:
     @just --list
 
 # produce prices for a soccer match (singles and multis)
-soccer *ARGS:
-    cargo run --release --bin soccer -- {{ARGS}}
+soc_prices *ARGS:
+    cargo run --release --bin soc_prices -- {{ARGS}}
 
 # produce prices for a race (singles and multis)
-prices *ARGS:
-    cargo run --release --bin prices -- {{ARGS}}
+rac_prices *ARGS:
+    cargo run --release --bin rac_prices -- {{ARGS}}
 
 # price singles using fractional overrounds
-fractional *ARGS:
-    cargo run --release --bin fractional -- {{ARGS}}
+rac_fractional *ARGS:
+    cargo run --release --bin rac_fractional -- {{ARGS}}
 
 # dump a dataset containing the fitted weights and various race parameters to a CSV file
-datadump *ARGS:
-    cargo run --release --bin datadump -- {{ARGS}}
+rac_datadump *ARGS:
+    cargo run --release --bin rac_datadump -- {{ARGS}}
 
 # backfit a linear regression model from a given dataset
-backfit *ARGS:
-    cargo run --release --bin backfit -- {{ARGS}}
+rac_backfit *ARGS:
+    cargo run --release --bin rac_backfit -- {{ARGS}}
 
 # evaluate the fitted model against a given dataset
-evaluate *ARGS:
-    cargo run --release --bin evaluate -- {{ARGS}}
+rac_evaluate *ARGS:
+    cargo run --release --bin rac_evaluate -- {{ARGS}}
 
 # measures the Place/Top-N price departure in the given dataset
-departure *ARGS:
-    cargo run --release --bin departure -- {{ARGS}}
+rac_departure *ARGS:
+    cargo run --release --bin rac_departure -- {{ARGS}}
 
-# run the multi example
+# run the racing multi example
 multi:
     cargo run --example multi --release
 
@@ -52,6 +52,8 @@ clippy:
 # publish packages
 publish:
     cargo publish -p brumby
+    cargo publish -p brumby-racing
+    cargo publish -p brumby-soccer
 
 # install Rust
 install-rust:

@@ -13,8 +13,8 @@ use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Cell, Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::racing_data;
-use brumby::racing_data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
+use brumby_racing::data;
+use brumby_racing::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
 use brumby_racing::model::cf::Coefficients;
@@ -68,18 +68,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start_time = Instant::now();
     let mut predicates = vec![];
     if let Some(race_type) = args.race_type {
-        predicates.push(racing_data::Predicate::Type { race_type });
+        predicates.push(data::Predicate::Type { race_type });
     }
     if let Some(cutoff_worst) = args.departure {
-        predicates.push(racing_data::Predicate::Departure { cutoff_worst })
+        predicates.push(data::Predicate::Departure { cutoff_worst })
     }
-    let races = racing_data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
 
     let mut configs = HashMap::new();
     for race_type in [EventType::Thoroughbred, EventType::Greyhound] {
         let filename = match race_type {
-            EventType::Thoroughbred => "config/thoroughbred.cf.json",
-            EventType::Greyhound => "config/greyhound.cf.json",
+            EventType::Thoroughbred => "brumby-racing/config/thoroughbred.cf.json",
+            EventType::Greyhound => "brumby-racing/config/greyhound.cf.json",
             EventType::Harness => unimplemented!(),
         };
         debug!("loading {race_type} config from {filename}");

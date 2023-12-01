@@ -18,7 +18,6 @@ pub mod multinomial;
 pub mod opt;
 pub mod poisson;
 pub mod probs;
-pub mod racing_data;
 pub mod selection;
 pub mod timed;
 

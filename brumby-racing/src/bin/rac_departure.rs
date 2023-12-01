@@ -12,8 +12,8 @@ use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Cell, Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::racing_data;
-use brumby::racing_data::{EventDetailExt, PlacePriceDeparture, PredicateClosures};
+use brumby_racing::data;
+use brumby_racing::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures};
 
 const TOP_SUBSET: usize = 25;
 
@@ -58,9 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start_time = Instant::now();
     let mut predicates = vec![];
     if let Some(race_type) = args.race_type {
-        predicates.push(racing_data::Predicate::Type { race_type });
+        predicates.push(data::Predicate::Type { race_type });
     }
-    let races = racing_data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
 
     let mut assessments = Vec::with_capacity(races.len());
     let num_races = races.len();

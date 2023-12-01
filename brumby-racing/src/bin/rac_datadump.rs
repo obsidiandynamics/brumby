@@ -11,14 +11,14 @@ use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
 use brumby_racing::{model};
-use brumby::racing_data;
+use brumby_racing::data;
 use brumby::csv::{CsvWriter, Record};
 use brumby::market::{Market, OverroundMethod};
 use brumby_racing::model::cf::Factor;
 use brumby_racing::model::fit;
 use brumby_racing::model::fit::FitOptions;
 use brumby::probs::SliceExt;
-use brumby::racing_data::{PredicateClosures, RaceSummary};
+use brumby_racing::data::{PredicateClosures, RaceSummary};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
@@ -76,12 +76,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut predicates = vec![];
     if let Some(race_type) = args.race_type {
-        predicates.push(racing_data::Predicate::Type { race_type });
+        predicates.push(data::Predicate::Type { race_type });
     }
     if let Some(cutoff_worst) = args.departure {
-        predicates.push(racing_data::Predicate::Departure { cutoff_worst })
+        predicates.push(data::Predicate::Departure { cutoff_worst })
     }
-    let race_files = racing_data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let race_files = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
     let total_num_races = race_files.len();
     let mut unique_races = HashSet::new();
     let mut duplicate_races = 0;
