@@ -8,24 +8,18 @@ pub mod capture;
 pub mod comb;
 pub mod csv;
 pub mod display;
-pub mod domain;
 pub mod factorial;
 pub mod file;
 pub mod harville;
-pub mod interval;
 pub mod linear;
 pub mod market;
 pub mod mc;
-pub mod model;
 pub mod multinomial;
 pub mod opt;
 pub mod poisson;
-pub mod print;
 pub mod probs;
 pub mod racing_data;
-pub mod scoregrid;
 pub mod selection;
-pub mod soccer_data;
 pub mod timed;
 
 #[cfg(test)]

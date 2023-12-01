@@ -1,6 +1,7 @@
 //! Linear regression.
 
 use core::fmt::Debug;
+use std::fmt::Display;
 use std::ops::Range;
 use std::string::ToString;
 
@@ -136,7 +137,7 @@ impl<O: AsIndex> Predictor<O> {
     }
 }
 
-pub(crate) fn validate_regressors<O: AsIndex>(
+pub fn validate_regressors<O: AsIndex>(
     regressors: &[Regressor<O>],
 ) -> Result<(), anyhow::Error> {
     if regressors.len() < 2 {
@@ -280,9 +281,9 @@ impl Significance {
         unreachable!()
     }
 }
-impl ToString for Significance {
-    fn to_string(&self) -> String {
-        self.label().into()
+impl Display for Significance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.label())
     }
 }
 

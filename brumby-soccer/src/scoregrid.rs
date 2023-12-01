@@ -2,15 +2,15 @@ use std::ops::Range;
 use ordinalizer::Ordinal;
 use strum_macros::{EnumCount, EnumIter};
 
-use multinomial::binomial;
+use brumby::multinomial::binomial;
 
-use crate::comb::{count_permutations, pick};
+use brumby::comb::{count_permutations, pick};
 use crate::domain::{OutcomeType, Score, Side};
 use crate::interval::{explore, IntervalConfig, ScoringProbs};
-use crate::linear::matrix::Matrix;
-use crate::multinomial::bivariate_binomial;
-use crate::probs::SliceExt;
-use crate::{factorial, multinomial, poisson};
+use brumby::linear::matrix::Matrix;
+use brumby::multinomial::bivariate_binomial;
+use brumby::probs::SliceExt;
+use brumby::{factorial, poisson};
 
 #[derive(Debug, Ordinal, EnumCount, EnumIter)]
 pub enum GoalEvent {

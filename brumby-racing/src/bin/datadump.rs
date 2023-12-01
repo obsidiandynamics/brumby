@@ -10,12 +10,13 @@ use racing_scraper::models::EventType;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
-use brumby::{model, racing_data};
+use brumby_racing::{model};
+use brumby::racing_data;
 use brumby::csv::{CsvWriter, Record};
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::cf::Factor;
-use brumby::model::fit;
-use brumby::model::fit::FitOptions;
+use brumby_racing::model::cf::Factor;
+use brumby_racing::model::fit;
+use brumby_racing::model::fit::FitOptions;
 use brumby::probs::SliceExt;
 use brumby::racing_data::{PredicateClosures, RaceSummary};
 

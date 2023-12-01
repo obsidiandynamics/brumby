@@ -1,7 +1,7 @@
-use brumby::domain::{MarketType, OutcomeType, Player, Side};
+use brumby_soccer::domain::{MarketType, OutcomeType, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby::interval::{explore, isolate, Exploration, IntervalConfig, ScoringProbs};
+use brumby_soccer::interval::{explore, isolate, Exploration, IntervalConfig, ScoringProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let player = Player::Named(Side::Home, "Markos".into());

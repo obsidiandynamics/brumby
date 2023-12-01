@@ -15,11 +15,11 @@ use brumby::racing_data::{download_by_id, RaceSummary};
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
-use brumby::model;
-use brumby::model::cf::Coefficients;
-use brumby::model::fit::{compute_msre, FitOptions};
-use brumby::model::{fit, Fitter, FitterConfig, TopN, WinPlace, PODIUM, Model, Primer};
-use brumby::print::{tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
+use brumby_racing::model;
+use brumby_racing::model::cf::Coefficients;
+use brumby_racing::model::fit::{compute_msre, FitOptions};
+use brumby_racing::model::{fit, Fitter, FitterConfig, TopN, WinPlace, PODIUM, Model, Primer};
+use brumby_racing::print::{tabulate_derived_prices, tabulate_prices, tabulate_probs, tabulate_values};
 use brumby::selection::Selections;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;

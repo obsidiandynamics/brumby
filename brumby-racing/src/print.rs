@@ -1,8 +1,8 @@
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
-use crate::linear::matrix::Matrix;
-use crate::market::MarketPrice;
-use crate::selection::{Rank, Runner};
+use brumby::linear::matrix::Matrix;
+use brumby::market::MarketPrice;
+use brumby::selection::{Rank, Runner};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DerivedPrice {
