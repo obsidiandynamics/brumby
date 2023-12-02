@@ -324,6 +324,12 @@ fn merge(
         .or_insert(merged_prob);
 }
 
+#[derive(Debug)]
+pub enum IsolationState {
+    None,
+    PlayerLookup(usize)
+}
+
 #[must_use]
 pub fn isolate(
     offer_type: &OfferType,
