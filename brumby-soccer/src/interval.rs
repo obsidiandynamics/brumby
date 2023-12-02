@@ -2,9 +2,9 @@ use std::ops::Range;
 
 use rustc_hash::FxHashMap;
 
-use brumby::lookup::Lookup;
+use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{OfferType, OutcomeType, Player, Score, Side};
+use crate::domain::{Player, Score, Side};
 
 pub mod query;
 
@@ -100,7 +100,7 @@ pub struct IntervalConfig {
 
 #[derive(Debug)]
 pub struct Exploration {
-    pub player_lookup: Lookup<Player>,
+    pub player_lookup: HashLookup<Player>,
     pub prospects: Prospects,
     pub pruned: f64,
 }
@@ -132,7 +132,7 @@ enum Half {
 pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Exploration {
     config.expansions.validate();
 
-    let mut player_lookup = Lookup::with_capacity(config.players.len() + 1);
+    let mut player_lookup = HashLookup::with_capacity(config.players.len() + 1);
     let mut home_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut away_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut combined_home_scorer_prob = 0.0;

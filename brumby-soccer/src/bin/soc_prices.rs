@@ -28,7 +28,7 @@ use brumby::opt::{
 use brumby::probs::SliceExt;
 use brumby_soccer::scoregrid::{from_correct_score, home_away_expectations};
 use brumby_soccer::data::{ContestSummary, download_by_id};
-use brumby_soccer::interval::query::isolate;
+use brumby_soccer::interval::query::{isolate, isolate_batch};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
@@ -79,6 +79,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     debug!("args: {args:?}");
     let contest = read_contest_data(&args).await?;
     info!("contest.name: {}", contest.name);
+    for offer_type in contest.offerings.keys() {
+        info!("offered {offer_type:?}");
+    }
 
     let ft_correct_score_prices =
         contest.offerings[&OfferType::CorrectScore(Period::FullTime)].clone();
@@ -341,14 +344,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Console::default().render(&ft_correct_score_table),
     );
 
-    // let mut future_scoregrid = allocate_scoregrid();
-    // correct_score_scoregrid(&ft_correct_score, &mut future_scoregrid);
-    // let h2_scoregrid = subtract(&ft_scoregrid, &h1_scoregrid);
-    // println!("ft_scoregrid.sum={}", ft_scoregrid.flatten().sum());
-    // println!("h1_scoregrid.sum={}", h1_scoregrid.flatten().sum());
-    // println!("h2_scoregrid.sum={}", h2_scoregrid.flatten().sum());
-
-
     let home_away_expectations = home_away_expectations(&ft_scoregrid);
     println!(
         "p(0, 0)={}, home + away expectations: ({} + {} = {})",
@@ -573,7 +568,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Console::default().render(&table_errors)
     );
 
-    let table_overrounds = print_overrounds(&[
+    let fitted_markets = [
         fitted_h1_h2h,
         fitted_h1_goals_ou,
         fitted_h2_h2h,
@@ -583,11 +578,47 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_ft_correct_score,
         fitted_first_goalscorer,
         fitted_anytime_goalscorer,
-    ]);
+    ];
+    let fitted_markets_hash = fitted_markets.iter().map(|market| (market.offer_type.clone(), market)).collect::<HashMap<_, _>>();
+
+    let table_overrounds = print_overrounds(&fitted_markets);
     println!(
         "Market overrounds:\n{}",
         Console::default().render(&table_overrounds)
     );
+
+    // let h2h_sel = (OfferType::HeadToHead(Period::FullTime), OutcomeType::Win(Side::Home));
+    // let tg_sel = (OfferType::TotalGoalsOverUnder(Period::FullTime, Over(2)), OutcomeType::Over(2));
+    // let anytime_player = Named(Side::Home, "Gianluca Lapadula".into());
+    // let anytime_sel = (OfferType::AnytimeGoalscorer, OutcomeType::Player(anytime_player.clone()));
+    // let player_prob = fitted_goalscorer_probs[&anytime_player];
+    // let exploration = explore(
+    //     &IntervalConfig {
+    //         intervals: INTERVALS as u8,
+    //         h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
+    //         h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
+    //         players: vec![
+    //             (anytime_player.clone(), player_prob)
+    //         ],
+    //         prune_thresholds: PruneThresholds {
+    //             max_total_goals: MAX_TOTAL_GOALS_FULL,
+    //             min_prob: 0.0,
+    //         },
+    //         expansions: Expansions::default()
+    //     },
+    //     0..INTERVALS as u8,
+    // );
+    // let selections = [h2h_sel, tg_sel, anytime_sel];
+    // let overround = selections.iter().map(|(offer_type, outcome_type)| {
+    //     let fitted_market = fitted_markets_hash[offer_type];
+    //     let outcome_index = fitted_market.outcomes.iter().position(|in_vec| in_vec == outcome_type).unwrap();
+    //     let outcome_prob = fitted_market.market.probs[outcome_index];
+    //     let outcome_price = fitted_market.market.prices[outcome_index];
+    //     1.0 / outcome_prob / outcome_price
+    // }).product::<f64>();
+    // let multi_prob = isolate_batch(&selections, &exploration.prospects, &exploration.player_lookup);
+    // let multi_price = 1.0 / multi_prob / overround;
+    // info!("selections: {selections:?}, prob: {multi_prob:.3}, overround: {overround:.3}, price: {multi_price:.3}");
 
     Ok(())
 }

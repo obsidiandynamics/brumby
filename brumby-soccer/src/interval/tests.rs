@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::Player;
+use crate::domain::{OfferType, OutcomeType, Player};
 use assert_float_eq::*;
 use crate::interval::query::isolate;
 

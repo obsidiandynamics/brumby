@@ -4,7 +4,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-pub mod lookup;
+pub mod hash_lookup;
 pub mod capture;
 pub mod comb;
 pub mod csv;

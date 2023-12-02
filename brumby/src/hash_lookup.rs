@@ -3,11 +3,11 @@ use std::hash::Hash;
 use std::ops::Index;
 
 #[derive(Debug)]
-pub struct Lookup<T: Eq + PartialEq + Hash> {
+pub struct HashLookup<T: Eq + PartialEq + Hash> {
     item_to_index: FxHashMap<T, usize>,
     index_to_item: Vec<T>,
 }
-impl<T: Eq + PartialEq + Hash> Lookup<T> {
+impl<T: Eq + PartialEq + Hash> HashLookup<T> {
     pub fn with_capacity(capacity: usize) -> Self {
         let item_to_index = FxHashMap::with_capacity_and_hasher(capacity, Default::default());
         let index_to_item = Vec::with_capacity(capacity);
@@ -21,8 +21,7 @@ impl<T: Eq + PartialEq + Hash> Lookup<T> {
     where
         T: Clone,
     {
-        self.item_to_index
-            .insert(item.clone(), self.item_to_index.len());
+        Self::insert_unique(&mut self.item_to_index, &item, self.index_to_item.len());
         self.index_to_item.push(item);
     }
 
@@ -37,9 +36,16 @@ impl<T: Eq + PartialEq + Hash> Lookup<T> {
     pub fn len(&self) -> usize {
         self.index_to_item.len()
     }
+
+    fn insert_unique(item_to_index: &mut FxHashMap<T, usize>, item: &T, index: usize) where T: Clone {
+        if let Some(existing_index) = item_to_index.insert(item.clone(), index) {
+            item_to_index.insert(item.clone(), existing_index);
+            panic!("duplicate item at index {index}, previously at {existing_index}")
+        }
+    }
 }
 
-impl<T: Eq + PartialEq + Hash> Index<usize> for Lookup<T> {
+impl<T: Eq + PartialEq + Hash> Index<usize> for HashLookup<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -48,12 +54,12 @@ impl<T: Eq + PartialEq + Hash> Index<usize> for Lookup<T> {
     }
 }
 
-impl<T: Eq + PartialEq + Hash + Clone> From<Vec<T>> for Lookup<T> {
+impl<T: Eq + PartialEq + Hash + Clone> From<Vec<T>> for HashLookup<T> {
     fn from(index_to_item: Vec<T>) -> Self {
         let mut item_to_index =
             FxHashMap::with_capacity_and_hasher(index_to_item.len(), Default::default());
         for (index, item) in index_to_item.iter().enumerate() {
-            item_to_index.insert(item.clone(), index);
+            HashLookup::insert_unique(&mut item_to_index, item, index);
         }
         Self {
             item_to_index,
@@ -68,7 +74,7 @@ mod tests {
 
     #[test]
     fn push_and_resolve() {
-        let mut lookup = Lookup::with_capacity(3);
+        let mut lookup = HashLookup::with_capacity(3);
         assert_eq!(0, lookup.len());
         lookup.push("zero");
         lookup.push("one");
@@ -85,8 +91,15 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "duplicate item at index 2, previously at 1")]
+    fn push_duplicate() {
+        let mut lookup = HashLookup::from(vec!["zero", "one"]);
+        lookup.push("one");
+    }
+
+    #[test]
     fn from_vec() {
-        let lookup = Lookup::from(vec!["zero", "one"]);
+        let lookup = HashLookup::from(vec!["zero", "one"]);
         assert_eq!(Some(&"zero"), lookup.item_at(0));
         assert_eq!(Some(1), lookup.index_of(&"one"));
         assert_eq!(2, lookup.len());
@@ -95,7 +108,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "no item at index 2")]
     fn no_item_at_index() {
-        let lookup = Lookup::from(vec!["zero", "one"]);
+        let lookup = HashLookup::from(vec!["zero", "one"]);
         lookup[2];
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate item at index 2, previously at 1")]
+    fn from_vec_duplicate() {
+        let _ = HashLookup::from(vec!["zero", "one", "one"]);
     }
 }
