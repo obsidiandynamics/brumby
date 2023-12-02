@@ -6,7 +6,7 @@ use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
 use crate::domain::{OutcomeType, Score, Side};
-use crate::interval::{explore, IntervalConfig, PruneThresholds, ScoringProbs};
+use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
@@ -185,6 +185,12 @@ pub fn from_interval(
                 max_total_goals,
                 min_prob: 0.0,
             },
+            expansions: Expansions {
+                ft_score: true,
+                player_stats: false,
+                player_split_stats: false,
+                first_goalscorer: false,
+            }
         },
         explore_intervals,
     );

@@ -44,6 +44,32 @@ impl<'a> From<&'a [f64]> for ScoringProbs {
     }
 }
 
+#[derive(Debug)]
+pub struct Expansions {
+    pub ft_score: bool,
+    pub player_stats: bool,
+    pub player_split_stats: bool,
+    pub first_goalscorer: bool,
+}
+impl Expansions {
+    fn validate(&self) {
+        if self.player_split_stats {
+            assert!(self.player_stats, "cannot expand player split stats without player stats");
+        }
+        assert!(self.ft_score || self.player_stats || self.first_goalscorer, "at least one expansion must be enabled")
+    }
+}
+
+impl Default for Expansions {
+    fn default() -> Self {
+        Self {
+            ft_score: true,
+            player_stats: true,
+            player_split_stats: true,
+            first_goalscorer: true,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct PruneThresholds {
@@ -56,8 +82,9 @@ pub struct IntervalConfig {
     pub intervals: u8,
     pub h1_probs: ScoringProbs,
     pub h2_probs: ScoringProbs,
-    pub prune_thresholds: PruneThresholds,
     pub players: Vec<(Player, f64)>,
+    pub prune_thresholds: PruneThresholds,
+    pub expansions: Expansions,
 }
 
 #[derive(Debug)]
@@ -92,6 +119,8 @@ enum Half {
 }
 
 pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Exploration {
+    config.expansions.validate();
+
     let mut player_lookup = Vec::with_capacity(config.players.len() + 1);
     let mut home_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut away_scorers = Vec::with_capacity(config.players.len() + 1);
@@ -150,6 +179,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
                 prob: neither_prob,
             };
             merge(
+                &config.expansions,
                 &half,
                 &current_prospect,
                 current_prob,
@@ -168,6 +198,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
                         prob: params.home_prob * player_prob,
                     };
                     merge(
+                        &config.expansions,
                         &half,
                         &current_prospect,
                         current_prob,
@@ -185,6 +216,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
                         prob: params.away_prob * player_prob,
                     };
                     merge(
+                        &config.expansions,
                         &half,
                         &current_prospect,
                         current_prob,
@@ -212,6 +244,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
                                     * 0.5,
                             };
                             merge(
+                                &config.expansions,
                                 &half,
                                 &current_prospect,
                                 current_prob,
@@ -238,6 +271,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
 
 #[inline]
 fn merge(
+    expansions: &Expansions,
     half: &Half,
     current_prospect: &Prospect,
     current_prob: f64,
@@ -247,24 +281,40 @@ fn merge(
     let merged_prob = current_prob * partial.prob;
     let mut merged = current_prospect.clone();
     if let Some(scorer) = partial.home_scorer {
-        let half_stats = match half {
-            Half::First => &mut merged.stats[scorer].h1,
-            Half::Second => &mut merged.stats[scorer].h2,
-        };
-        half_stats.goals += 1;
-        merged.score.home += 1;
-        if merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Home {
+        if expansions.player_split_stats {
+            let split_stats = match half {
+                Half::First => &mut merged.stats[scorer].h1,
+                Half::Second => &mut merged.stats[scorer].h2,
+            };
+            split_stats.goals += 1;
+        } else if expansions.player_stats {
+            merged.stats[scorer].h2.goals += 1;
+        }
+
+        if expansions.ft_score {
+            merged.score.home += 1;
+        }
+
+        if expansions.first_goalscorer && merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Home {
             merged.first_scorer = Some(scorer);
         }
     }
     if let Some(scorer) = partial.away_scorer {
-        let half_stats = match half {
-            Half::First => &mut merged.stats[scorer].h1,
-            Half::Second => &mut merged.stats[scorer].h2,
-        };
-        half_stats.goals += 1;
-        merged.score.away += 1;
-        if merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Away {
+        if expansions.player_split_stats {
+            let split_stats = match half {
+                Half::First => &mut merged.stats[scorer].h1,
+                Half::Second => &mut merged.stats[scorer].h2,
+            };
+            split_stats.goals += 1;
+        } else if expansions.player_stats {
+            merged.stats[scorer].h2.goals += 1;
+        }
+
+        if expansions.ft_score {
+            merged.score.away += 1;
+        }
+
+        if expansions.first_goalscorer && merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Away {
             merged.first_scorer = Some(scorer);
         }
     }

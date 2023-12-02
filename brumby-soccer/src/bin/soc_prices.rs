@@ -18,7 +18,7 @@ use brumby::{factorial, poisson};
 use brumby_soccer::{scoregrid};
 use brumby_soccer::domain::{OfferType, OutcomeType, Over, Period, Player, Side};
 use brumby_soccer::domain::Player::Named;
-use brumby_soccer::interval::{explore, IntervalConfig, isolate, PruneThresholds, ScoringProbs};
+use brumby_soccer::interval::{Expansions, explore, IntervalConfig, isolate, PruneThresholds, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
@@ -35,7 +35,7 @@ const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
 const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
-const GOALSCORER_MIN_PROB: f64 = 1e-4;
+const GOALSCORER_MIN_PROB: f64 = 0.0;
 const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -49,8 +49,8 @@ struct Args {
     download: Option<String>,
 
     /// print player markets
-    #[clap(short = 'p', long = "players")]
-    print_players: bool,
+    #[clap(long = "player-goals")]
+    player_goals: bool,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -178,8 +178,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         adj_optimal_h2[i] = orig_h2 / (avg_h1_h2 / ft);
     }
     println!("adjusted optimal_h1={adj_optimal_h1:?}, optimal_h2={adj_optimal_h2:?}");
-    // let optimal_h1 = h1_search_outcome.optimal_values;
-    // let optimal_h2 = h2_search_outcome.optimal_values;
+    // let adj_optimal_h1 = h1_search_outcome.optimal_values;
+    // let adj_optimal_h2 = h2_search_outcome.optimal_values;
 
     // let ft_gamma_sum = ft_search_outcome.optimal_values.sum();
     // h1_search_outcome.optimal_values.normalise(ft_gamma_sum * 1.0);
@@ -418,6 +418,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
                 },
+                expansions: Expansions {
+                    ft_score: false,
+                    player_stats: false,
+                    player_split_stats: false,
+                    first_goalscorer: true,
+                }
             },
             0..INTERVALS as u8,
         );
@@ -444,7 +450,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ),
     };
 
-    if args.print_players {
+    if args.player_goals {
         println!(
             "sample first goalscorer σ={:.3}",
             implied_booksum(&first_gs.market.prices)
@@ -476,6 +482,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
                 },
+                expansions: Expansions {
+                    ft_score: false,
+                    player_stats: true,
+                    player_split_stats: false,
+                    first_goalscorer: false,
+                }
             },
             0..INTERVALS as u8,
         );
@@ -508,7 +520,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ),
     };
 
-    if args.print_players {
+    if args.player_goals {
         println!(
             "sample anytime goalscorer σ={:.3}",
             implied_booksum(&anytime_gs.market.prices)
@@ -725,6 +737,12 @@ fn fit_first_goalscorer(
                         max_total_goals: MAX_TOTAL_GOALS_FULL,
                         min_prob: GOALSCORER_MIN_PROB,
                     },
+                    expansions: Expansions {
+                        ft_score: false,
+                        player_stats: false,
+                        player_split_stats: false,
+                        first_goalscorer: true,
+                    }
                 },
                 0..INTERVALS as u8,
             );

@@ -15,6 +15,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     max_total_goals,
                     min_prob: 1e-6,
                 },
+                expansions: Default::default(),
             },
             0..intervals,
         )
@@ -25,15 +26,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     // sanity check
     assert_eq!(65, run(4, u16::MAX));
 
-    c.bench_function("cri_interval_18_unbounded", |b| {
+    c.bench_function("cri_interval_18_min_1e-6", |b| {
         b.iter(|| run(18, u16::MAX));
     });
 
-    c.bench_function("cri_interval_90_unbounded", |b| {
+    c.bench_function("cri_interval_90_min_1e-6", |b| {
         b.iter(|| run(90, u16::MAX));
     });
 
-    c.bench_function("cri_interval_90_max_8", |b| {
+    c.bench_function("cri_interval_90_min_1e-6_max_8_goals", |b| {
         b.iter(|| run(90, 8));
     });
 }

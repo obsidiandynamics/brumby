@@ -33,6 +33,7 @@ fn explore_2x2() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..2,
     );
@@ -203,11 +204,12 @@ fn explore_2x2_pruned_2_goals() {
             intervals: 2,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            players: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: 2,
                 min_prob: 0.0,
             },
-            players: vec![],
+            expansions: Default::default(),
         },
         0..2,
     );
@@ -327,6 +329,7 @@ fn explore_3x3() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..3,
     );
@@ -348,6 +351,7 @@ fn explore_4x4() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..4,
     );
@@ -370,6 +374,7 @@ fn explore_1x1_player() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..1,
     );
@@ -519,6 +524,7 @@ fn explore_2x2_player() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..2,
     );
@@ -564,6 +570,7 @@ fn explore_2x2_player_asymmetric() {
                 max_total_goals: u16::MAX,
                 min_prob: 0.0,
             },
+            expansions: Default::default(),
         },
         0..2,
     );

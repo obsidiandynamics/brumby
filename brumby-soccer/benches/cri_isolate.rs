@@ -16,6 +16,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     max_total_goals,
                     min_prob: 1e-6,
                 },
+                expansions: Default::default(),
             },
             0..intervals,
         )
