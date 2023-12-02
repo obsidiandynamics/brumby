@@ -1,4 +1,4 @@
-use crate::domain::{MarketType, OutcomeType, Over, Period, Player, Score, Side};
+use crate::domain::{OfferType, OutcomeType, Over, Period, Player, Score, Side};
 use racing_scraper::get_sports_contest;
 use racing_scraper::sports::soccer::contest_model::ContestModel;
 use racing_scraper::sports::soccer::market_model::{HomeAway, Scorer, SoccerMarket};
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub struct ContestSummary {
     pub id: String,
     pub name: String,
-    pub offerings: HashMap<MarketType, HashMap<OutcomeType, f64>>,
+    pub offerings: HashMap<OfferType, HashMap<OutcomeType, f64>>,
 }
 
 impl From<ContestModel> for ContestSummary {
@@ -20,7 +20,7 @@ impl From<ContestModel> for ContestSummary {
             match market {
                 SoccerMarket::CorrectScore(markets) => {
                     offerings.insert(
-                        MarketType::CorrectScore(Period::FullTime),
+                        OfferType::CorrectScore(Period::FullTime),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
                                 OutcomeType::Score(Score {
@@ -35,7 +35,7 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::TotalGoalsOverUnder(market, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
-                        MarketType::TotalGoalsOverUnder(Period::FullTime, Over(over)),
+                        OfferType::TotalGoalsOverUnder(Period::FullTime, Over(over)),
                         HashMap::from([
                             (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
                             (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
@@ -44,7 +44,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::H2H(h2h) => {
                     offerings.insert(
-                        MarketType::HeadToHead(Period::FullTime),
+                        OfferType::HeadToHead(Period::FullTime),
                         HashMap::from([
                             (OutcomeType::Win(Side::Home), h2h.home),
                             (OutcomeType::Win(Side::Away), h2h.away),
@@ -54,7 +54,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::AnyTimeGoalScorer(scorers) => {
                     offerings.insert(
-                        MarketType::AnytimeGoalscorer,
+                        OfferType::AnytimeGoalscorer,
                         HashMap::from_iter(scorers.into_iter().map(|scorer| {
                             let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(scorer);
                             (outcome_type, odds)
@@ -63,7 +63,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::FirstGoalScorer(scorers) => {
                     offerings.insert(
-                        MarketType::FirstGoalscorer,
+                        OfferType::FirstGoalscorer,
                         HashMap::from_iter(scorers.into_iter().map(|scorer| {
                             let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(scorer);
                             (outcome_type, odds)
@@ -72,7 +72,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::CorrectScoreFirstHalf(markets) => {
                     offerings.insert(
-                        MarketType::CorrectScore(Period::FirstHalf),
+                        OfferType::CorrectScore(Period::FirstHalf),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
                                 OutcomeType::Score(Score {
@@ -86,7 +86,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::CorrectScoreSecondHalf(markets) => {
                     offerings.insert(
-                        MarketType::CorrectScore(Period::SecondHalf),
+                        OfferType::CorrectScore(Period::SecondHalf),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
                                 OutcomeType::Score(Score {
@@ -113,7 +113,7 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::FirstHalfGoalsOverUnder(market, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
-                        MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(over)),
+                        OfferType::TotalGoalsOverUnder(Period::FirstHalf, Over(over)),
                         HashMap::from([
                             (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
                             (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
@@ -122,7 +122,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::FirstHalfH2H(h2h) => {
                     offerings.insert(
-                        MarketType::HeadToHead(Period::FirstHalf),
+                        OfferType::HeadToHead(Period::FirstHalf),
                         HashMap::from([
                             (OutcomeType::Win(Side::Home), h2h.home),
                             (OutcomeType::Win(Side::Away), h2h.away),
@@ -133,7 +133,7 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::SecondHalfGoalsOverUnder(market, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
-                        MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(over)),
+                        OfferType::TotalGoalsOverUnder(Period::SecondHalf, Over(over)),
                         HashMap::from([
                             (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
                             (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
@@ -142,7 +142,7 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::SecondHalfH2H(h2h) => {
                     offerings.insert(
-                        MarketType::HeadToHead(Period::SecondHalf),
+                        OfferType::HeadToHead(Period::SecondHalf),
                         HashMap::from([
                             (OutcomeType::Win(Side::Home), h2h.home),
                             (OutcomeType::Win(Side::Away), h2h.away),

@@ -34,7 +34,7 @@ pub enum Period {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MarketType {
+pub enum OfferType {
     HeadToHead(Period),
     TotalGoalsOverUnder(Period, Over),
     CorrectScore(Period),

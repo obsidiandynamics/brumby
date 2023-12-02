@@ -16,9 +16,9 @@ use tracing::{debug, info};
 
 use brumby::{factorial, poisson};
 use brumby_soccer::{scoregrid};
-use brumby_soccer::domain::{MarketType, OutcomeType, Over, Period, Player, Side};
+use brumby_soccer::domain::{OfferType, OutcomeType, Over, Period, Player, Side};
 use brumby_soccer::domain::Player::Named;
-use brumby_soccer::interval::{explore, IntervalConfig, isolate, ScoringProbs};
+use brumby_soccer::interval::{explore, IntervalConfig, isolate, PruneThresholds, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
@@ -35,6 +35,7 @@ const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
 const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
+const GOALSCORER_MIN_PROB: f64 = 1e-4;
 const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -79,51 +80,51 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("contest.name: {}", contest.name);
 
     let ft_correct_score_prices =
-        contest.offerings[&MarketType::CorrectScore(Period::FullTime)].clone();
-    let ft_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::FullTime)].clone();
+        contest.offerings[&OfferType::CorrectScore(Period::FullTime)].clone();
+    let ft_h2h_prices = contest.offerings[&OfferType::HeadToHead(Period::FullTime)].clone();
     let ft_goals_ou_prices =
-        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2))].clone();
-    let h1_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::FirstHalf)].clone();
+        contest.offerings[&OfferType::TotalGoalsOverUnder(Period::FullTime, Over(2))].clone();
+    let h1_h2h_prices = contest.offerings[&OfferType::HeadToHead(Period::FirstHalf)].clone();
     let h1_goals_ou_prices =
-        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2))].clone();
-    let h2_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::SecondHalf)].clone();
+        contest.offerings[&OfferType::TotalGoalsOverUnder(Period::FirstHalf, Over(2))].clone();
+    let h2_h2h_prices = contest.offerings[&OfferType::HeadToHead(Period::SecondHalf)].clone();
     let h2_goals_ou_prices =
-        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2))].clone();
-    let first_gs = contest.offerings[&MarketType::FirstGoalscorer].clone();
-    let anytime_gs = contest.offerings[&MarketType::AnytimeGoalscorer].clone();
+        contest.offerings[&OfferType::TotalGoalsOverUnder(Period::SecondHalf, Over(2))].clone();
+    let first_gs = contest.offerings[&OfferType::FirstGoalscorer].clone();
+    let anytime_gs = contest.offerings[&OfferType::AnytimeGoalscorer].clone();
 
     let ft_h2h = fit_market(
-        MarketType::HeadToHead(Period::FullTime),
+        OfferType::HeadToHead(Period::FullTime),
         &ft_h2h_prices,
         1.0,
     );
     let ft_goals_ou = fit_market(
-        MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
+        OfferType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
         &ft_goals_ou_prices,
         1.0,
     );
     let ft_correct_score = fit_market(
-        MarketType::CorrectScore(Period::FullTime),
+        OfferType::CorrectScore(Period::FullTime),
         &ft_correct_score_prices,
         1.0,
     );
     let h1_h2h = fit_market(
-        MarketType::HeadToHead(Period::FirstHalf),
+        OfferType::HeadToHead(Period::FirstHalf),
         &h1_h2h_prices,
         1.0,
     );
     let h1_goals_ou = fit_market(
-        MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
+        OfferType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
         &h1_goals_ou_prices,
         1.0,
     );
     let h2_h2h = fit_market(
-        MarketType::HeadToHead(Period::SecondHalf),
+        OfferType::HeadToHead(Period::SecondHalf),
         &h2_h2h_prices,
         1.0,
     );
     let h2_goals_ou = fit_market(
-        MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
+        OfferType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
         &h2_goals_ou_prices,
         1.0,
     );
@@ -212,14 +213,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let fitted_h1_h2h = frame_prices(&h1_scoregrid, &ft_h2h.outcomes, &ft_h2h.market.overround);
     let fitted_h1_h2h = LabelledMarket {
-        market_type: MarketType::HeadToHead(Period::FirstHalf),
+        offer_type: OfferType::HeadToHead(Period::FirstHalf),
         outcomes: h1_h2h.outcomes.clone(),
         market: fitted_h1_h2h,
     };
     let h1_h2h_table = print_market(&fitted_h1_h2h);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_h1_h2h.market_type,
+        fitted_h1_h2h.offer_type,
         fitted_h1_h2h.market.probs.sum(),
         Console::default().render(&h1_h2h_table)
     );
@@ -230,14 +231,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &ft_goals_ou.market.overround,
     );
     let fitted_h1_goals_ou = LabelledMarket {
-        market_type: MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
+        offer_type: OfferType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
         outcomes: h1_goals_ou.outcomes.clone(),
         market: fitted_h1_goals_ou,
     };
     let h1_goals_ou_table = print_market(&fitted_h1_goals_ou);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_h1_goals_ou.market_type,
+        fitted_h1_goals_ou.offer_type,
         fitted_h1_goals_ou.market.probs.sum(),
         Console::default().render(&h1_goals_ou_table)
     );
@@ -259,14 +260,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let fitted_h2_h2h = frame_prices(&h2_scoregrid, &h2_h2h.outcomes, &h2_h2h.market.overround);
     let fitted_h2_h2h = LabelledMarket {
-        market_type: MarketType::HeadToHead(Period::SecondHalf),
+        offer_type: OfferType::HeadToHead(Period::SecondHalf),
         outcomes: h2_h2h.outcomes.clone(),
         market: fitted_h2_h2h,
     };
     let h2_h2h_table = print_market(&fitted_h2_h2h);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_h2_h2h.market_type,
+        fitted_h2_h2h.offer_type,
         fitted_h2_h2h.market.probs.sum(),
         Console::default().render(&h2_h2h_table)
     );
@@ -277,28 +278,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &h2_goals_ou.market.overround,
     );
     let fitted_h2_goals_ou = LabelledMarket {
-        market_type: MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
+        offer_type: OfferType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
         outcomes: h2_goals_ou.outcomes.clone(),
         market: fitted_h2_goals_ou,
     };
     let h2_goals_ou_table = print_market(&fitted_h2_goals_ou);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_h2_goals_ou.market_type,
+        fitted_h2_goals_ou.offer_type,
         fitted_h2_goals_ou.market.probs.sum(),
         Console::default().render(&h2_goals_ou_table)
     );
 
     let fitted_ft_h2h = frame_prices(&ft_scoregrid, &ft_h2h.outcomes, &ft_h2h.market.overround);
     let fitted_ft_h2h = LabelledMarket {
-        market_type: MarketType::HeadToHead(Period::FullTime),
+        offer_type: OfferType::HeadToHead(Period::FullTime),
         outcomes: ft_h2h.outcomes.clone(),
         market: fitted_ft_h2h,
     };
     let ft_h2h_table = print_market(&fitted_ft_h2h);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_ft_h2h.market_type,
+        fitted_ft_h2h.offer_type,
         fitted_ft_h2h.market.probs.sum(),
         Console::default().render(&ft_h2h_table)
     );
@@ -309,14 +310,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &ft_goals_ou.market.overround,
     );
     let fitted_ft_goals_ou = LabelledMarket {
-        market_type: MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
+        offer_type: OfferType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
         outcomes: ft_goals_ou.outcomes.clone(),
         market: fitted_ft_goals_ou,
     };
     let ft_goals_ou_table = print_market(&fitted_ft_goals_ou);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_ft_goals_ou.market_type,
+        fitted_ft_goals_ou.offer_type,
         fitted_ft_goals_ou.market.probs.sum(),
         Console::default().render(&ft_goals_ou_table)
     );
@@ -327,14 +328,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &ft_correct_score.market.overround,
     );
     let fitted_ft_correct_score = LabelledMarket {
-        market_type: MarketType::CorrectScore(Period::FullTime),
+        offer_type: OfferType::CorrectScore(Period::FullTime),
         outcomes: ft_correct_score.outcomes.clone(),
         market: fitted_ft_correct_score,
     };
     let ft_correct_score_table = print_market(&fitted_ft_correct_score);
     println!(
         "{:?}: [Σ={:.3}]\n{}",
-        fitted_ft_correct_score.market_type,
+        fitted_ft_correct_score.offer_type,
         fitted_ft_correct_score.market.probs.sum(),
         Console::default().render(&ft_correct_score_table),
     );
@@ -357,11 +358,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let first_gs = fit_market(
-        MarketType::FirstGoalscorer,
+        OfferType::FirstGoalscorer,
         &first_gs,
         FIRST_GOALSCORER_BOOKSUM,
     );
-    let anytime_gs = fit_market(MarketType::AnytimeGoalscorer, &anytime_gs, 1.0);
+    let anytime_gs = fit_market(OfferType::AnytimeGoalscorer, &anytime_gs, 1.0);
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
     let home_ratio = (ft_search_outcome.optimal_values[0] + ft_search_outcome.optimal_values[2] / 2.0)
@@ -412,13 +413,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
                 h1_probs: ScoringProbs { home_prob: adj_optimal_h1[0], away_prob: adj_optimal_h1[1], common_prob: adj_optimal_h1[2] },
                 h2_probs: ScoringProbs { home_prob: adj_optimal_h2[0], away_prob: adj_optimal_h2[1], common_prob: adj_optimal_h2[2] },
-                max_total_goals: MAX_TOTAL_GOALS_FULL,
                 players: vec![(player.clone(), *prob)],
+                prune_thresholds: PruneThresholds {
+                    max_total_goals: MAX_TOTAL_GOALS_FULL,
+                    min_prob: GOALSCORER_MIN_PROB,
+                },
             },
             0..INTERVALS as u8,
         );
         let isolated_prob = isolate(
-            &MarketType::FirstGoalscorer,
+            &OfferType::FirstGoalscorer,
             &OutcomeType::Player(player.clone()),
             &exploration.prospects,
             &exploration.player_lookup,
@@ -431,7 +435,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
 
     let fitted_first_goalscorer = LabelledMarket {
-        market_type: MarketType::FirstGoalscorer,
+        offer_type: OfferType::FirstGoalscorer,
         outcomes: first_gs.outcomes.clone(),
         market: Market::frame(
             &first_gs.market.overround,
@@ -448,7 +452,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let table_first_goalscorer = print_market(&fitted_first_goalscorer);
         println!(
             "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
-            fitted_first_goalscorer.market_type,
+            fitted_first_goalscorer.offer_type,
             fitted_first_goalscorer.market.probs.sum(),
             implied_booksum(&fitted_first_goalscorer.market.prices),
             fitted_first_goalscorer.market.probs.len(),
@@ -467,13 +471,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
                 h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
                 h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                max_total_goals: MAX_TOTAL_GOALS_FULL,
                 players: vec![(player.clone(), *prob)],
+                prune_thresholds: PruneThresholds {
+                    max_total_goals: MAX_TOTAL_GOALS_FULL,
+                    min_prob: GOALSCORER_MIN_PROB,
+                },
             },
             0..INTERVALS as u8,
         );
         let isolated_prob = isolate(
-            &MarketType::AnytimeGoalscorer,
+            &OfferType::AnytimeGoalscorer,
             &OutcomeType::Player(player.clone()),
             &exploration.prospects,
             &exploration.player_lookup,
@@ -492,7 +499,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         anytime_goalscorer_booksum,
     );
     let fitted_anytime_goalscorer = LabelledMarket {
-        market_type: MarketType::AnytimeGoalscorer,
+        offer_type: OfferType::AnytimeGoalscorer,
         outcomes: fitted_anytime_goalscorer_outcomes,
         market: Market::frame(
             &anytime_goalscorer_overround.overround,
@@ -509,7 +516,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
         println!(
             "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
-            fitted_anytime_goalscorer.market_type,
+            fitted_anytime_goalscorer.offer_type,
             fitted_anytime_goalscorer.market.probs.sum(),
             implied_booksum(&fitted_anytime_goalscorer.market.prices),
             fitted_first_goalscorer.market.probs.len(),
@@ -531,7 +538,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .iter()
     .map(|(sample, fitted)| {
         (
-            &sample.market_type,
+            &sample.offer_type,
             MarketErrors {
                 rmse: compute_error(
                     &sample.market.prices,
@@ -577,7 +584,7 @@ fn implied_booksum(prices: &[f64]) -> f64 {
 }
 
 fn fit_market(
-    market_type: MarketType,
+    offer_type: OfferType,
     map: &HashMap<OutcomeType, f64>,
     normal: f64,
 ) -> LabelledMarket {
@@ -590,7 +597,7 @@ fn fit_market(
     let prices = entries.iter().map(|(_, &price)| price).collect();
     let market = Market::fit(&OVERROUND_METHOD, prices, normal);
     LabelledMarket {
-        market_type,
+        offer_type,
         outcomes,
         market,
     }
@@ -598,7 +605,7 @@ fn fit_market(
 
 #[derive(Debug)]
 pub struct LabelledMarket {
-    market_type: MarketType,
+    offer_type: OfferType,
     outcomes: Vec<OutcomeType>,
     market: Market,
 }
@@ -713,13 +720,16 @@ fn fit_first_goalscorer(
                     intervals: INTERVALS as u8,
                     h1_probs: h1_probs.clone(),
                     h2_probs: h2_probs.clone(),
-                    max_total_goals: MAX_TOTAL_GOALS_FULL,
                     players: vec![(player.clone(), value)],
+                    prune_thresholds: PruneThresholds {
+                        max_total_goals: MAX_TOTAL_GOALS_FULL,
+                        min_prob: GOALSCORER_MIN_PROB,
+                    },
                 },
                 0..INTERVALS as u8,
             );
             let isolated_prob = isolate(
-                &MarketType::FirstGoalscorer,
+                &OfferType::FirstGoalscorer,
                 &OutcomeType::Player(player.clone()),
                 &exploration.prospects,
                 &exploration.player_lookup,
@@ -885,7 +895,7 @@ fn print_market(market: &LabelledMarket) -> Table {
     table
 }
 
-fn print_errors(errors: &[(&MarketType, MarketErrors)]) -> Table {
+fn print_errors(errors: &[(&OfferType, MarketErrors)]) -> Table {
     let mut table = Table::default()
         .with_cols(vec![
             Col::new(Styles::default().with(MinWidth(10)).with(Left)),
@@ -896,11 +906,11 @@ fn print_errors(errors: &[(&MarketType, MarketErrors)]) -> Table {
             Styles::default().with(Header(true)),
             vec!["Market".into(), "RMSRE".into(), "RMSE".into()],
         ));
-    for (market_type, error) in errors {
+    for (offer_type, error) in errors {
         table.push_row(Row::new(
             Styles::default(),
             vec![
-                format!("{:?}", market_type).into(),
+                format!("{:?}", offer_type).into(),
                 format!("{:.3}", error.rmsre).into(),
                 format!("{:.3}", error.rmse).into(),
             ],
@@ -918,7 +928,7 @@ fn print_overrounds(markets: &[LabelledMarket]) -> Table {
         table.push_row(Row::new(
             Styles::default(),
             vec![
-                format!("{:?}", market.market_type).into(),
+                format!("{:?}", market.offer_type).into(),
                 format!("{:.3}", market.market.overround.value).into(),
             ],
         ));

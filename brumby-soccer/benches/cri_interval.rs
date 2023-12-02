@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use brumby_soccer::interval;
-use brumby_soccer::interval::{IntervalConfig, ScoringProbs};
+use brumby_soccer::interval::{IntervalConfig, PruneThresholds, ScoringProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn run(intervals: u8, max_total_goals: u16) -> usize {
@@ -10,8 +10,11 @@ fn criterion_benchmark(c: &mut Criterion) {
                 intervals,
                 h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
                 h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-                max_total_goals,
                 players: vec![],
+                prune_thresholds: PruneThresholds {
+                    max_total_goals,
+                    min_prob: 1e-6,
+                },
             },
             0..intervals,
         )
@@ -20,7 +23,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     // sanity check
-    assert_eq!(16, run(3, u16::MAX));
+    assert_eq!(65, run(4, u16::MAX));
 
     c.bench_function("cri_interval_18_unbounded", |b| {
         b.iter(|| run(18, u16::MAX));
