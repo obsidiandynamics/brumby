@@ -170,16 +170,16 @@ pub fn from_interval(
     intervals: u8,
     explore_intervals: Range<u8>,
     max_total_goals: u16,
-    h1_params: ScoringProbs,
-    h2_params: ScoringProbs,
+    h1_probs: ScoringProbs,
+    h2_probs: ScoringProbs,
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
     let exploration = explore(
         &IntervalConfig {
             intervals,
-            h1_probs: h1_params,
-            h2_probs: h2_params,
+            h1_probs,
+            h2_probs,
             players: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals,

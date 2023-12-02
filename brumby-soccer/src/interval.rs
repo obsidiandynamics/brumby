@@ -1,7 +1,12 @@
-use rustc_hash::FxHashMap;
 use std::ops::Range;
 
+use rustc_hash::FxHashMap;
+
+use brumby::lookup::Lookup;
+
 use crate::domain::{OfferType, OutcomeType, Player, Score, Side};
+
+pub mod query;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Prospect {
@@ -54,9 +59,15 @@ pub struct Expansions {
 impl Expansions {
     fn validate(&self) {
         if self.player_split_stats {
-            assert!(self.player_stats, "cannot expand player split stats without player stats");
+            assert!(
+                self.player_stats,
+                "cannot expand player split stats without player stats"
+            );
         }
-        assert!(self.ft_score || self.player_stats || self.first_goalscorer, "at least one expansion must be enabled")
+        assert!(
+            self.ft_score || self.player_stats || self.first_goalscorer,
+            "at least one expansion must be enabled"
+        )
     }
 }
 
@@ -74,7 +85,7 @@ impl Default for Expansions {
 #[derive(Debug)]
 pub struct PruneThresholds {
     pub max_total_goals: u16,
-    pub min_prob: f64
+    pub min_prob: f64,
 }
 
 #[derive(Debug)]
@@ -89,7 +100,7 @@ pub struct IntervalConfig {
 
 #[derive(Debug)]
 pub struct Exploration {
-    pub player_lookup: Vec<Player>,
+    pub player_lookup: Lookup<Player>,
     pub prospects: Prospects,
     pub pruned: f64,
 }
@@ -118,10 +129,10 @@ enum Half {
     Second,
 }
 
-pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Exploration {
+pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Exploration {
     config.expansions.validate();
 
-    let mut player_lookup = Vec::with_capacity(config.players.len() + 1);
+    let mut player_lookup = Lookup::with_capacity(config.players.len() + 1);
     let mut home_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut away_scorers = Vec::with_capacity(config.players.len() + 1);
     let mut combined_home_scorer_prob = 0.0;
@@ -150,7 +161,7 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
     current_prospects.insert(Prospect::init(player_lookup.len()), 1.0);
     let mut pruned = 0.0;
 
-    for interval in explore_intervals {
+    for interval in include_intervals {
         let half = if interval < config.intervals / 2 {
             Half::First
         } else {
@@ -295,7 +306,10 @@ fn merge(
             merged.score.home += 1;
         }
 
-        if expansions.first_goalscorer && merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Home {
+        if expansions.first_goalscorer
+            && merged.first_scorer.is_none()
+            && partial.first_scoring_side.unwrap() == &Side::Home
+        {
             merged.first_scorer = Some(scorer);
         }
     }
@@ -314,7 +328,10 @@ fn merge(
             merged.score.away += 1;
         }
 
-        if expansions.first_goalscorer && merged.first_scorer.is_none() && partial.first_scoring_side.unwrap() == &Side::Away {
+        if expansions.first_goalscorer
+            && merged.first_scorer.is_none()
+            && partial.first_scoring_side.unwrap() == &Side::Away
+        {
             merged.first_scorer = Some(scorer);
         }
     }
@@ -324,99 +341,87 @@ fn merge(
         .or_insert(merged_prob);
 }
 
-#[derive(Debug)]
-pub enum IsolationState {
-    None,
-    PlayerLookup(usize)
-}
-
-#[must_use]
-pub fn isolate(
-    offer_type: &OfferType,
-    outcome_type: &OutcomeType,
-    prospects: &Prospects,
-    player_lookup: &[Player],
-) -> f64 {
-    match offer_type {
-        OfferType::HeadToHead(_) => unimplemented!(),
-        OfferType::TotalGoalsOverUnder(_, _) => unimplemented!(),
-        OfferType::CorrectScore(_) => unimplemented!(),
-        OfferType::DrawNoBet => unimplemented!(),
-        OfferType::AnytimeGoalscorer => {
-            isolate_anytime_goalscorer(outcome_type, prospects, player_lookup)
-        }
-        OfferType::FirstGoalscorer => {
-            isolate_first_goalscorer(outcome_type, prospects, player_lookup)
-        }
-        OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-        OfferType::AnytimeAssist => unimplemented!(),
-    }
-}
-
-#[must_use]
-fn isolate_first_goalscorer(
-    outcome_type: &OutcomeType,
-    prospects: &Prospects,
-    player_lookup: &[Player],
-) -> f64 {
-    match outcome_type {
-        OutcomeType::Player(player) => prospects
-            .iter()
-            .filter(|(prospect, _)| {
-                prospect
-                    .first_scorer
-                    .map(|scorer| &player_lookup[scorer] == player)
-                    .unwrap_or(false)
-            })
-            .map(|(_, prob)| prob)
-            .sum(),
-        OutcomeType::None => prospects
-            .iter()
-            .filter(|(prospect, _)| prospect.first_scorer.is_none())
-            .map(|(_, prob)| prob)
-            .sum(),
-        _ => panic!(
-            "{outcome_type:?} unsupported in {:?}",
-            OfferType::FirstGoalscorer
-        ),
-    }
-}
-
-#[must_use]
-fn isolate_anytime_goalscorer(
-    outcome_type: &OutcomeType,
-    prospects: &Prospects,
-    player_lookup: &[Player],
-) -> f64 {
-    match outcome_type {
-        OutcomeType::Player(player) => prospects
-            .iter()
-            .filter(|(prospect, _)| {
-                let scorer = prospect
-                    .stats
-                    .iter()
-                    .enumerate()
-                    .find(|(scorer_index, _)| &player_lookup[*scorer_index] == player);
-                match scorer {
-                    None => {
-                        panic!("missing {player:?} from stats")
-                    }
-                    Some((_, stats)) => stats.h1.goals > 0 || stats.h2.goals > 0,
-                }
-            })
-            .map(|(_, prob)| prob)
-            .sum(),
-        OutcomeType::None => prospects
-            .iter()
-            .filter(|(prospect, _)| prospect.first_scorer.is_none())
-            .map(|(_, prob)| prob)
-            .sum(),
-        _ => panic!(
-            "{outcome_type:?} unsupported in {:?}",
-            OfferType::AnytimeGoalscorer
-        ),
-    }
-}
+// #[must_use]
+// pub fn isolate(
+//     offer_type: &OfferType,
+//     outcome_type: &OutcomeType,
+//     prospects: &Prospects,
+//     player_lookup: &Lookup<Player>,
+// ) -> f64 {
+//     match offer_type {
+//         OfferType::HeadToHead(_) => unimplemented!(),
+//         OfferType::TotalGoalsOverUnder(_, _) => unimplemented!(),
+//         OfferType::CorrectScore(_) => unimplemented!(),
+//         OfferType::DrawNoBet => unimplemented!(),
+//         OfferType::AnytimeGoalscorer => {
+//             isolate_anytime_goalscorer(outcome_type, prospects, player_lookup)
+//         }
+//         OfferType::FirstGoalscorer => {
+//             isolate_first_goalscorer(outcome_type, prospects, player_lookup)
+//         }
+//         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
+//         OfferType::AnytimeAssist => unimplemented!(),
+//     }
+// }
+//
+// #[must_use]
+// fn isolate_first_goalscorer(
+//     outcome_type: &OutcomeType,
+//     prospects: &Prospects,
+//     player_lookup: &Lookup<Player>,
+// ) -> f64 {
+//     match outcome_type {
+//         OutcomeType::Player(player) => prospects
+//             .iter()
+//             .filter(|(prospect, _)| {
+//                 prospect
+//                     .first_scorer
+//                     .map(|scorer| &player_lookup[scorer] == player)
+//                     .unwrap_or(false)
+//             })
+//             .map(|(_, prob)| prob)
+//             .sum(),
+//         OutcomeType::None => prospects
+//             .iter()
+//             .filter(|(prospect, _)| prospect.first_scorer.is_none())
+//             .map(|(_, prob)| prob)
+//             .sum(),
+//         _ => panic!("{outcome_type:?} unsupported"),
+//     }
+// }
+//
+// #[must_use]
+// fn isolate_anytime_goalscorer(
+//     outcome_type: &OutcomeType,
+//     prospects: &Prospects,
+//     player_lookup: &Lookup<Player>,
+// ) -> f64 {
+//     match outcome_type {
+//         OutcomeType::Player(player) => prospects
+//             .iter()
+//             .filter(|(prospect, _)| {
+//                 let scorer = prospect
+//                     .stats
+//                     .iter()
+//                     .enumerate()
+//                     .find(|(scorer_index, _)| &player_lookup[*scorer_index] == player);
+//                 match scorer {
+//                     None => {
+//                         panic!("missing {player:?} from stats")
+//                     }
+//                     Some((_, stats)) => stats.h1.goals > 0 || stats.h2.goals > 0,
+//                 }
+//             })
+//             .map(|(_, prob)| prob)
+//             .sum(),
+//         OutcomeType::None => prospects
+//             .iter()
+//             .filter(|(prospect, _)| prospect.first_scorer.is_none())
+//             .map(|(_, prob)| prob)
+//             .sum(),
+//         _ => panic!("{outcome_type:?} unsupported"),
+//     }
+// }
 
 #[cfg(test)]
 mod tests;

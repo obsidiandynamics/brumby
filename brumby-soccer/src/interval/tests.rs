@@ -1,6 +1,7 @@
 use super::*;
 use crate::domain::Player;
 use assert_float_eq::*;
+use crate::interval::query::isolate;
 
 fn print_prospects(prospects: &Prospects) {
     for (prospect, prob) in prospects {

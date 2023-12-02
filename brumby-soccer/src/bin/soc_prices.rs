@@ -18,7 +18,7 @@ use brumby::{factorial, poisson};
 use brumby_soccer::{scoregrid};
 use brumby_soccer::domain::{OfferType, OutcomeType, Over, Period, Player, Side};
 use brumby_soccer::domain::Player::Named;
-use brumby_soccer::interval::{Expansions, explore, IntervalConfig, isolate, PruneThresholds, ScoringProbs};
+use brumby_soccer::interval::{Expansions, explore, IntervalConfig, PruneThresholds, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
@@ -28,6 +28,7 @@ use brumby::opt::{
 use brumby::probs::SliceExt;
 use brumby_soccer::scoregrid::{from_correct_score, home_away_expectations};
 use brumby_soccer::data::{ContestSummary, download_by_id};
+use brumby_soccer::interval::query::isolate;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;

@@ -1,7 +1,8 @@
 use brumby_soccer::domain::{OfferType, OutcomeType, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby_soccer::interval::{explore, isolate, Exploration, IntervalConfig, ScoringProbs, PruneThresholds};
+use brumby_soccer::interval::{explore, Exploration, IntervalConfig, ScoringProbs, PruneThresholds};
+use brumby_soccer::interval::query::isolate;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let player = Player::Named(Side::Home, "Markos".into());
@@ -33,7 +34,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     );
     assert!(isolated > 0.0);
 
-    c.bench_function("cri_isolate_first_goalscorer_18_unbounded", |b| {
+    c.bench_function("cri_isolate_first_goalscorer_18", |b| {
         let exploration = prepare(18, u16::MAX, player.clone());
         b.iter(|| {
             isolate(
