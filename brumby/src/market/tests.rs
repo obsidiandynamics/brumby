@@ -345,3 +345,14 @@ fn frame_odds_ratio() {
         );
     }
 }
+
+#[test]
+fn booksum() {
+    let probs = vec![0.1, 0.2, 0.3, 0.4, 0.0];
+    let market = Market::frame(&Overround {
+        method: OverroundMethod::Multiplicative,
+        value: 1.1,
+    }, probs, &BOUNDS);
+    assert_eq!(1.0, market.fair_booksum());
+    assert_eq!(1.1, market.offered_booksum());
+}

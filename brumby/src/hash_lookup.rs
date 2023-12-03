@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::hash::Hash;
 use std::ops::Index;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HashLookup<T: Eq + PartialEq + Hash> {
     item_to_index: FxHashMap<T, usize>,
     index_to_item: Vec<T>,
@@ -30,11 +30,17 @@ impl<T: Eq + PartialEq + Hash> HashLookup<T> {
     }
 
     pub fn index_of(&self, item: &T) -> Option<usize> {
-        self.item_to_index.get(&item).map(|&index| index)
+        self.item_to_index.get(&item).copied()
     }
 
     pub fn len(&self) -> usize {
         self.index_to_item.len()
+    }
+
+    pub fn is_empty(&self) -> bool { self.index_to_item.is_empty() }
+
+    pub fn items(&self) -> &[T] {
+        &self.index_to_item
     }
 
     fn insert_unique(item_to_index: &mut FxHashMap<T, usize>, item: &T, index: usize) where T: Clone {
@@ -76,9 +82,12 @@ mod tests {
     fn push_and_resolve() {
         let mut lookup = HashLookup::with_capacity(3);
         assert_eq!(0, lookup.len());
+        assert!(lookup.is_empty());
         lookup.push("zero");
         lookup.push("one");
+        assert!(!lookup.is_empty());
         assert_eq!(2, lookup.len());
+        assert_eq!(&["zero", "one"], lookup.items());
 
         assert_eq!(Some(&"zero"), lookup.item_at(0));
         assert_eq!(Some(0), lookup.index_of(&"zero"));
@@ -100,6 +109,7 @@ mod tests {
     #[test]
     fn from_vec() {
         let lookup = HashLookup::from(vec!["zero", "one"]);
+        assert_eq!(&["zero", "one"], lookup.items());
         assert_eq!(Some(&"zero"), lookup.item_at(0));
         assert_eq!(Some(1), lookup.index_of(&"one"));
         assert_eq!(2, lookup.len());

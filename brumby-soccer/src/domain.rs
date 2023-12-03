@@ -1,3 +1,6 @@
+use brumby::hash_lookup::HashLookup;
+use brumby::market::Market;
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Score {
     pub home: u8,
@@ -36,7 +39,7 @@ pub enum Period {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OfferType {
     HeadToHead(Period),
-    TotalGoalsOverUnder(Period, Over),
+    TotalGoals(Period, Over),
     CorrectScore(Period),
     DrawNoBet,
     AnytimeGoalscorer,
@@ -66,4 +69,17 @@ pub enum OutcomeType {
     Score(Score),
     Player(Player),
     None,
+}
+
+#[derive(Debug)]
+pub struct Offer {
+    pub offer_type: OfferType,
+    pub outcomes: HashLookup<OutcomeType>,
+    pub market: Market,
+}
+
+#[derive(Debug)]
+pub struct FittingErrors {
+    pub rmse: f64,
+    pub rmsre: f64,
 }

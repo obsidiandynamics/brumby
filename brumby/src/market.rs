@@ -83,6 +83,14 @@ impl Market {
         Ok(())
     }
 
+    pub fn fair_booksum(&self) -> f64 {
+        self.probs.sum()
+    }
+
+    pub fn offered_booksum(&self) -> f64 {
+        self.prices.iter().map(|price| 1.0 / price).sum()
+    }
+
     pub fn fit(method: &OverroundMethod, prices: Vec<f64>, fair_sum: f64) -> Self {
         match method {
             OverroundMethod::Multiplicative => Self::fit_multiplicative(prices, fair_sum),

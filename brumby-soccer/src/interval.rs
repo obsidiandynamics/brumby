@@ -10,7 +10,8 @@ pub mod query;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Prospect {
-    pub score: Score,
+    pub ht_score: Score,
+    pub ft_score: Score,
     pub stats: Vec<PlayerStats>,
     pub first_scorer: Option<usize>,
 }
@@ -18,9 +19,17 @@ impl Prospect {
     fn init(players: usize) -> Prospect {
         let stats = vec![PlayerStats::default(); players];
         Prospect {
-            score: Score { home: 0, away: 0 },
+            ht_score: Score::nil_all(),
+            ft_score: Score::nil_all(),
             stats,
             first_scorer: None,
+        }
+    }
+
+    fn h2_score(&self) -> Score {
+        Score {
+            home: self.ft_score.home - self.ht_score.home,
+            away: self.ft_score.away - self.ht_score.away,
         }
     }
 }
@@ -51,6 +60,7 @@ impl<'a> From<&'a [f64]> for ScoringProbs {
 
 #[derive(Debug)]
 pub struct Expansions {
+    pub ht_score: bool,
     pub ft_score: bool,
     pub player_stats: bool,
     pub player_split_stats: bool,
@@ -65,7 +75,7 @@ impl Expansions {
             );
         }
         assert!(
-            self.ft_score || self.player_stats || self.first_goalscorer,
+            self.ft_score || self.ht_score || self.player_stats || self.first_goalscorer,
             "at least one expansion must be enabled"
         )
     }
@@ -75,6 +85,7 @@ impl Default for Expansions {
     fn default() -> Self {
         Self {
             ft_score: true,
+            ht_score: true,
             player_stats: true,
             player_split_stats: true,
             first_goalscorer: true,
@@ -124,6 +135,7 @@ pub struct PlayerStats {
     pub h2: SplitStats,
 }
 
+#[derive(Debug, Eq, PartialEq)]
 enum Half {
     First,
     Second,
@@ -199,7 +211,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
             );
 
             // at least one more goal allowed before pruning
-            if current_prospect.score.total() < config.prune_thresholds.max_total_goals {
+            if current_prospect.ft_score.total() < config.prune_thresholds.max_total_goals {
                 // only the home team scores
                 for (player_index, player_prob) in &home_scorers {
                     let partial = PartialProspect {
@@ -240,7 +252,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
             }
 
             // at least two more goals allowed before pruning
-            if current_prospect.score.total() + 1 < config.prune_thresholds.max_total_goals {
+            if current_prospect.ft_score.total() + 1 < config.prune_thresholds.max_total_goals {
                 // both teams score
                 for (home_player_index, home_player_prob) in &home_scorers {
                     for (away_player_index, away_player_prob) in &away_scorers {
@@ -303,7 +315,10 @@ fn merge(
         }
 
         if expansions.ft_score {
-            merged.score.home += 1;
+            merged.ft_score.home += 1;
+        }
+        if expansions.ht_score && half == &Half::First {
+            merged.ht_score.home += 1;
         }
 
         if expansions.first_goalscorer
@@ -325,7 +340,10 @@ fn merge(
         }
 
         if expansions.ft_score {
-            merged.score.away += 1;
+            merged.ft_score.away += 1;
+        }
+        if expansions.ht_score && half == &Half::First {
+            merged.ht_score.away += 1;
         }
 
         if expansions.first_goalscorer
@@ -340,88 +358,6 @@ fn merge(
         .and_modify(|prob| *prob += merged_prob)
         .or_insert(merged_prob);
 }
-
-// #[must_use]
-// pub fn isolate(
-//     offer_type: &OfferType,
-//     outcome_type: &OutcomeType,
-//     prospects: &Prospects,
-//     player_lookup: &Lookup<Player>,
-// ) -> f64 {
-//     match offer_type {
-//         OfferType::HeadToHead(_) => unimplemented!(),
-//         OfferType::TotalGoalsOverUnder(_, _) => unimplemented!(),
-//         OfferType::CorrectScore(_) => unimplemented!(),
-//         OfferType::DrawNoBet => unimplemented!(),
-//         OfferType::AnytimeGoalscorer => {
-//             isolate_anytime_goalscorer(outcome_type, prospects, player_lookup)
-//         }
-//         OfferType::FirstGoalscorer => {
-//             isolate_first_goalscorer(outcome_type, prospects, player_lookup)
-//         }
-//         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-//         OfferType::AnytimeAssist => unimplemented!(),
-//     }
-// }
-//
-// #[must_use]
-// fn isolate_first_goalscorer(
-//     outcome_type: &OutcomeType,
-//     prospects: &Prospects,
-//     player_lookup: &Lookup<Player>,
-// ) -> f64 {
-//     match outcome_type {
-//         OutcomeType::Player(player) => prospects
-//             .iter()
-//             .filter(|(prospect, _)| {
-//                 prospect
-//                     .first_scorer
-//                     .map(|scorer| &player_lookup[scorer] == player)
-//                     .unwrap_or(false)
-//             })
-//             .map(|(_, prob)| prob)
-//             .sum(),
-//         OutcomeType::None => prospects
-//             .iter()
-//             .filter(|(prospect, _)| prospect.first_scorer.is_none())
-//             .map(|(_, prob)| prob)
-//             .sum(),
-//         _ => panic!("{outcome_type:?} unsupported"),
-//     }
-// }
-//
-// #[must_use]
-// fn isolate_anytime_goalscorer(
-//     outcome_type: &OutcomeType,
-//     prospects: &Prospects,
-//     player_lookup: &Lookup<Player>,
-// ) -> f64 {
-//     match outcome_type {
-//         OutcomeType::Player(player) => prospects
-//             .iter()
-//             .filter(|(prospect, _)| {
-//                 let scorer = prospect
-//                     .stats
-//                     .iter()
-//                     .enumerate()
-//                     .find(|(scorer_index, _)| &player_lookup[*scorer_index] == player);
-//                 match scorer {
-//                     None => {
-//                         panic!("missing {player:?} from stats")
-//                     }
-//                     Some((_, stats)) => stats.h1.goals > 0 || stats.h2.goals > 0,
-//                 }
-//             })
-//             .map(|(_, prob)| prob)
-//             .sum(),
-//         OutcomeType::None => prospects
-//             .iter()
-//             .filter(|(prospect, _)| prospect.first_scorer.is_none())
-//             .map(|(_, prob)| prob)
-//             .sum(),
-//         _ => panic!("{outcome_type:?} unsupported"),
-//     }
-// }
 
 #[cfg(test)]
 mod tests;

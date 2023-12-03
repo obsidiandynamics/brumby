@@ -149,23 +149,6 @@ pub fn from_iterator(iter: Iter, scoregrid: &mut Matrix<f64>) {
     }
 }
 
-// pub fn from_interval(
-//     interval_home_prob: f64,
-//     interval_away_prob: f64,
-//     interval_common_prob: f64,
-//     scoregrid: &mut Matrix<f64>,
-// ) {
-//     assert_eq!(scoregrid.rows(), scoregrid.cols());
-//     let intervals = scoregrid.rows() - 1;
-//     let space = ScoreOutcomeSpace {
-//         interval_home_prob,
-//         interval_away_prob,
-//         interval_common_prob,
-//     };
-//     let mut fixtures = IterFixtures::new(intervals);
-//     let iter = Iter::new(&space, &mut fixtures);
-//     from_iterator(iter, scoregrid);
-// }
 pub fn from_interval(
     intervals: u8,
     explore_intervals: Range<u8>,
@@ -187,6 +170,7 @@ pub fn from_interval(
             },
             expansions: Expansions {
                 ft_score: true,
+                ht_score: false,
                 player_stats: false,
                 player_split_stats: false,
                 first_goalscorer: false,
@@ -195,7 +179,7 @@ pub fn from_interval(
         explore_intervals,
     );
     for (scenario, prob) in exploration.prospects {
-        scoregrid[(scenario.score.home as usize, scenario.score.away as usize)] += prob;
+        scoregrid[(scenario.ft_score.home as usize, scenario.ft_score.away as usize)] += prob;
     }
 }
 
