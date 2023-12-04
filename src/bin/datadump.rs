@@ -1,21 +1,23 @@
-use anyhow::anyhow;
-use brumby::csv::{CsvWriter, Record};
-use brumby::{data, model};
-use brumby::data::{EventDetailExt, PredicateClosures};
-use brumby::market::{Market, OverroundMethod};
-use brumby::model::cf::Factor;
-use brumby::model::fit;
-use brumby::model::fit::FitOptions;
-use brumby::probs::SliceExt;
-use clap::Parser;
-use racing_scraper::models::EventType;
 use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Instant;
+
+use anyhow::anyhow;
+use clap::Parser;
+use racing_scraper::models::EventType;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
+
+use brumby::{model, racing_data};
+use brumby::csv::{CsvWriter, Record};
+use brumby::market::{Market, OverroundMethod};
+use brumby::model::cf::Factor;
+use brumby::model::fit;
+use brumby::model::fit::FitOptions;
+use brumby::probs::SliceExt;
+use brumby::racing_data::{PredicateClosures, RaceSummary};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 
@@ -73,12 +75,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut predicates = vec![];
     if let Some(race_type) = args.race_type {
-        predicates.push(data::Predicate::Type { race_type });
+        predicates.push(racing_data::Predicate::Type { race_type });
     }
     if let Some(cutoff_worst) = args.departure {
-        predicates.push(data::Predicate::Departure { cutoff_worst })
+        predicates.push(racing_data::Predicate::Departure { cutoff_worst })
     }
-    let race_files = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let race_files = racing_data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
     let total_num_races = race_files.len();
     let mut unique_races = HashSet::new();
     let mut duplicate_races = 0;
@@ -94,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             race_file.file.to_str().unwrap(),
             index + 1,
         );
-        let race = race_file.race.summarise();
+        let race = RaceSummary::from(race_file.race);
         let markets: Vec<_> = (0..race.prices.rows())
             .map(|rank| {
                 let prices = race.prices.row_slice(rank).to_vec();

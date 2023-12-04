@@ -13,8 +13,8 @@ use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Cell, Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::data;
-use brumby::data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
+use brumby::racing_data;
+use brumby::racing_data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
 use brumby::model::cf::Coefficients;
@@ -68,12 +68,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start_time = Instant::now();
     let mut predicates = vec![];
     if let Some(race_type) = args.race_type {
-        predicates.push(data::Predicate::Type { race_type });
+        predicates.push(racing_data::Predicate::Type { race_type });
     }
     if let Some(cutoff_worst) = args.departure {
-        predicates.push(data::Predicate::Departure { cutoff_worst })
+        predicates.push(racing_data::Predicate::Departure { cutoff_worst })
     }
-    let races = data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
+    let races = racing_data::read_from_dir(args.dir.unwrap(), PredicateClosures::from(predicates))?;
 
     let mut configs = HashMap::new();
     for race_type in [EventType::Thoroughbred, EventType::Greyhound] {
@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             index + 1
         );
         let departure = race_file.race.place_price_departure();
-        let race = race_file.race.summarise();
+        let race = RaceSummary::from(race_file.race);
         let calibrator = Fitter::try_from(configs[&race.race_type].clone())?;
         let sample_top_n = TopN {
             markets: (0..race.prices.rows())

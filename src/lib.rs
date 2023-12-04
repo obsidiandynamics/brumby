@@ -7,7 +7,6 @@
 pub mod capture;
 pub mod comb;
 pub mod csv;
-pub mod data;
 pub mod display;
 pub mod entity;
 pub mod factorial;
@@ -23,8 +22,10 @@ pub mod opt;
 pub mod poisson;
 pub mod print;
 pub mod probs;
+pub mod racing_data;
 pub mod scoregrid;
 pub mod selection;
+pub mod soccer_data;
 pub mod timed;
 
 #[cfg(test)]

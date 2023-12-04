@@ -1,8 +1,6 @@
 use rustc_hash::FxHashMap;
-use strum::IntoEnumIterator;
 
 use crate::entity::{MarketType, OutcomeType, Player, Score, Side};
-use crate::scoregrid::GoalEvent;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Prospect {
@@ -90,60 +88,73 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
 
     for _ in 0..config.intervals {
         let mut next_prospects = init_prospects(current_prospects.len() * 4);
-        for goal_event in GoalEvent::iter() {
-            match goal_event {
-                GoalEvent::Neither => {
+
+        for (current_prospect, current_prob) in current_prospects {
+            // let partial_goals = if partial.home_scorer.is_some() { 1 } else { 0 }
+            //     + if partial.away_scorer.is_some() { 1 } else { 0 };
+            // // let partial_goals = partial.home_scorer.map(|_| 1).unwrap_or(0)
+            // //     + partial.away_scorer.map(|_| 1).unwrap_or(0);
+            // if current_prospect.score.total() + partial_goals > config.max_total_goals {
+            //     continue;
+            // }
+
+            // neither team scores
+            let partial = PartialProspect {
+                home_scorer: None,
+                away_scorer: None,
+                first_scoring_side: None,
+                prob: neither_prob,
+            };
+            merge(&current_prospect, current_prob, partial, &mut next_prospects);
+
+            // at least one more goal allowed before pruning
+            if current_prospect.score.total() < config.max_total_goals {
+                // only the home team scores
+                for (player_index, player_prob) in &home_scorers {
+                    let partial = PartialProspect {
+                        home_scorer: Some(*player_index),
+                        away_scorer: None,
+                        first_scoring_side: Some(&Side::Home),
+                        prob: config.home_prob * player_prob,
+                    };
+                    merge(&current_prospect, current_prob, partial, &mut next_prospects);
+                }
+
+                // only the away team scores
+                for (player_index, player_prob) in &away_scorers {
                     let partial = PartialProspect {
                         home_scorer: None,
-                        away_scorer: None,
-                        first_scoring_side: None,
-                        prob: neither_prob,
+                        away_scorer: Some(*player_index),
+                        first_scoring_side: Some(&Side::Away),
+                        prob: config.away_prob * player_prob,
                     };
-                    pruned += merge(config, &current_prospects, partial, &mut next_prospects);
+                    merge(&current_prospect, current_prob, partial, &mut next_prospects);
                 }
-                GoalEvent::Home => {
-                    for (player_index, player_prob) in &home_scorers {
-                        let partial = PartialProspect {
-                            home_scorer: Some(*player_index),
-                            away_scorer: None,
-                            first_scoring_side: Some(&Side::Home),
-                            prob: config.home_prob * player_prob,
-                        };
-                        pruned += merge(config, &current_prospects, partial, &mut next_prospects);
-                    }
-                }
-                GoalEvent::Away => {
-                    for (player_index, player_prob) in &away_scorers {
-                        let partial = PartialProspect {
-                            home_scorer: None,
-                            away_scorer: Some(*player_index),
-                            first_scoring_side: Some(&Side::Away),
-                            prob: config.away_prob * player_prob,
-                        };
-                        pruned += merge(config, &current_prospects, partial, &mut next_prospects);
-                    }
-                }
-                GoalEvent::Both => {
-                    for (home_player_index, home_player_prob) in &home_scorers {
-                        for (away_player_index, away_player_prob) in &away_scorers {
-                            for first_scoring_side in [&Side::Home, &Side::Away] {
-                                let partial = PartialProspect {
-                                    home_scorer: Some(*home_player_index),
-                                    away_scorer: Some(*away_player_index),
-                                    first_scoring_side: Some(first_scoring_side),
-                                    prob: config.common_prob
-                                        * home_player_prob
-                                        * away_player_prob
-                                        * 0.5,
-                                };
-                                pruned +=
-                                    merge(config, &current_prospects, partial, &mut next_prospects);
-                            }
+            } else {
+                pruned += current_prob * (config.home_prob + config.away_prob);
+            }
+
+            // at least two more goals allowed before pruning
+            if current_prospect.score.total() + 1 < config.max_total_goals {
+                // both teams score
+                for (home_player_index, home_player_prob) in &home_scorers {
+                    for (away_player_index, away_player_prob) in &away_scorers {
+                        for first_scoring_side in [&Side::Home, &Side::Away] {
+                            let partial = PartialProspect {
+                                home_scorer: Some(*home_player_index),
+                                away_scorer: Some(*away_player_index),
+                                first_scoring_side: Some(first_scoring_side),
+                                prob: config.common_prob * home_player_prob * away_player_prob * 0.5,
+                            };
+                            merge(&current_prospect, current_prob, partial, &mut next_prospects);
                         }
                     }
                 }
-            };
+            } else {
+                pruned += current_prob * config.common_prob;
+            }
         }
+
         current_prospects = next_prospects;
     }
 
@@ -154,26 +165,15 @@ pub fn explore(config: &IntervalConfig) -> Exploration {
     }
 }
 
-#[must_use]
+#[inline]
 fn merge(
-    config: &IntervalConfig,
-    current_prospects: &Prospects,
+    current_prospect: &Prospect,
+    current_prob: f64,
     partial: PartialProspect,
     next_prospects: &mut Prospects,
-) -> f64 {
-    let mut pruned = 0.0;
-    for (current, current_prob) in current_prospects {
-        let merged_prob = *current_prob * partial.prob;
-        let partial_goals = if partial.home_scorer.is_some() { 1 } else { 0 }
-            + if partial.away_scorer.is_some() { 1 } else { 0 };
-        // let partial_goals = partial.home_scorer.map(|_| 1).unwrap_or(0)
-        //     + partial.away_scorer.map(|_| 1).unwrap_or(0);
-        if current.score.total() + partial_goals > config.max_total_goals {
-            pruned += merged_prob;
-            continue;
-        }
-
-        let mut merged = current.clone();
+) {
+        let merged_prob = current_prob * partial.prob;
+        let mut merged = current_prospect.clone();
         if let Some(scorer) = partial.home_scorer {
             merged.stats[scorer].goals += 1;
             merged.score.home += 1;
@@ -192,8 +192,6 @@ fn merge(
             .entry(merged)
             .and_modify(|prob| *prob += merged_prob)
             .or_insert(merged_prob);
-    }
-    pruned
 }
 
 #[must_use]
