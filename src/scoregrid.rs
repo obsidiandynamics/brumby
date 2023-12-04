@@ -265,6 +265,20 @@ pub fn from_correct_score(outcomes: &[OutcomeType], probs: &[f64], scoregrid: &m
     }
 }
 
+pub fn home_away_expectations(scoregrid: &Matrix<f64>) -> (f64, f64) {
+    let (mut home_expectation, mut away_expectation) = (0.0, 0.0);
+
+    for home_goals in 0..scoregrid.rows() {
+        for away_goals in 0..scoregrid.cols() {
+            let prob = scoregrid[(home_goals, away_goals)];
+            home_expectation += home_goals as f64 * prob;
+            away_expectation += away_goals as f64 * prob;
+        }
+    }
+
+    (home_expectation, away_expectation)
+}
+
 pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid[(0, 0)] += additive;
     scoregrid.flatten_mut().normalise(1.0);
