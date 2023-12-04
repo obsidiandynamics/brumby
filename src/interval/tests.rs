@@ -1,3 +1,4 @@
+use assert_float_eq::*;
 use super::*;
 use crate::entity::Player;
 
@@ -367,4 +368,82 @@ fn explore_1x1_player() {
         &exploration.player_lookup
     );
     assert_eq!(0.6875, isolated_anytime_other);
+}
+
+#[test]
+fn explore_2x2_player() {
+    let player = Player::Named(Side::Home, "Markos".into());
+    let exploration = explore(&IntervalConfig {
+        intervals: 2,
+        home_prob: 0.25,
+        away_prob: 0.25,
+        common_prob: 0.25,
+        max_total_goals: u16::MAX,
+        players: vec![(player.clone(), 0.25)],
+    });
+    assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
+    assert_eq!(0.0, exploration.pruned);
+
+    let isolated_1gs_none = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::None,
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_eq!(0.0625, isolated_1gs_none);
+
+    let isolated_1gs_player = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::Player(player.clone()),
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_eq!(0.1171875, isolated_1gs_player);
+
+    let isolated_1gs_other = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::Player(Player::Other),
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_eq!(1.0 - 0.0625 - 0.1171875, isolated_1gs_other);
+}
+
+#[test]
+fn explore_2x2_player_asymmetric() {
+    let player = Player::Named(Side::Home, "Markos".into());
+    let exploration = explore(&IntervalConfig {
+        intervals: 2,
+        home_prob: 0.3,
+        away_prob: 0.2,
+        common_prob: 0.1,
+        max_total_goals: u16::MAX,
+        players: vec![(player.clone(), 0.25)],
+    });
+    assert_float_relative_eq!(1.0, exploration.prospects.values().sum::<f64>());
+    assert_eq!(0.0, exploration.pruned);
+
+    let isolated_1gs_none = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::None,
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_float_relative_eq!(0.16, isolated_1gs_none);
+
+    let isolated_1gs_player = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::Player(player.clone()),
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_float_relative_eq!(0.1225, isolated_1gs_player);
+
+    let isolated_1gs_other = isolate(
+        &MarketType::FirstGoalscorer,
+        &OutcomeType::Player(Player::Other),
+        &exploration.prospects,
+        &exploration.player_lookup
+    );
+    assert_float_relative_eq!(1.0 - 0.16 - 0.1225, isolated_1gs_other);
 }

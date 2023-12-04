@@ -219,25 +219,25 @@ pub fn from_bivariate_poisson(
 }
 
 pub fn from_binomial(
+    intervals: u8,
     interval_home_prob: f64,
     interval_away_prob: f64,
     scoregrid: &mut Matrix<f64>,
 ) {
     let factorial = factorial::Calculator;
-    let home_intervals = scoregrid.rows() as u8 - 1;
-    let away_intervals = scoregrid.cols() as u8 - 1;
-    for home_goals in 0..=home_intervals {
-        for away_goals in 0..=away_intervals {
+    for home_goals in 0..=u8::min(intervals, (scoregrid.rows() - 1) as u8) {
+        for away_goals in 0..=u8::min(intervals, (scoregrid.cols() - 1) as u8) {
             let home_prob =
-                binomial(home_intervals, home_goals, interval_home_prob, &factorial);
+                binomial(intervals, home_goals, interval_home_prob, &factorial);
             let away_prob =
-                binomial(away_intervals, away_goals, interval_away_prob, &factorial);
+                binomial(intervals, away_goals, interval_away_prob, &factorial);
             scoregrid[(home_goals as usize, away_goals as usize)] = home_prob * away_prob;
         }
     }
 }
 
 pub fn from_bivariate_binomial(
+    intervals: u8,
     interval_home_prob: f64,
     interval_away_prob: f64,
     interval_common_prob: f64,
@@ -245,10 +245,22 @@ pub fn from_bivariate_binomial(
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
     let factorial = factorial::Calculator;
-    let intervals = scoregrid.rows() as u8 - 1;
-    for home_goals in 0..=intervals {
-        for away_goals in 0..=intervals {
+    for home_goals in 0..=u8::min(intervals, (scoregrid.rows() - 1) as u8) {
+        for away_goals in 0..=u8::min(intervals, (scoregrid.cols() - 1) as u8) {
             scoregrid[(home_goals as usize, away_goals as usize)] = bivariate_binomial(intervals, home_goals, away_goals, interval_home_prob, interval_away_prob, interval_common_prob, &factorial);
+        }
+    }
+}
+
+pub fn from_correct_score(outcomes: &[OutcomeType], probs: &[f64], scoregrid: &mut Matrix<f64>) {
+    for (index, outcome) in outcomes.iter().enumerate() {
+        match outcome {
+            OutcomeType::Score(score) => {
+                if (score.home as usize) < scoregrid.rows() && (score.away as usize) < scoregrid.cols() {
+                    scoregrid[(score.home as usize, score.away as usize)] += probs[index];
+                }
+            }
+            _ => panic!("unexpected {outcome:?}")
         }
     }
 }

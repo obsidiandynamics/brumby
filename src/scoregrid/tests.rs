@@ -110,7 +110,7 @@ pub fn univariate_poisson_binomial_similarity() {
         |_| true,
         |values| {
             let mut binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-            from_binomial(values[0], values[1], &mut binomial);
+            from_binomial(INTERVALS as u8, values[0], values[1], &mut binomial);
             compute_mse(poisson.flatten(), binomial.flatten())
         },
     );
@@ -118,6 +118,7 @@ pub fn univariate_poisson_binomial_similarity() {
 
     let mut binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     from_binomial(
+        INTERVALS as u8,
         search_outcome.optimal_values[0],
         search_outcome.optimal_values[1],
         &mut binomial,
@@ -168,7 +169,7 @@ pub fn bivariate_poisson_binomial_similarity() {
         |_| true,
         |values| {
             let mut biv_binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-            from_bivariate_binomial(values[0], values[1], values[2], &mut biv_binomial);
+            from_bivariate_binomial(INTERVALS as u8,values[0], values[1], values[2], &mut biv_binomial);
             compute_mse(biv_poisson.flatten(), biv_binomial.flatten())
         },
     );
@@ -176,6 +177,7 @@ pub fn bivariate_poisson_binomial_similarity() {
 
     let mut biv_binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
     from_bivariate_binomial(
+        INTERVALS as u8,
         search_outcome.optimal_values[0],
         search_outcome.optimal_values[1],
         search_outcome.optimal_values[2],
@@ -193,12 +195,13 @@ pub fn bivariate_poisson_binomial_similarity() {
 
 #[test]
 pub fn bivariate_binomial_interval_equivalence() {
-    const INTERVAL_HOME_PROB: f64 = 0.25;
-    const INTERVAL_AWAY_PROB: f64 = 0.2;
-    const INTERVAL_COMMON_PROB: f64 = 0.15;
+    // 0.06208521833506868, 0.3083379160120557, 0.04249018964350848
+    const INTERVAL_HOME_PROB: f64 = 0.06208521833506868;
+    const INTERVAL_AWAY_PROB: f64 = 0.3083379160120557;
+    const INTERVAL_COMMON_PROB: f64 = 0.04249018964350848;
     const INTERVALS: usize = 6;
     let mut biv_binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_bivariate_binomial(INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut biv_binomial);
+    from_bivariate_binomial(INTERVALS as u8, INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut biv_binomial);
     println!(
         "biv_binomial:\n{}sum: {}",
         biv_binomial.verbose(),
