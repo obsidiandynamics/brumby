@@ -1,6 +1,6 @@
-use assert_float_eq::*;
 use super::*;
 use crate::entity::Player;
+use assert_float_eq::*;
 
 fn assert_expected_prospects(expected: &[(Prospect, f64)], actual: &Prospects) {
     for (expected_prospect, expected_probability) in expected {
@@ -17,14 +17,16 @@ fn assert_expected_prospects(expected: &[(Prospect, f64)], actual: &Prospects) {
 
 #[test]
 fn explore_2x2() {
-    let exploration = explore(&IntervalConfig {
-        intervals: 2,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: u16::MAX,
-        players: vec![],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 2,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: u16::MAX,
+            players: vec![],
+        },
+        0..2,
+    );
     assert_eq!(9, exploration.prospects.len());
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     let expected = [
@@ -108,7 +110,7 @@ fn explore_2x2() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.0625, isolated_1gs_none);
 
@@ -116,7 +118,7 @@ fn explore_2x2() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(1.0 - 0.0625, isolated_1gs_other);
 
@@ -124,7 +126,7 @@ fn explore_2x2() {
         &MarketType::AnytimeGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.0625, isolated_anytime_none);
 
@@ -132,21 +134,23 @@ fn explore_2x2() {
         &MarketType::AnytimeGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(1.0 - 0.0625, isolated_anytime_other);
 }
 
 #[test]
 fn explore_2x2_pruned() {
-    let exploration = explore(&IntervalConfig {
-        intervals: 2,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: 2,
-        players: vec![],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 2,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: 2,
+            players: vec![],
+        },
+        0..2,
+    );
     let expected = [
         (
             Prospect {
@@ -205,7 +209,7 @@ fn explore_2x2_pruned() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.0625, isolated_1gs_none);
 
@@ -213,21 +217,23 @@ fn explore_2x2_pruned() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(1.0 - 0.0625 - 0.3125, isolated_1gs_other);
 }
 
 #[test]
 fn explore_3x3() {
-    let exploration = explore(&IntervalConfig {
-        intervals: 3,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: u16::MAX,
-        players: vec![],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 3,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: u16::MAX,
+            players: vec![],
+        },
+        0..3,
+    );
     assert_eq!(16, exploration.prospects.len());
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
@@ -235,14 +241,16 @@ fn explore_3x3() {
 
 #[test]
 fn explore_4x4() {
-    let exploration = explore(&IntervalConfig {
-        intervals: 4,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: u16::MAX,
-        players: vec![],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 4,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: u16::MAX,
+            players: vec![],
+        },
+        0..4,
+    );
     assert_eq!(25, exploration.prospects.len());
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
@@ -251,14 +259,16 @@ fn explore_4x4() {
 #[test]
 fn explore_1x1_player() {
     let player = Player::Named(Side::Home, "Markos".into());
-    let exploration = explore(&IntervalConfig {
-        intervals: 1,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: u16::MAX,
-        players: vec![(player.clone(), 0.25)],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 1,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: u16::MAX,
+            players: vec![(player.clone(), 0.25)],
+        },
+        0..1,
+    );
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     let expected = [
         (
@@ -325,7 +335,7 @@ fn explore_1x1_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.25, isolated_1gs_none);
 
@@ -333,7 +343,7 @@ fn explore_1x1_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.09375, isolated_1gs_player);
 
@@ -341,7 +351,7 @@ fn explore_1x1_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(1.0 - 0.25 - 0.09375, isolated_1gs_other);
 
@@ -349,7 +359,7 @@ fn explore_1x1_player() {
         &MarketType::AnytimeGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.25, isolated_anytime_none);
 
@@ -357,7 +367,7 @@ fn explore_1x1_player() {
         &MarketType::AnytimeGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.125, isolated_anytime_player);
 
@@ -365,7 +375,7 @@ fn explore_1x1_player() {
         &MarketType::AnytimeGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.6875, isolated_anytime_other);
 }
@@ -373,14 +383,16 @@ fn explore_1x1_player() {
 #[test]
 fn explore_2x2_player() {
     let player = Player::Named(Side::Home, "Markos".into());
-    let exploration = explore(&IntervalConfig {
-        intervals: 2,
-        home_prob: 0.25,
-        away_prob: 0.25,
-        common_prob: 0.25,
-        max_total_goals: u16::MAX,
-        players: vec![(player.clone(), 0.25)],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 2,
+            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            max_total_goals: u16::MAX,
+            players: vec![(player.clone(), 0.25)],
+        },
+        0..2,
+    );
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
 
@@ -388,7 +400,7 @@ fn explore_2x2_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.0625, isolated_1gs_none);
 
@@ -396,7 +408,7 @@ fn explore_2x2_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(0.1171875, isolated_1gs_player);
 
@@ -404,7 +416,7 @@ fn explore_2x2_player() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_eq!(1.0 - 0.0625 - 0.1171875, isolated_1gs_other);
 }
@@ -412,14 +424,16 @@ fn explore_2x2_player() {
 #[test]
 fn explore_2x2_player_asymmetric() {
     let player = Player::Named(Side::Home, "Markos".into());
-    let exploration = explore(&IntervalConfig {
-        intervals: 2,
-        home_prob: 0.3,
-        away_prob: 0.2,
-        common_prob: 0.1,
-        max_total_goals: u16::MAX,
-        players: vec![(player.clone(), 0.25)],
-    });
+    let exploration = explore(
+        &IntervalConfig {
+            intervals: 2,
+            h1_params: ModelParams { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
+            h2_params: ModelParams { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
+            max_total_goals: u16::MAX,
+            players: vec![(player.clone(), 0.25)],
+        },
+        0..2,
+    );
     assert_float_relative_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
 
@@ -427,7 +441,7 @@ fn explore_2x2_player_asymmetric() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_float_relative_eq!(0.16, isolated_1gs_none);
 
@@ -435,7 +449,7 @@ fn explore_2x2_player_asymmetric() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_float_relative_eq!(0.1225, isolated_1gs_player);
 
@@ -443,7 +457,7 @@ fn explore_2x2_player_asymmetric() {
         &MarketType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
-        &exploration.player_lookup
+        &exploration.player_lookup,
     );
     assert_float_relative_eq!(1.0 - 0.16 - 0.1225, isolated_1gs_other);
 }

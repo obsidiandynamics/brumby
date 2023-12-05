@@ -1,5 +1,5 @@
-use crate::entity::Side;
 use super::*;
+use crate::entity::Side;
 use crate::opt::{hypergrid_search, HypergridSearchConfig};
 use crate::probs::SliceExt;
 
@@ -70,7 +70,22 @@ pub fn outcome_correct_score_gather() {
 pub fn interval() {
     const INTERVALS: usize = 2;
     let mut scoregrid = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_interval(INTERVALS as u8, u16::MAX, 0.25, 0.25, 0.25, &mut scoregrid);
+    from_interval(
+        INTERVALS as u8,
+        0..INTERVALS as u8,
+        u16::MAX,
+        ModelParams {
+            home_prob: 0.25,
+            away_prob: 0.25,
+            common_prob: 0.25,
+        },
+        ModelParams {
+            home_prob: 0.25,
+            away_prob: 0.25,
+            common_prob: 0.25,
+        },
+        &mut scoregrid,
+    );
     println!(
         "scoregrid:\n{}sum: {}",
         scoregrid.verbose(),
@@ -169,7 +184,13 @@ pub fn bivariate_poisson_binomial_similarity() {
         |_| true,
         |values| {
             let mut biv_binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-            from_bivariate_binomial(INTERVALS as u8,values[0], values[1], values[2], &mut biv_binomial);
+            from_bivariate_binomial(
+                INTERVALS as u8,
+                values[0],
+                values[1],
+                values[2],
+                &mut biv_binomial,
+            );
             compute_mse(biv_poisson.flatten(), biv_binomial.flatten())
         },
     );
@@ -201,7 +222,13 @@ pub fn bivariate_binomial_interval_equivalence() {
     const INTERVAL_COMMON_PROB: f64 = 0.04249018964350848;
     const INTERVALS: usize = 6;
     let mut biv_binomial = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_bivariate_binomial(INTERVALS as u8, INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut biv_binomial);
+    from_bivariate_binomial(
+        INTERVALS as u8,
+        INTERVAL_HOME_PROB,
+        INTERVAL_AWAY_PROB,
+        INTERVAL_COMMON_PROB,
+        &mut biv_binomial,
+    );
     println!(
         "biv_binomial:\n{}sum: {}",
         biv_binomial.verbose(),
@@ -209,7 +236,22 @@ pub fn bivariate_binomial_interval_equivalence() {
     );
 
     let mut interval = Matrix::allocate(INTERVALS + 1, INTERVALS + 1);
-    from_interval(INTERVALS as u8, u16::MAX, INTERVAL_HOME_PROB, INTERVAL_AWAY_PROB, INTERVAL_COMMON_PROB, &mut interval);
+    from_interval(
+        INTERVALS as u8,
+        0..INTERVALS as u8,
+        u16::MAX,
+        ModelParams {
+            home_prob: INTERVAL_HOME_PROB,
+            away_prob: INTERVAL_AWAY_PROB,
+            common_prob: INTERVAL_COMMON_PROB,
+        },
+        ModelParams {
+            home_prob: INTERVAL_HOME_PROB,
+            away_prob: INTERVAL_AWAY_PROB,
+            common_prob: INTERVAL_COMMON_PROB,
+        },
+        &mut interval,
+    );
     println!(
         "interval:\n{}sum: {}",
         interval.verbose(),

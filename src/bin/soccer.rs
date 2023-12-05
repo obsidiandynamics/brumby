@@ -1,31 +1,32 @@
 use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::error::Error;
+use std::ops::Range;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
-use HAlign::Left;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
+use HAlign::Left;
 
-use brumby::{factorial, poisson, scoregrid};
-use brumby::entity::{MarketType, OutcomeType, Over, Player, Side};
 use brumby::entity::Player::Named;
-use brumby::interval::{explore, IntervalConfig, isolate};
+use brumby::entity::{MarketType, OutcomeType, Over, Period, Player, Side};
+use brumby::interval::{explore, isolate, IntervalConfig, ModelParams};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
-    hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent,
+    hypergrid_search, univariate_descent, HypergridSearchConfig, HypergridSearchOutcome,
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
-use brumby::scoregrid::{from_correct_score, home_away_expectations};
-use brumby::soccer_data::{ContestSummary, download_by_id};
+use brumby::scoregrid::{from_correct_score, home_away_expectations, subtract};
+use brumby::soccer_data::{download_by_id, ContestSummary};
+use brumby::{factorial, poisson, scoregrid};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.04..=301.0;
@@ -75,72 +76,281 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let contest = read_contest_data(&args).await?;
     info!("contest.name: {}", contest.name);
 
-    // let ext_markets = atlanta_vs_sporting_lisbon();
-    let correct_score_prices = contest.offerings[&MarketType::CorrectScore].clone();
-    let h2h_prices = contest.offerings[&MarketType::HeadToHead].clone();
-    let goals_ou_prices = contest.offerings[&MarketType::TotalGoalsOverUnder(Over(2))].clone();
+    let ft_correct_score_prices =
+        contest.offerings[&MarketType::CorrectScore(Period::FullTime)].clone();
+    let ft_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::FullTime)].clone();
+    let ft_goals_ou_prices =
+        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2))].clone();
+    let h1_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::FirstHalf)].clone();
+    let h1_goals_ou_prices =
+        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2))].clone();
+    let h2_h2h_prices = contest.offerings[&MarketType::HeadToHead(Period::SecondHalf)].clone();
+    let h2_goals_ou_prices =
+        contest.offerings[&MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2))].clone();
     let first_gs = contest.offerings[&MarketType::FirstGoalscorer].clone();
     let anytime_gs = contest.offerings[&MarketType::AnytimeGoalscorer].clone();
 
-    let h2h = fit_market(MarketType::HeadToHead, &h2h_prices, 1.0);
-    let goals_ou = fit_market(MarketType::TotalGoalsOverUnder(Over(2)), &goals_ou_prices, 1.0);
-    let correct_score = fit_market(MarketType::CorrectScore, &correct_score_prices, 1.0);
+    let ft_h2h = fit_market(
+        MarketType::HeadToHead(Period::FullTime),
+        &ft_h2h_prices,
+        1.0,
+    );
+    let ft_goals_ou = fit_market(
+        MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
+        &ft_goals_ou_prices,
+        1.0,
+    );
+    let ft_correct_score = fit_market(
+        MarketType::CorrectScore(Period::FullTime),
+        &ft_correct_score_prices,
+        1.0,
+    );
+    let h1_h2h = fit_market(
+        MarketType::HeadToHead(Period::FirstHalf),
+        &h1_h2h_prices,
+        1.0,
+    );
+    let h1_goals_ou = fit_market(
+        MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
+        &h1_goals_ou_prices,
+        1.0,
+    );
+    let h2_h2h = fit_market(
+        MarketType::HeadToHead(Period::SecondHalf),
+        &h2_h2h_prices,
+        1.0,
+    );
+    let h2_goals_ou = fit_market(
+        MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
+        &h2_goals_ou_prices,
+        1.0,
+    );
 
-    let init_estimates = {
-        println!("*** fitting bivariate poisson scoregrid ***");
+    // first half
+    let h1_search_outcome = {
+        let init_estimates = {
+            println!("*** H1: fitting bivariate poisson scoregrid ***");
+            let start = Instant::now();
+            let search_outcome = fit_bivariate_poisson_scoregrid(&[&h1_h2h, &h1_goals_ou]);
+            let elapsed = start.elapsed();
+            println!("H1: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+            search_outcome
+                .optimal_values
+                .iter()
+                .map(|optimal_value| {
+                    1.0 - poisson::univariate(
+                        0,
+                        optimal_value / INTERVALS as f64 * 2.0,
+                        &factorial::Calculator,
+                    )
+                    // poisson::univariate(1, optimal_value / INTERVALS as f64, &factorial::Calculator)
+                })
+                .collect::<Vec<_>>()
+        };
+        println!("H1: initial estimates: {init_estimates:?}");
+
+        println!("*** H1: fitting bivariate binomial scoregrid ***");
         let start = Instant::now();
-        let search_outcome = fit_bivariate_poisson_scoregrid(&[&h2h, &goals_ou]);
+        let search_outcome =
+            fit_bivariate_binomial_scoregrid(&[&h1_h2h, &h1_goals_ou], &init_estimates, (INTERVALS / 2) as u8);
+        // let search_outcome = fit_scoregrid(&[&correct_score]);
         let elapsed = start.elapsed();
-        println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        println!("H1: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
         search_outcome
-            .optimal_values
-            .iter()
-            .map(|optimal_value| {
-                1.0 - poisson::univariate(
-                    0,
-                    optimal_value / INTERVALS as f64,
-                    &factorial::Calculator,
-                )
-                // poisson::univariate(1, optimal_value / INTERVALS as f64, &factorial::Calculator)
-            })
-            .collect::<Vec<_>>()
     };
-    println!("initial estimates: {init_estimates:?}");
 
-    println!("*** fitting bivariate binomial scoregrid ***");
-    let start = Instant::now();
-    let search_outcome = fit_bivariate_binomial_scoregrid(&[&h2h, &goals_ou], &init_estimates);
-    // let search_outcome = fit_scoregrid(&[&correct_score]);
-    let elapsed = start.elapsed();
-    println!("{elapsed:?} elapsed: search outcome: {search_outcome:?}");
-
-    let mut scoregrid = allocate_scoregrid();
+    let mut h1_scoregrid = allocate_scoregrid();
     interval_scoregrid(
-        search_outcome.optimal_values[0],
-        search_outcome.optimal_values[1],
-        search_outcome.optimal_values[2],
-        &mut scoregrid,
+        0..(INTERVALS / 2) as u8,
+        ModelParams { home_prob: h1_search_outcome.optimal_values[0], away_prob: h1_search_outcome.optimal_values[1], common_prob: h1_search_outcome.optimal_values[2] },
+        ModelParams { home_prob: 0.0, away_prob: 0.0, common_prob: 0.0 },
+        &mut h1_scoregrid,
+    );
+
+    let fitted_h1_h2h = frame_prices(&h1_scoregrid, &ft_h2h.outcomes, &ft_h2h.market.overround);
+    let fitted_h1_h2h = LabelledMarket {
+        market_type: MarketType::HeadToHead(Period::FirstHalf),
+        outcomes: h1_h2h.outcomes.clone(),
+        market: fitted_h1_h2h,
+    };
+    let h1_h2h_table = print_market(&fitted_h1_h2h);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h1_h2h.market_type,
+        fitted_h1_h2h.market.probs.sum(),
+        Console::default().render(&h1_h2h_table)
+    );
+
+    let fitted_h1_goals_ou = frame_prices(
+        &h1_scoregrid,
+        &ft_goals_ou.outcomes,
+        &ft_goals_ou.market.overround,
+    );
+    let fitted_h1_goals_ou = LabelledMarket {
+        market_type: MarketType::TotalGoalsOverUnder(Period::FirstHalf, Over(2)),
+        outcomes: h1_goals_ou.outcomes.clone(),
+        market: fitted_h1_goals_ou,
+    };
+    let h1_goals_ou_table = print_market(&fitted_h1_goals_ou);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h1_goals_ou.market_type,
+        fitted_h1_goals_ou.market.probs.sum(),
+        Console::default().render(&h1_goals_ou_table)
+    );
+
+    let ft_search_outcome = {
+        let init_estimates = {
+            println!("*** F/T: fitting bivariate poisson scoregrid ***");
+            let start = Instant::now();
+            let search_outcome = fit_bivariate_poisson_scoregrid(&[&ft_h2h, &ft_goals_ou]);
+            let elapsed = start.elapsed();
+            println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+            search_outcome
+                .optimal_values
+                .iter()
+                .map(|optimal_value| {
+                    1.0 - poisson::univariate(
+                        0,
+                        optimal_value / INTERVALS as f64,
+                        &factorial::Calculator,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        println!("F/T: initial estimates: {init_estimates:?}");
+
+        println!("*** F/T: fitting bivariate binomial scoregrid ***");
+        let start = Instant::now();
+        let search_outcome =
+            fit_bivariate_binomial_scoregrid(&[&ft_h2h, &ft_goals_ou], &init_estimates, INTERVALS as u8);
+        // let search_outcome = fit_scoregrid(&[&correct_score]);
+        let elapsed = start.elapsed();
+        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        search_outcome
+    };
+
+    let mut ft_scoregrid = allocate_scoregrid();
+    interval_scoregrid(
+        0..INTERVALS as u8,
+        ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+        ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+        &mut ft_scoregrid,
     );
     // let scoregrid = correct_score_scoregrid(&correct_score);
-    let home_away_expectations = home_away_expectations(&scoregrid);
+
+    let fitted_ft_h2h = frame_prices(&ft_scoregrid, &ft_h2h.outcomes, &ft_h2h.market.overround);
+    let fitted_ft_h2h = LabelledMarket {
+        market_type: MarketType::HeadToHead(Period::FullTime),
+        outcomes: ft_h2h.outcomes.clone(),
+        market: fitted_ft_h2h,
+    };
+    let ft_h2h_table = print_market(&fitted_ft_h2h);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_ft_h2h.market_type,
+        fitted_ft_h2h.market.probs.sum(),
+        Console::default().render(&ft_h2h_table)
+    );
+
+    let fitted_ft_goals_ou = frame_prices(
+        &ft_scoregrid,
+        &ft_goals_ou.outcomes,
+        &ft_goals_ou.market.overround,
+    );
+    let fitted_ft_goals_ou = LabelledMarket {
+        market_type: MarketType::TotalGoalsOverUnder(Period::FullTime, Over(2)),
+        outcomes: ft_goals_ou.outcomes.clone(),
+        market: fitted_ft_goals_ou,
+    };
+    let ft_goals_ou_table = print_market(&fitted_ft_goals_ou);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_ft_goals_ou.market_type,
+        fitted_ft_goals_ou.market.probs.sum(),
+        Console::default().render(&ft_goals_ou_table)
+    );
+
+    let fitted_ft_correct_score = frame_prices(
+        &ft_scoregrid,
+        &ft_correct_score.outcomes,
+        &ft_correct_score.market.overround,
+    );
+    let fitted_ft_correct_score = LabelledMarket {
+        market_type: MarketType::CorrectScore(Period::FullTime),
+        outcomes: ft_correct_score.outcomes.clone(),
+        market: fitted_ft_correct_score,
+    };
+    let ft_correct_score_table = print_market(&fitted_ft_correct_score);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_ft_correct_score.market_type,
+        fitted_ft_correct_score.market.probs.sum(),
+        Console::default().render(&ft_correct_score_table),
+    );
+
+    let mut future_scoregrid = allocate_scoregrid();
+    correct_score_scoregrid(&ft_correct_score, &mut future_scoregrid);
+    let h2_scoregrid = subtract(&ft_scoregrid, &h1_scoregrid);
+    // println!("ft_scoregrid.sum={}", ft_scoregrid.flatten().sum());
+    // println!("h1_scoregrid.sum={}", h1_scoregrid.flatten().sum());
+    // println!("h2_scoregrid.sum={}", h2_scoregrid.flatten().sum());
+    //TODO replace ht with h2
+    let fitted_h2_h2h = frame_prices(&h2_scoregrid, &h2_h2h.outcomes, &h2_h2h.market.overround);
+    let fitted_h2_h2h = LabelledMarket {
+        market_type: MarketType::HeadToHead(Period::SecondHalf),
+        outcomes: h2_h2h.outcomes.clone(),
+        market: fitted_h2_h2h,
+    };
+    let h2_h2h_table = print_market(&fitted_h2_h2h);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h2_h2h.market_type,
+        fitted_h2_h2h.market.probs.sum(),
+        Console::default().render(&h2_h2h_table)
+    );
+
+    let fitted_h2_goals_ou = frame_prices(
+        &h2_scoregrid,
+        &h2_goals_ou.outcomes,
+        &h2_goals_ou.market.overround,
+    );
+    let fitted_h2_goals_ou = LabelledMarket {
+        market_type: MarketType::TotalGoalsOverUnder(Period::SecondHalf, Over(2)),
+        outcomes: h2_goals_ou.outcomes.clone(),
+        market: fitted_h2_goals_ou,
+    };
+    let h2_goals_ou_table = print_market(&fitted_h2_goals_ou);
+    println!(
+        "{:?}: [Σ={:.3}]\n{}",
+        fitted_h2_goals_ou.market_type,
+        fitted_h2_goals_ou.market.probs.sum(),
+        Console::default().render(&h2_goals_ou_table)
+    );
+
+    let home_away_expectations = home_away_expectations(&ft_scoregrid);
     println!(
         "p(0, 0)={}, home + away expectations: ({} + {} = {})",
-        scoregrid[(0, 0)],
+        ft_scoregrid[(0, 0)],
         home_away_expectations.0,
         home_away_expectations.1,
         home_away_expectations.0 + home_away_expectations.1
     );
 
-    let first_gs = fit_market(MarketType::FirstGoalscorer, &first_gs, FIRST_GOALSCORER_BOOKSUM);
+    let first_gs = fit_market(
+        MarketType::FirstGoalscorer,
+        &first_gs,
+        FIRST_GOALSCORER_BOOKSUM,
+    );
     let anytime_gs = fit_market(MarketType::AnytimeGoalscorer, &anytime_gs, 1.0);
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
-    let home_ratio = (search_outcome.optimal_values[0] + search_outcome.optimal_values[2] / 2.0)
-        / search_outcome.optimal_values.sum()
-        * (1.0 - scoregrid[(0, 0)]);
-    let away_ratio = (search_outcome.optimal_values[1] + search_outcome.optimal_values[2] / 2.0)
-        / search_outcome.optimal_values.sum()
-        * (1.0 - scoregrid[(0, 0)]);
+    let home_ratio = (ft_search_outcome.optimal_values[0] + ft_search_outcome.optimal_values[2] / 2.0)
+        / ft_search_outcome.optimal_values.sum()
+        * (1.0 - ft_scoregrid[(0, 0)]);
+    let away_ratio = (ft_search_outcome.optimal_values[1] + ft_search_outcome.optimal_values[2] / 2.0)
+        / ft_search_outcome.optimal_values.sum()
+        * (1.0 - ft_scoregrid[(0, 0)]);
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
     let mut fitted_goalscorer_probs = BTreeMap::new();
     let start = Instant::now();
@@ -156,7 +366,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 };
                 let init_estimate = first_gs.market.probs[index] / side_ratio;
                 let player_search_outcome = fit_first_goalscorer(
-                    &search_outcome.optimal_values,
+                    &ft_search_outcome.optimal_values,
                     player,
                     init_estimate,
                     first_gs.market.probs[index],
@@ -173,14 +383,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut fitted_first_goalscorer_probs = vec![];
     for (player, prob) in &fitted_goalscorer_probs {
-        let exploration = explore(&IntervalConfig {
-            intervals: INTERVALS as u8,
-            home_prob: search_outcome.optimal_values[0],
-            away_prob: search_outcome.optimal_values[1],
-            common_prob: search_outcome.optimal_values[2],
-            max_total_goals: MAX_TOTAL_GOALS,
-            players: vec![(player.clone(), *prob)],
-        });
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: INTERVALS as u8,
+                h1_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                h2_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                max_total_goals: MAX_TOTAL_GOALS,
+                players: vec![(player.clone(), *prob)],
+            },
+            0..INTERVALS as u8,
+        );
         let isolated_prob = isolate(
             &MarketType::FirstGoalscorer,
             &OutcomeType::Player(player.clone()),
@@ -190,7 +402,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_first_goalscorer_probs.push(isolated_prob);
         // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
     }
-    fitted_first_goalscorer_probs.push(scoregrid[(0, 0)]);
+    fitted_first_goalscorer_probs.push(ft_scoregrid[(0, 0)]);
     fitted_first_goalscorer_probs.normalise(FIRST_GOALSCORER_BOOKSUM);
     // fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
 
@@ -205,10 +417,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if args.print_players {
-        println!("sample first goalscorer σ={:.3}", implied_booksum(&first_gs.market.prices));
+        println!(
+            "sample first goalscorer σ={:.3}",
+            implied_booksum(&first_gs.market.prices)
+        );
         let table_first_goalscorer = print_market(&fitted_first_goalscorer);
         println!(
-            "First Goalscorer: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            fitted_first_goalscorer.market_type,
             fitted_first_goalscorer.market.probs.sum(),
             implied_booksum(&fitted_first_goalscorer.market.prices),
             fitted_first_goalscorer.market.probs.len(),
@@ -220,14 +436,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut fitted_anytime_goalscorer_probs = vec![];
     for (player, prob) in &fitted_goalscorer_probs {
         fitted_anytime_goalscorer_outcomes.push(OutcomeType::Player(player.clone()));
-        let exploration = explore(&IntervalConfig {
-            intervals: INTERVALS as u8,
-            home_prob: search_outcome.optimal_values[0],
-            away_prob: search_outcome.optimal_values[1],
-            common_prob: search_outcome.optimal_values[2],
-            max_total_goals: MAX_TOTAL_GOALS,
-            players: vec![(player.clone(), *prob)],
-        });
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: INTERVALS as u8,
+                h1_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                h2_params: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
+                max_total_goals: MAX_TOTAL_GOALS,
+                players: vec![(player.clone(), *prob)],
+            },
+            0..INTERVALS as u8,
+        );
         let isolated_prob = isolate(
             &MarketType::AnytimeGoalscorer,
             &OutcomeType::Player(player.clone()),
@@ -239,7 +457,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     fitted_anytime_goalscorer_outcomes.push(OutcomeType::None);
     // fitted_anytime_goalscorer_probs.normalise(home_away_expectations.0 + home_away_expectations.1);
-    fitted_anytime_goalscorer_probs.push(scoregrid[(0, 0)]);
+    fitted_anytime_goalscorer_probs.push(ft_scoregrid[(0, 0)]);
 
     let anytime_goalscorer_booksum = fitted_anytime_goalscorer_probs.sum();
     let anytime_goalscorer_overround = Market::fit(
@@ -258,10 +476,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if args.print_players {
-        println!("sample anytime goalscorer σ={:.3}", implied_booksum(&anytime_gs.market.prices));
+        println!(
+            "sample anytime goalscorer σ={:.3}",
+            implied_booksum(&anytime_gs.market.prices)
+        );
         let table_anytime_goalscorer = print_market(&fitted_anytime_goalscorer);
         println!(
-            "Anytime Goalscorer: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            fitted_anytime_goalscorer.market_type,
             fitted_anytime_goalscorer.market.probs.sum(),
             implied_booksum(&fitted_anytime_goalscorer.market.prices),
             fitted_first_goalscorer.market.probs.len(),
@@ -269,64 +491,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    let fitted_h2h = frame_prices(&scoregrid, &h2h.outcomes, &h2h.market.overround);
-    let fitted_h2h = LabelledMarket {
-        market_type: MarketType::HeadToHead,
-        outcomes: h2h.outcomes.clone(),
-        market: fitted_h2h,
-    };
-    let table_h2h = print_market(&fitted_h2h);
-    println!(
-        "H2H: [Σ={:.3}]\n{}",
-        fitted_h2h.market.probs.sum(),
-        Console::default().render(&table_h2h)
-    );
-
-    let fitted_goals_ou = frame_prices(&scoregrid, &goals_ou.outcomes, &goals_ou.market.overround);
-    let fitted_goals_ou = LabelledMarket {
-        market_type: MarketType::TotalGoalsOverUnder(Over(2)),
-        outcomes: goals_ou.outcomes.clone(),
-        market: fitted_goals_ou,
-    };
-    let table_goals_ou = print_market(&fitted_goals_ou);
-    println!(
-        "Goals O/U: [Σ={:.3}]\n{}",
-        fitted_goals_ou.market.probs.sum(),
-        Console::default().render(&table_goals_ou)
-    );
-
-    let fitted_correct_score = frame_prices(
-        &scoregrid,
-        &correct_score.outcomes,
-        &correct_score.market.overround,
-    );
-    let fitted_correct_score = LabelledMarket {
-        market_type: MarketType::CorrectScore,
-        outcomes: correct_score.outcomes.clone(),
-        market: fitted_correct_score,
-    };
-    let table_correct_score = print_market(&fitted_correct_score);
-    println!(
-        "Correct Score: [Σ={:.3}]\n{}",
-        fitted_correct_score.market.probs.sum(),
-        Console::default().render(&table_correct_score),
-    );
-
     let market_errors = [
-        ("H2H", &h2h, &fitted_h2h),
-        ("Goals O/U", &goals_ou, &fitted_goals_ou),
-        ("Correct Score", &correct_score, &fitted_correct_score),
-        ("First Goalscorer", &first_gs, &fitted_first_goalscorer),
-        (
-            "Anytime Goalscorer",
-            &anytime_gs,
-            &fitted_anytime_goalscorer,
-        ),
+        (&h1_h2h, &fitted_h1_h2h),
+        (&h1_goals_ou, &fitted_h1_goals_ou),
+        (&ft_h2h, &fitted_ft_h2h),
+        (&ft_goals_ou, &fitted_ft_goals_ou),
+        (&ft_correct_score, &fitted_ft_correct_score),
+        (&first_gs, &fitted_first_goalscorer),
+        (&anytime_gs, &fitted_anytime_goalscorer),
     ]
     .iter()
-    .map(|(key, sample, fitted)| {
+    .map(|(sample, fitted)| {
         (
-            *key,
+            &sample.market_type,
             MarketErrors {
                 rmse: compute_error(
                     &sample.market.prices,
@@ -349,9 +526,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let table_overrounds = print_overrounds(&[
-        fitted_h2h,
-        fitted_goals_ou,
-        fitted_correct_score,
+        fitted_h1_h2h,
+        fitted_h1_goals_ou,
+        fitted_ft_h2h,
+        fitted_ft_goals_ou,
+        fitted_ft_correct_score,
         fitted_first_goalscorer,
         fitted_anytime_goalscorer,
     ]);
@@ -367,7 +546,11 @@ fn implied_booksum(prices: &[f64]) -> f64 {
     prices.invert().sum()
 }
 
-fn fit_market(market_type: MarketType, map: &HashMap<OutcomeType, f64>, normal: f64) -> LabelledMarket {
+fn fit_market(
+    market_type: MarketType,
+    map: &HashMap<OutcomeType, f64>,
+    normal: f64,
+) -> LabelledMarket {
     let mut entries = map.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let outcomes = entries
@@ -393,11 +576,12 @@ pub struct LabelledMarket {
 fn fit_bivariate_binomial_scoregrid(
     markets: &[&LabelledMarket],
     init_estimates: &[f64],
+    intervals: u8,
 ) -> HypergridSearchOutcome {
     let mut scoregrid = allocate_scoregrid();
     let bounds = init_estimates
         .iter()
-        .map(|&estimate| (estimate * 0.75)..=(estimate * 1.33))
+        .map(|&estimate| (estimate * 0.67)..=(estimate * 1.5))
         .collect::<Vec<_>>();
     hypergrid_search(
         &HypergridSearchConfig {
@@ -409,7 +593,7 @@ fn fit_bivariate_binomial_scoregrid(
         |values| values.sum() <= 1.0,
         |values| {
             bivariate_binomial_scoregrid(
-                INTERVALS as u8,
+                intervals,
                 values[0],
                 values[1],
                 values[2],
@@ -426,7 +610,7 @@ fn fit_bivariate_poisson_scoregrid(markets: &[&LabelledMarket]) -> HypergridSear
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
-            bounds: vec![0.1..=5.0, 0.1..=5.0, 0.0..=0.5].into(),
+            bounds: vec![0.2..=3.0, 0.2..=3.0, 0.0..=0.5].into(),
             resolution: 10,
         },
         |_| true,
@@ -464,14 +648,16 @@ fn fit_first_goalscorer(
             acceptable_residual: 1e-9,
         },
         |value| {
-            let exploration = explore(&IntervalConfig {
-                intervals: INTERVALS as u8,
-                home_prob: optimal_scoring_probs[0],
-                away_prob: optimal_scoring_probs[1],
-                common_prob: optimal_scoring_probs[2],
-                max_total_goals: MAX_TOTAL_GOALS,
-                players: vec![(player.clone(), value)],
-            });
+            let exploration = explore(
+                &IntervalConfig {
+                    intervals: INTERVALS as u8,
+                    h1_params: ModelParams { home_prob: optimal_scoring_probs[0], away_prob: optimal_scoring_probs[1], common_prob: optimal_scoring_probs[2] },
+                    h2_params: ModelParams { home_prob: optimal_scoring_probs[0], away_prob: optimal_scoring_probs[1], common_prob: optimal_scoring_probs[2] },
+                    max_total_goals: MAX_TOTAL_GOALS,
+                    players: vec![(player.clone(), value)],
+                },
+                0..INTERVALS as u8,
+            );
             let isolated_prob = isolate(
                 &MarketType::FirstGoalscorer,
                 &OutcomeType::Player(player.clone()),
@@ -502,18 +688,18 @@ impl ErrorType {
 
 /// Intervals.
 fn interval_scoregrid(
-    interval_home_prob: f64,
-    interval_away_prob: f64,
-    interval_common_prob: f64,
+    explore_intervals: Range<u8>,
+    h1_params: ModelParams,
+    h2_params: ModelParams,
     scoregrid: &mut Matrix<f64>,
 ) {
     scoregrid.fill(0.0);
     scoregrid::from_interval(
         INTERVALS as u8,
+        explore_intervals,
         MAX_TOTAL_GOALS,
-        interval_home_prob,
-        interval_away_prob,
-        interval_common_prob,
+        h1_params,
+        h2_params,
         scoregrid,
     );
     // scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
@@ -633,25 +819,25 @@ fn print_market(market: &LabelledMarket) -> Table {
     table
 }
 
-fn print_errors(errors: &[(&str, MarketErrors)]) -> Table {
-    let mut table = Table::default().with_cols(vec![
-        Col::new(Styles::default().with(MinWidth(10)).with(Left)),
-        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
-        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
-    ]).with_row(
-        Row::new(
+fn print_errors(errors: &[(&MarketType, MarketErrors)]) -> Table {
+    let mut table = Table::default()
+        .with_cols(vec![
+            Col::new(Styles::default().with(MinWidth(10)).with(Left)),
+            Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+            Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+        ])
+        .with_row(Row::new(
             Styles::default().with(Header(true)),
-            vec![
-                "Market".into(),
-                "RMSRE".into(),
-                "RMSE".into()
-            ],
-        )
-    );
-    for (key, error) in errors {
+            vec!["Market".into(), "RMSRE".into(), "RMSE".into()],
+        ));
+    for (market_type, error) in errors {
         table.push_row(Row::new(
             Styles::default(),
-            vec![key.to_string().into(), format!("{:.3}", error.rmsre).into(), format!("{:.3}", error.rmse).into()],
+            vec![
+                format!("{:?}", market_type).into(),
+                format!("{:.3}", error.rmsre).into(),
+                format!("{:.3}", error.rmse).into(),
+            ],
         ));
     }
     table
