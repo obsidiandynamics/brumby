@@ -11,7 +11,7 @@ keywords.workspace = true
 exclude.workspace = true
 
 [dependencies]
-brumby = { path = "../brumby" }
+brumby = { version = "0.7.2", path = "../brumby" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 ordinalizer = { workspace = true }
