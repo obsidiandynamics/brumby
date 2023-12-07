@@ -1,5 +1,6 @@
 use brumby::capture::Capture;
-use brumby::{market, mc, model};
+use brumby::{market, mc};
+use brumby_racing::{model};
 use brumby::mc::DilatedProbs;
 use brumby::probs::SliceExt;
 use brumby::selection::{Rank, Runner};

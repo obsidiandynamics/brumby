@@ -17,8 +17,8 @@ use brumby::racing_data;
 use brumby::racing_data::{EventDetailExt, PlacePriceDeparture, PredicateClosures, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::cf::Coefficients;
-use brumby::model::{fit, Fitter, FitterConfig, TopN, WinPlace};
+use brumby_racing::model::cf::Coefficients;
+use brumby_racing::model::{fit, Fitter, FitterConfig, TopN, WinPlace};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::Multiplicative;
 const TOP_SUBSET: usize = 25;

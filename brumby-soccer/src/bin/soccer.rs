@@ -14,10 +14,11 @@ use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::table::{Col, Row, Table};
 use tracing::{debug, info};
 
-use brumby::{factorial, poisson, scoregrid};
-use brumby::domain::{MarketType, OutcomeType, Over, Period, Player, Side};
-use brumby::domain::Player::Named;
-use brumby::interval::{explore, IntervalConfig, isolate, ScoringProbs};
+use brumby::{factorial, poisson};
+use brumby_soccer::{scoregrid};
+use brumby_soccer::domain::{MarketType, OutcomeType, Over, Period, Player, Side};
+use brumby_soccer::domain::Player::Named;
+use brumby_soccer::interval::{explore, IntervalConfig, isolate, ScoringProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::opt::{
@@ -25,8 +26,8 @@ use brumby::opt::{
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
-use brumby::scoregrid::{from_correct_score, home_away_expectations};
-use brumby::soccer_data::{ContestSummary, download_by_id};
+use brumby_soccer::scoregrid::{from_correct_score, home_away_expectations};
+use brumby_soccer::soccer_data::{ContestSummary, download_by_id};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;

@@ -1,9 +1,8 @@
 use ordinalizer::Ordinal;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumCount, EnumIter};
-use crate::linear::regression;
-
-use crate::linear::regression::{AsIndex, Predictor, Regressor};
+use brumby::linear::regression;
+use brumby::linear::regression::{AsIndex, Predictor, Regressor};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Coefficients {

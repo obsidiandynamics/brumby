@@ -1,7 +1,7 @@
 use super::*;
 use crate::domain::Side;
-use crate::opt::{hypergrid_search, HypergridSearchConfig};
-use crate::probs::SliceExt;
+use brumby::opt::{hypergrid_search, HypergridSearchConfig};
+use brumby::probs::SliceExt;
 
 #[test]
 pub fn iterate_scoregrid_5x5() {

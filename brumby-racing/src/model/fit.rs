@@ -9,14 +9,15 @@ use tracing::trace;
 
 use mc::MonteCarloEngine;
 
-use crate::capture::Capture;
-use crate::linear::matrix::Matrix;
-use crate::market::{Market, MarketPrice, Overround, PriceBounds};
-use crate::mc::DilatedProbs;
+use brumby::capture::Capture;
+use brumby::linear::matrix::Matrix;
+use brumby::market::{Market, MarketPrice, Overround, PriceBounds};
+use brumby::mc::DilatedProbs;
 use crate::model::cf::{Coefficients, Factor};
-use crate::probs::SliceExt;
-use crate::selection::{Rank, Selections};
-use crate::{mc, model, selection};
+use brumby::probs::SliceExt;
+use brumby::selection::{Rank, Selections};
+use brumby::{mc, selection};
+use crate::model;
 
 pub const FITTED_PRICE_RANGES: [Range<f64>; 4] =
     [1.0..1001.0, 1.0..1001.0, 1.0..1001.0, 1.0..1001.0];

@@ -14,10 +14,10 @@ use tracing::{debug, info};
 use brumby::racing_data::{download_by_id, RaceSummary};
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, Overround, OverroundMethod};
-use brumby::model;
-use brumby::model::{fit, PODIUM, TopN};
-use brumby::model::fit::compute_msre;
-use brumby::print::{tabulate_derived_prices, tabulate_prices, tabulate_values};
+use brumby_racing::model;
+use brumby_racing::model::{fit, PODIUM, TopN};
+use brumby_racing::model::fit::compute_msre;
+use brumby_racing::print::{tabulate_derived_prices, tabulate_prices, tabulate_values};
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {

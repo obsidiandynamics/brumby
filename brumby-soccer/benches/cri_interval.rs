@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby::interval;
-use brumby::interval::{IntervalConfig, ScoringProbs};
+use brumby_soccer::interval;
+use brumby_soccer::interval::{IntervalConfig, ScoringProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn run(intervals: u8, max_total_goals: u16) -> usize {

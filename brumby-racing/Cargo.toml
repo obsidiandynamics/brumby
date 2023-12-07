@@ -1,0 +1,25 @@
+[package]
+name = "brumby-racing"
+version.workspace = true
+edition.workspace = true
+readme.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+exclude.workspace = true
+
+[dependencies]
+brumby = { path = "../brumby" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+ordinalizer = { workspace = true }
+racing_scraper = { workspace = true }
+serde = { workspace = true }
+stanza = { workspace = true }
+strum = { workspace = true }
+strum_macros ={ workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -7,10 +7,10 @@ use stanza::renderer::Renderer;
 use brumby::display::DisplaySlice;
 use brumby::file::ReadJsonFile;
 use brumby::market::{Market, OverroundMethod};
-use brumby::model::{Fitter, FitterConfig, WinPlace, Model};
-use brumby::model::cf::Coefficients;
-use brumby::model::fit::FitOptions;
-use brumby::print;
+use brumby_racing::model::{Fitter, FitterConfig, Model, WinPlace};
+use brumby_racing::model::cf::Coefficients;
+use brumby_racing::model::fit::FitOptions;
+use brumby_racing::print;
 use brumby::selection::{Rank, Runner};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // load coefficients from a file and create a fitter
-    let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
+    let coefficients = Coefficients::read_json_file(PathBuf::from("../../config/thoroughbred.cf.json"))?;
     let config = FitterConfig {
         coefficients,
         fit_options: FitOptions::fast(),
