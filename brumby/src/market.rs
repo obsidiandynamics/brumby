@@ -5,9 +5,6 @@ use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
-// const MIN_PRICE: f64 = 1.04;
-// const MAX_PRICE: f64 = 200.0;
-
 pub type PriceBounds = RangeInclusive<f64>;
 
 pub trait MarketPrice {
