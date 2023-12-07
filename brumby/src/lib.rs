@@ -31,6 +31,6 @@ pub mod timed;
 #[cfg(test)]
 pub(crate) mod testing;
 
-#[doc = include_str!("../README.md")]
+#[doc = include_str!("../../README.md")]
 #[cfg(doc)]
 fn readme() {}

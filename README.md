@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // load coefficients from a file and create a fitter
-    let coefficients = Coefficients::read_json_file(PathBuf::from("config/thoroughbred.cf.json"))?;
+    let coefficients = Coefficients::read_json_file(PathBuf::from("../config/thoroughbred.cf.json"))?;
     let config = FitterConfig {
         coefficients,
         fit_options: FitOptions::fast() // use the default presents in production; fast presets are used for testing
