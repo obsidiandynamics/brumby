@@ -1,8 +1,8 @@
 [package]
 name = "brumby-soccer"
+readme = "README.md"
 version.workspace = true
 edition.workspace = true
-readme.workspace = true
 authors.workspace = true
 license.workspace = true
 description.workspace = true
@@ -11,7 +11,7 @@ keywords.workspace = true
 exclude.workspace = true
 
 [dependencies]
-brumby = { version = "0.7.2", path = "../brumby" }
+brumby = { version = "0.7.3", path = "../brumby" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 ordinalizer = { workspace = true }
