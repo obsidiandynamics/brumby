@@ -1,15 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use brumby::interval;
-use brumby::interval::{IntervalConfig, ModelParams};
+use brumby::interval::{IntervalConfig, ScoringProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn run(intervals: u8, max_total_goals: u16) -> usize {
         interval::explore(
             &IntervalConfig {
                 intervals,
-                h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-                h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+                h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+                h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
                 max_total_goals,
                 players: vec![],
             },

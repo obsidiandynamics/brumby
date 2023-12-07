@@ -1,7 +1,7 @@
-use brumby::entity::{MarketType, OutcomeType, Player, Side};
+use brumby::domain::{MarketType, OutcomeType, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby::interval::{explore, isolate, Exploration, IntervalConfig, ModelParams};
+use brumby::interval::{explore, isolate, Exploration, IntervalConfig, ScoringProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let player = Player::Named(Side::Home, "Markos".into());
@@ -9,8 +9,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         explore(
             &IntervalConfig {
                 intervals,
-                h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-                h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+                h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+                h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
                 max_total_goals,
                 players: vec![(player, 0.25)],
             },

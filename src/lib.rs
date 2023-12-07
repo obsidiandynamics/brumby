@@ -8,7 +8,7 @@ pub mod capture;
 pub mod comb;
 pub mod csv;
 pub mod display;
-pub mod entity;
+pub mod domain;
 pub mod factorial;
 pub mod file;
 pub mod harville;

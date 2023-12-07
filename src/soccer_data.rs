@@ -1,4 +1,4 @@
-use crate::entity::{MarketType, OutcomeType, Over, Period, Player, Score, Side};
+use crate::domain::{MarketType, OutcomeType, Over, Period, Player, Score, Side};
 use racing_scraper::get_sports_contest;
 use racing_scraper::sports::soccer::contest_model::ContestModel;
 use racing_scraper::sports::soccer::market_model::{HomeAway, Scorer, SoccerMarket};

@@ -1,7 +1,7 @@
 use std::ops::Range;
 use rustc_hash::FxHashMap;
 
-use crate::entity::{MarketType, OutcomeType, Player, Score, Side};
+use crate::domain::{MarketType, OutcomeType, Player, Score, Side};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Prospect {
@@ -26,18 +26,29 @@ pub fn init_prospects(capacity: usize) -> Prospects {
     Prospects::with_capacity_and_hasher(capacity, Default::default())
 }
 
-#[derive(Debug)]
-pub struct ModelParams {
+#[derive(Debug, Clone)]
+pub struct ScoringProbs {
     pub home_prob: f64,
     pub away_prob: f64,
     pub common_prob: f64,
 }
 
+impl<'a> From<&'a [f64]> for ScoringProbs {
+    fn from(params: &'a [f64]) -> Self {
+        assert_eq!(3, params.len());
+        Self {
+            home_prob: params[0],
+            away_prob: params[1],
+            common_prob: params[2],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct IntervalConfig {
     pub intervals: u8,
-    pub h1_params: ModelParams,
-    pub h2_params: ModelParams,
+    pub h1_probs: ScoringProbs,
+    pub h2_probs: ScoringProbs,
     pub max_total_goals: u16,
     pub players: Vec<(Player, f64)>,
 }
@@ -94,13 +105,13 @@ pub fn explore(config: &IntervalConfig, explore_intervals: Range<u8>) -> Explora
 
     for interval in explore_intervals {
         let params = if interval < config.intervals / 2 {
-            &config.h1_params
+            &config.h1_probs
         } else {
-            &config.h1_params
+            &config.h2_probs
         };
 
         let neither_prob = 1.0 - params.home_prob - params.away_prob - params.common_prob;
-        
+
         let mut next_prospects = init_prospects((current_prospects.len() as f64 * 1.1) as usize);
 
         for (current_prospect, current_prob) in current_prospects {

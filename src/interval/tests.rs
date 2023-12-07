@@ -1,5 +1,5 @@
 use super::*;
-use crate::entity::Player;
+use crate::domain::Player;
 use assert_float_eq::*;
 
 fn assert_expected_prospects(expected: &[(Prospect, f64)], actual: &Prospects) {
@@ -20,8 +20,8 @@ fn explore_2x2() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: u16::MAX,
             players: vec![],
         },
@@ -144,8 +144,8 @@ fn explore_2x2_pruned() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: 2,
             players: vec![],
         },
@@ -227,8 +227,8 @@ fn explore_3x3() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 3,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: u16::MAX,
             players: vec![],
         },
@@ -244,8 +244,8 @@ fn explore_4x4() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 4,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: u16::MAX,
             players: vec![],
         },
@@ -262,8 +262,8 @@ fn explore_1x1_player() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 1,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: u16::MAX,
             players: vec![(player.clone(), 0.25)],
         },
@@ -386,8 +386,8 @@ fn explore_2x2_player() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_params: ModelParams { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             max_total_goals: u16::MAX,
             players: vec![(player.clone(), 0.25)],
         },
@@ -427,8 +427,8 @@ fn explore_2x2_player_asymmetric() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_params: ModelParams { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
-            h2_params: ModelParams { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
+            h1_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
+            h2_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
             max_total_goals: u16::MAX,
             players: vec![(player.clone(), 0.25)],
         },
