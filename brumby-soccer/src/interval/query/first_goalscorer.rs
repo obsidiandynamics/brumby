@@ -6,8 +6,9 @@ pub(crate) fn requirements() -> Expansions {
     Expansions {
         ht_score: false,
         ft_score: false,
-        player_stats: false,
-        player_split_stats: false,
+        player_goal_stats: false,
+        player_split_goal_stats: false,
+        max_player_assists: 0,
         first_goalscorer: true,
     }
 }

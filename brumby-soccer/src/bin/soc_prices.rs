@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use clap::Parser;
-use racing_scraper::sports::PROVIDER;
+use racing_scraper::sports::Provider;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use tracing::{debug, info};
@@ -15,19 +15,17 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::probs::SliceExt;
 use brumby_soccer::{fit, print};
-use brumby_soccer::data::{ContestSummary, DataProvider, download_by_id};
+use brumby_soccer::data::{ContestSummary, DataProvider, download_by_id, SoccerFeedId};
 use brumby_soccer::domain::{
     FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Score,
 };
 use brumby_soccer::fit::ErrorType;
-use brumby_soccer::interval::{
-    Expansions, Exploration, explore, IntervalConfig, PruneThresholds, ScoringProbs,
-};
+use brumby_soccer::interval::{Expansions, Exploration, explore, IntervalConfig, PlayerProbs, PruneThresholds, ScoringProbs};
 use brumby_soccer::interval::query::isolate;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
-const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
+const FIRST_GOALSCORER_BOOKSUM: f64 = 1.9;
 const INTERVALS: usize = 18;
 // const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
@@ -42,12 +40,16 @@ struct Args {
 
     /// download contest data by ID
     #[clap(short = 'd', long)]
-    download: Option<String>,
-    // download: Option<SoccerFeedId>,
+    // download: Option<String>,
+    download: Option<SoccerFeedId>,
 
-    /// print player markets
+    /// print player goal markets
     #[clap(long = "player-goals")]
     player_goals: bool,
+
+    /// print player assists markets
+    #[clap(long = "player-assists")]
+    player_assists: bool,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -92,6 +94,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         contest.offerings[&OfferType::TotalGoals(Period::SecondHalf, Over(2))].clone();
     let first_gs = contest.offerings[&OfferType::FirstGoalscorer].clone();
     let anytime_gs = contest.offerings[&OfferType::AnytimeGoalscorer].clone();
+    let anytime_assist = contest.offerings[&OfferType::AnytimeAssist].clone();
 
     let ft_h2h = fit_offer(OfferType::HeadToHead(Period::FullTime), &ft_h2h_prices, 1.0);
     let ft_goals_ou = fit_offer(
@@ -446,7 +449,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
                 h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
                 h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                players: vec![(player.clone(), *prob)],
+                player_probs: vec![(player.clone(), PlayerProbs { goal: Some(*prob), assist: None })],
                 prune_thresholds: PruneThresholds {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
@@ -454,8 +457,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: false,
-                    player_stats: false,
-                    player_split_stats: false,
+                    player_goal_stats: false,
+                    player_split_goal_stats: false,
+                    max_player_assists: 0,
                     first_goalscorer: true,
                 },
             },
@@ -508,11 +512,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                // h1_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
                 h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
                 h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                players: vec![(player.clone(), *prob)],
+                player_probs: vec![(player.clone(), PlayerProbs { goal: Some(*prob), assist: None })],
                 prune_thresholds: PruneThresholds {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
@@ -520,8 +522,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: false,
-                    player_stats: true,
-                    player_split_stats: false,
+                    player_goal_stats: true,
+                    player_split_goal_stats: false,
+                    max_player_assists: 0,
                     first_goalscorer: false,
                 },
             },
@@ -534,18 +537,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &exploration.player_lookup,
         );
         fitted_anytime_goalscorer_probs.push(isolated_prob);
-        // println!("anytime scorer {player:?}, prob: {isolated_prob:.3}");
     }
     fitted_anytime_goalscorer_outcomes.push(OutcomeType::None);
-    // fitted_anytime_goalscorer_probs.normalise(home_away_expectations.0 + home_away_expectations.1);
     fitted_anytime_goalscorer_probs.push(draw_prob);
 
-    // let anytime_goalscorer_booksum = fitted_anytime_goalscorer_probs.sum();
-    // let anytime_goalscorer_overround = Market::fit(
-    //     &OVERROUND_METHOD,
-    //     anytime_gs.market.prices.clone(),
-    //     anytime_goalscorer_booksum,
-    // ).overround;
     let anytime_goalscorer_overround = Overround {
         method: OVERROUND_METHOD,
         value: anytime_gs.market.offered_booksum() / fitted_anytime_goalscorer_probs.sum()
@@ -571,8 +566,91 @@ async fn main() -> Result<(), Box<dyn Error>> {
             fitted_anytime_goalscorer.offer_type,
             fitted_anytime_goalscorer.market.probs.sum(),
             implied_booksum(&fitted_anytime_goalscorer.market.prices),
-            fitted_first_goalscorer.market.probs.len(),
+            fitted_anytime_goalscorer.market.probs.len(),
             Console::default().render(&table_anytime_goalscorer)
+        );
+    }
+
+    let sample_anytime_assist_booksum = anytime_assist.values().map(|price| 1.0 / price).sum::<f64>();
+
+    let anytime_assist = fit_offer(
+        OfferType::AnytimeAssist,
+        &anytime_assist,
+        sample_anytime_assist_booksum / anytime_goalscorer_overround.value,
+    );
+
+    let fitted_assist_probs = fit::fit_anytime_assist_all(
+        &ScoringProbs::from(adj_optimal_h1.as_slice()),
+        &ScoringProbs::from(adj_optimal_h2.as_slice()),
+        &anytime_assist,
+        draw_prob,
+        anytime_assist.market.fair_booksum()
+    );
+
+    let mut fitted_anytime_assist_outcomes =
+        HashLookup::with_capacity(fitted_assist_probs.len());
+    let mut fitted_anytime_assist_probs = Vec::with_capacity(fitted_assist_probs.len());
+    for (player, prob) in &fitted_assist_probs {
+        fitted_anytime_assist_outcomes.push(OutcomeType::Player(player.clone()));
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: INTERVALS as u8,
+                h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
+                h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
+                player_probs: vec![(player.clone(), PlayerProbs { goal: None, assist: Some(*prob) })],
+                prune_thresholds: PruneThresholds {
+                    max_total_goals: MAX_TOTAL_GOALS_FULL,
+                    min_prob: GOALSCORER_MIN_PROB,
+                },
+                expansions: Expansions {
+                    ht_score: false,
+                    ft_score: false,
+                    player_goal_stats: false,
+                    player_split_goal_stats: false,
+                    max_player_assists: 1,
+                    first_goalscorer: false,
+                },
+            },
+            0..INTERVALS as u8,
+        );
+        let isolated_prob = isolate(
+            &OfferType::AnytimeAssist,
+            &OutcomeType::Player(player.clone()),
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        fitted_anytime_assist_probs.push(isolated_prob);
+    }
+    fitted_anytime_assist_outcomes.push(OutcomeType::None);
+    fitted_anytime_assist_probs.push(draw_prob);
+
+    let anytime_assist_overround = Overround {
+        method: OVERROUND_METHOD,
+        value: anytime_assist.market.offered_booksum() / fitted_anytime_assist_probs.sum()
+    };
+    let fitted_anytime_assist = Offer {
+        offer_type: OfferType::AnytimeAssist,
+        outcomes: fitted_anytime_assist_outcomes,
+        market: Market::frame(
+            &anytime_assist_overround,
+            fitted_anytime_assist_probs,
+            &SINGLE_PRICE_BOUNDS,
+        ),
+    };
+
+    if args.player_assists {
+        println!(
+            "sample anytime assists σ={:.3}",
+            implied_booksum(&anytime_assist.market.prices)
+        );
+        let table_anytime_assist = print::tabulate_offer(&fitted_anytime_assist);
+        println!(
+            "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
+            fitted_anytime_assist.offer_type,
+            fitted_anytime_assist.market.probs.sum(),
+            implied_booksum(&fitted_anytime_assist.market.prices),
+            fitted_anytime_assist.market.probs.len(),
+            Console::default().render(&table_anytime_assist)
         );
     }
 
@@ -586,6 +664,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         (&ft_correct_score, &fitted_ft_correct_score),
         (&first_gs, &fitted_first_goalscorer),
         (&anytime_gs, &fitted_anytime_goalscorer),
+        (&anytime_assist, &fitted_anytime_assist),
     ]
     .iter()
     .map(|(sample, fitted)| {
@@ -622,6 +701,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_ft_correct_score,
         fitted_first_goalscorer,
         fitted_anytime_goalscorer,
+        fitted_anytime_assist,
     ];
 
     let table_overrounds = print::tabulate_overrounds(&fitted_markets);
@@ -861,7 +941,7 @@ fn explore_scores(h1_probs: ScoringProbs, h2_probs: ScoringProbs) -> Exploration
             intervals: INTERVALS as u8,
             h1_probs,
             h2_probs,
-            players: vec![],
+            player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: MAX_TOTAL_GOALS_FULL,
                 min_prob: 0.0,
@@ -869,8 +949,9 @@ fn explore_scores(h1_probs: ScoringProbs, h2_probs: ScoringProbs) -> Exploration
             expansions: Expansions {
                 ht_score: true,
                 ft_score: true,
-                player_stats: false,
-                player_split_stats: false,
+                player_goal_stats: false,
+                player_split_goal_stats: false,
+                max_player_assists: 0,
                 first_goalscorer: false,
             },
         },
@@ -989,7 +1070,7 @@ async fn read_contest_data(args: &Args) -> anyhow::Result<ContestSummary> {
             //ContestModel::read_json_file(path)?
             unimplemented!()
         } else if let Some(id) = args.download.as_ref() {
-            download_by_id(FeedId::new(DataProvider(PROVIDER::PointsBet), id.clone())).await?
+            download_by_id(id.clone()).await?
         } else {
             unreachable!()
         }

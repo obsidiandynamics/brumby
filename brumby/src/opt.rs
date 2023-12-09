@@ -1,4 +1,5 @@
 use std::ops::RangeInclusive;
+use anyhow::bail;
 
 use crate::capture::Capture;
 use crate::comb::{count_permutations, pick};
@@ -10,6 +11,17 @@ pub struct UnivariateDescentConfig {
     pub min_step: f64,
     pub max_steps: u64,
     pub acceptable_residual: f64,
+}
+impl UnivariateDescentConfig {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        if self.min_step <= 0.0 {
+            bail!("min step must be positive")
+        }
+        if self.acceptable_residual < 0.0 {
+            bail!("acceptable residual must be non-negative")
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -24,6 +36,8 @@ pub fn univariate_descent(
     config: &UnivariateDescentConfig,
     mut loss_f: impl FnMut(f64) -> f64,
 ) -> UnivariateDescentOutcome {
+    config.validate().unwrap();
+
     let mut steps = 0;
     let mut residual = loss_f(config.init_value);
     if residual <= config.acceptable_residual {
@@ -78,6 +92,24 @@ pub struct HypergridSearchConfig<'a> {
     pub bounds: Capture<'a, Vec<RangeInclusive<f64>>, [RangeInclusive<f64>]>,
     pub resolution: usize,
 }
+impl HypergridSearchConfig<'_> {
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        if self.max_steps <= 0 {
+            bail!("at least one step must be specified")
+        }
+        if self.acceptable_residual < 0.0 {
+            bail!("acceptable residual must be non-negative")
+        }
+        if self.bounds.is_empty() {
+            bail!("at least one search dimension must be specified")
+        }
+        const MIN_RESOLUTION: usize = 3;
+        if self.resolution < MIN_RESOLUTION {
+            bail!("search resolution must be at least {MIN_RESOLUTION}")
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct HypergridSearchOutcome {
@@ -90,6 +122,7 @@ pub fn hypergrid_search(
     config: &HypergridSearchConfig,
     mut constraint_f: impl FnMut(&[f64]) -> bool,
     mut loss_f: impl FnMut(&[f64]) -> f64) -> HypergridSearchOutcome {
+    config.validate().unwrap();
 
     let mut steps = 0;
     let mut values = Vec::with_capacity(config.bounds.len());

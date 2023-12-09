@@ -1,12 +1,14 @@
-use crate::domain::{OfferType, OutcomeType, Player};
-use crate::interval::{Expansions, Prospect, Prospects};
 use brumby::hash_lookup::HashLookup;
 
+use crate::domain::{OfferType, OutcomeType, Player};
+use crate::interval::{Expansions, Prospect, Prospects};
+
+mod anytime_assist;
+mod anytime_goalscorer;
 mod correct_score;
+mod first_goalscorer;
 mod head_to_head;
 mod total_goals;
-mod first_goalscorer;
-mod anytime_goalscorer;
 
 #[derive(Debug)]
 pub enum QuerySpec {
@@ -15,6 +17,7 @@ pub enum QuerySpec {
     PlayerLookup(usize),
     NoFirstGoalscorer,
     NoAnytimeGoalscorer,
+    NoAnytimeAssist,
 }
 
 #[must_use]
@@ -27,7 +30,7 @@ pub fn requirements(offer_type: &OfferType) -> Expansions {
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-        OfferType::AnytimeAssist => unimplemented!(),
+        OfferType::AnytimeAssist => anytime_assist::requirements(),
     }
 }
 
@@ -45,7 +48,7 @@ pub fn prepare(
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome_type, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome_type, player_lookup),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-        OfferType::AnytimeAssist => unimplemented!(),
+        OfferType::AnytimeAssist => anytime_assist::prepare(outcome_type, player_lookup),
     }
 }
 
@@ -59,7 +62,7 @@ pub fn filter(offer_type: &OfferType, query: &QuerySpec, prospect: &Prospect) ->
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-        OfferType::AnytimeAssist => unimplemented!(),
+        OfferType::AnytimeAssist => anytime_assist::filter(query, prospect),
     }
 }
 
@@ -79,7 +82,7 @@ pub fn isolate(
 }
 
 #[must_use]
-pub fn isolate_batch(
+pub fn isolate_set(
     selections: &[(OfferType, OutcomeType)],
     prospects: &Prospects,
     player_lookup: &HashLookup<Player>,
@@ -93,10 +96,198 @@ pub fn isolate_batch(
     prospects
         .iter()
         .filter(|(prospect, _)| {
-            queries
+            !queries
                 .iter()
                 .any(|(offer_type, query)| !filter(offer_type, query, prospect))
         })
         .map(|(_, prospect_prob)| prospect_prob)
         .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::{Period, Score, Side};
+    use crate::interval::{explore, IntervalConfig, ScoringProbs};
+
+    use super::*;
+
+    #[test]
+    fn isolate_degenerate_case_of_isolate_set() {
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: 4,
+                h1_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                h2_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                player_probs: vec![],
+                prune_thresholds: Default::default(),
+                expansions: Expansions {
+                    ht_score: false,
+                    ft_score: true,
+                    player_goal_stats: true,
+                    player_split_goal_stats: false,
+                    max_player_assists: 0,
+                    first_goalscorer: false,
+                },
+            },
+            0..4,
+        );
+        let home_win = isolate(
+            &OfferType::HeadToHead(Period::FullTime),
+            &OutcomeType::Win(Side::Home),
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert!(home_win > 0.0, "{home_win}");
+
+        let home_win_set = isolate_set(
+            &[(
+                OfferType::HeadToHead(Period::FullTime),
+                OutcomeType::Win(Side::Home),
+            )],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert_eq!(home_win, home_win_set);
+    }
+
+    #[test]
+    fn logical_implication_is_a_subset() {
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: 4,
+                h1_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                h2_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                player_probs: vec![],
+                prune_thresholds: Default::default(),
+                expansions: Expansions {
+                    ht_score: false,
+                    ft_score: true,
+                    player_goal_stats: true,
+                    player_split_goal_stats: false,
+                    max_player_assists: 0,
+                    first_goalscorer: false,
+                },
+            },
+            0..4,
+        );
+
+        let home_win = isolate_set(
+            &[(
+                OfferType::HeadToHead(Period::FullTime),
+                OutcomeType::Win(Side::Home),
+            )],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert!(home_win > 0.0, "{home_win}");
+
+        let one_nil = isolate_set(
+            &[(
+                OfferType::CorrectScore(Period::FullTime),
+                OutcomeType::Score(Score { home: 1, away: 0 }),
+            )],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert!(one_nil > 0.0, "{one_nil}");
+        assert!(home_win > one_nil);
+
+        let one_nil_and_home_win = isolate_set(
+            &[
+                (
+                    OfferType::CorrectScore(Period::FullTime),
+                    OutcomeType::Score(Score { home: 1, away: 0 }),
+                ),
+                (
+                    OfferType::HeadToHead(Period::FullTime),
+                    OutcomeType::Win(Side::Home),
+                ),
+            ],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert_eq!(one_nil, one_nil_and_home_win);
+    }
+
+    #[test]
+    fn impossibility_of_conflicting_outcomes() {
+        let exploration = explore(
+            &IntervalConfig {
+                intervals: 4,
+                h1_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                h2_probs: ScoringProbs {
+                    home_prob: 0.25,
+                    away_prob: 0.25,
+                    common_prob: 0.25,
+                },
+                player_probs: vec![],
+                prune_thresholds: Default::default(),
+                expansions: Expansions {
+                    ht_score: false,
+                    ft_score: true,
+                    player_goal_stats: true,
+                    player_split_goal_stats: false,
+                    max_player_assists: 0,
+                    first_goalscorer: false,
+                },
+            },
+            0..4,
+        );
+
+        let home_win = isolate_set(
+            &[(
+                OfferType::HeadToHead(Period::FullTime),
+                OutcomeType::Win(Side::Home),
+            )],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert!(home_win > 0.0, "{home_win}");
+
+        let nil_one = isolate_set(
+            &[(
+                OfferType::CorrectScore(Period::FullTime),
+                OutcomeType::Score(Score { home: 0, away: 1 }),
+            )],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert!(nil_one > 0.0, "{nil_one}");
+
+        let nil_one_home_win = isolate_set(
+            &[
+                (
+                    OfferType::CorrectScore(Period::FullTime),
+                    OutcomeType::Score(Score { home: 0, away: 1 }),
+                ),
+                (
+                    OfferType::HeadToHead(Period::FullTime),
+                    OutcomeType::Win(Side::Home),
+                ),
+            ],
+            &exploration.prospects,
+            &exploration.player_lookup,
+        );
+        assert_eq!(0.0, nil_one_home_win);
+    }
 }

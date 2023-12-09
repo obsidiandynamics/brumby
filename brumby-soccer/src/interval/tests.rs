@@ -29,11 +29,8 @@ fn explore_2x2() {
             intervals: 2,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..2,
@@ -45,7 +42,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
                 first_scorer: None,
             },
             0.0625f64,
@@ -54,7 +51,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -63,7 +60,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -72,7 +69,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -81,7 +78,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 2 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -90,7 +87,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0}, h2: SplitStats { goals: 2 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -99,7 +96,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 2 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 2 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -108,7 +105,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 1, away: 2 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 2 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -117,7 +114,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 2 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -126,7 +123,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 2, away: 2 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 2 }, h2: SplitStats { goals: 2 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 2 }, assists: 4 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -135,7 +132,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -144,7 +141,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -153,7 +150,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -162,7 +159,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -171,7 +168,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 2, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 2 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -180,7 +177,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 2 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -189,37 +186,53 @@ fn explore_2x2() {
     assert_eq!(0.0, exploration.pruned);
     assert_expected_prospects(&expected, &exploration.prospects);
 
-    let isolated_1gs_none = isolate(
+    let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.0625, isolated_1gs_none);
+    assert_eq!(0.0625, first_goalscorer_none);
 
-    let isolated_1gs_other = isolate(
+    let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.0625, isolated_1gs_other);
+    assert_eq!(1.0 - 0.0625, first_goalscorer_other);
 
-    let isolated_anytime_none = isolate(
+    let anytime_goalscorer_none = isolate(
         &OfferType::AnytimeGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.0625, isolated_anytime_none);
+    assert_eq!(0.0625, anytime_goalscorer_none);
 
-    let isolated_anytime_other = isolate(
+    let anytime_goalscorer_other = isolate(
         &OfferType::AnytimeGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.0625, isolated_anytime_other);
+    assert_eq!(1.0 - 0.0625, anytime_goalscorer_other);
+
+    let anytime_assist_none = isolate(
+        &OfferType::AnytimeAssist,
+        &OutcomeType::None,
+        &exploration.prospects,
+        &exploration.player_lookup,
+    );
+    assert_eq!(0.0625, anytime_assist_none);
+
+    let anytime_assist_other = isolate(
+        &OfferType::AnytimeAssist,
+        &OutcomeType::Player(Player::Other),
+        &exploration.prospects,
+        &exploration.player_lookup,
+    );
+    assert_eq!(1.0 - 0.0625, anytime_assist_other);
 }
 
 #[test]
@@ -229,7 +242,7 @@ fn explore_2x2_pruned_2_goals() {
             intervals: 2,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![],
+            player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: 2,
                 min_prob: 0.0,
@@ -244,7 +257,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
                 first_scorer: None,
             },
             0.0625f64,
@@ -253,7 +266,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -262,7 +275,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -271,7 +284,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -280,7 +293,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 2 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -289,7 +302,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0}, h2: SplitStats { goals: 2 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -298,7 +311,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 2 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -307,7 +320,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -316,7 +329,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -325,7 +338,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 1 }, h2: SplitStats { goals: 0 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -334,7 +347,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}],
+                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -344,21 +357,21 @@ fn explore_2x2_pruned_2_goals() {
     assert_eq!(0.3125, exploration.pruned);
     assert_expected_prospects(&expected, &exploration.prospects);
 
-    let isolated_1gs_none = isolate(
+    let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.0625, isolated_1gs_none);
+    assert_eq!(0.0625, first_goalscorer_none);
 
-    let isolated_1gs_other = isolate(
+    let fist_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.0625 - 0.3125, isolated_1gs_other);
+    assert_eq!(1.0 - 0.0625 - 0.3125, fist_goalscorer_other);
 }
 
 #[test]
@@ -368,11 +381,8 @@ fn explore_3x3() {
             intervals: 3,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..3,
@@ -390,11 +400,8 @@ fn explore_4x4() {
             intervals: 4,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..4,
@@ -406,18 +413,15 @@ fn explore_4x4() {
 }
 
 #[test]
-fn explore_1x1_player() {
+fn explore_1x1_player_goal() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
         &IntervalConfig {
             intervals: 1,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![(player.clone(), 0.25)],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..1,
@@ -430,8 +434,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }
                 ],
                 first_scorer: None,
             },
@@ -442,8 +446,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 2 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 2 }, assists: 2 }
                 ],
                 first_scorer: Some(1),
             },
@@ -454,8 +458,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 2 }
                 ],
                 first_scorer: Some(1),
             },
@@ -466,8 +470,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 2 }
                 ],
                 first_scorer: Some(0),
             },
@@ -478,8 +482,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }
                 ],
                 first_scorer: Some(1),
             },
@@ -490,8 +494,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 1 }
                 ],
                 first_scorer: Some(0),
             },
@@ -502,8 +506,8 @@ fn explore_1x1_player() {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
                 stats: vec![
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 0 }},
-                    PlayerStats { h1: SplitStats { goals: 0 }, h2: SplitStats { goals: 1 }}
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
+                    PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }
                 ],
                 first_scorer: Some(1),
             },
@@ -513,68 +517,89 @@ fn explore_1x1_player() {
     assert_eq!(0.0, exploration.pruned);
     assert_expected_prospects(&expected, &exploration.prospects);
 
-    let isolated_1gs_none = isolate(
+    let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.25, isolated_1gs_none);
+    assert_eq!(0.25, first_goalscorer_none);
 
-    let isolated_1gs_player = isolate(
+    let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.09375, isolated_1gs_player);
+    assert_eq!(0.09375, first_goalscorer_player);
 
-    let isolated_1gs_other = isolate(
+    let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.25 - 0.09375, isolated_1gs_other);
+    assert_eq!(1.0 - 0.25 - 0.09375, first_goalscorer_other);
 
-    let isolated_anytime_none = isolate(
+    let anytime_goalscorer_none = isolate(
         &OfferType::AnytimeGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.25, isolated_anytime_none);
+    assert_eq!(0.25, anytime_goalscorer_none);
 
-    let isolated_anytime_player = isolate(
+    let anytime_goalscorer_player = isolate(
         &OfferType::AnytimeGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.125, isolated_anytime_player);
+    assert_eq!(0.125, anytime_goalscorer_player);
 
-    let isolated_anytime_other = isolate(
+    let anytime_goalscorer_other = isolate(
         &OfferType::AnytimeGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.6875, isolated_anytime_other);
+    assert_eq!(0.6875, anytime_goalscorer_other);
+
+    let anytime_assist_none = isolate(
+        &OfferType::AnytimeAssist,
+        &OutcomeType::None,
+        &exploration.prospects,
+        &exploration.player_lookup,
+    );
+    assert_eq!(0.25, anytime_assist_none);
+
+    let anytime_assist_player = isolate(
+        &OfferType::AnytimeAssist,
+        &OutcomeType::Player(player.clone()),
+        &exploration.prospects,
+        &exploration.player_lookup,
+    );
+    assert_eq!(0.0, anytime_assist_player);
+
+    let anytime_assist_other = isolate(
+        &OfferType::AnytimeAssist,
+        &OutcomeType::Player(Player::Other),
+        &exploration.prospects,
+        &exploration.player_lookup,
+    );
+    assert_eq!(1.0 - 0.25, anytime_assist_other);
 }
 
 #[test]
-fn explore_2x2_player() {
+fn explore_2x2_player_goal() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
             h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
             h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            players: vec![(player.clone(), 0.25)],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..2,
@@ -583,44 +608,41 @@ fn explore_2x2_player() {
     assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
 
-    let isolated_1gs_none = isolate(
+    let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.0625, isolated_1gs_none);
+    assert_eq!(0.0625, first_goalscorer_none);
 
-    let isolated_1gs_player = isolate(
+    let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(0.1171875, isolated_1gs_player);
+    assert_eq!(0.1171875, first_goalscorer_player);
 
-    let isolated_1gs_other = isolate(
+    let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.0625 - 0.1171875, isolated_1gs_other);
+    assert_eq!(1.0 - 0.0625 - 0.1171875, first_goalscorer_other);
 }
 
 #[test]
-fn explore_2x2_player_asymmetric() {
+fn explore_2x2_player_goal_asymmetric() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
             h1_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
             h2_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
-            players: vec![(player.clone(), 0.25)],
-            prune_thresholds: PruneThresholds {
-                max_total_goals: u16::MAX,
-                min_prob: 0.0,
-            },
+            player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
+            prune_thresholds: Default::default(),
             expansions: Default::default(),
         },
         0..2,
@@ -629,27 +651,27 @@ fn explore_2x2_player_asymmetric() {
     assert_float_relative_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.0, exploration.pruned);
 
-    let isolated_1gs_none = isolate(
+    let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_float_relative_eq!(0.16, isolated_1gs_none);
+    assert_float_relative_eq!(0.16, first_goalscorer_none);
 
-    let isolated_1gs_player = isolate(
+    let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_float_relative_eq!(0.1225, isolated_1gs_player);
+    assert_float_relative_eq!(0.1225, first_goalscorer_player);
 
-    let isolated_1gs_other = isolate(
+    let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
         &OutcomeType::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_float_relative_eq!(1.0 - 0.16 - 0.1225, isolated_1gs_other);
+    assert_float_relative_eq!(1.0 - 0.16 - 0.1225, first_goalscorer_other);
 }

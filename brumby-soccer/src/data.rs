@@ -4,7 +4,7 @@ use racing_scraper::sports::soccer::market_model::{HomeAway, Player as ScraperPl
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use racing_scraper::sports::{get_sports_contest, PROVIDER};
+use racing_scraper::sports::{get_sports_contest, Provider};
 use thiserror::Error;
 use brumby::feed_id::FeedId;
 
@@ -56,20 +56,23 @@ impl From<ContestModel> for ContestSummary {
                         ]),
                     );
                 }
-                SoccerMarket::AnyTimeGoalScorer(scorers) => {
+                SoccerMarket::AnytimeGoalScorer(players) => {
                     offerings.insert(
                         OfferType::AnytimeGoalscorer,
-                        HashMap::from_iter(scorers.into_iter().map(|scorer| {
-                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(scorer);
+                        HashMap::from_iter(players.into_iter().map(|player| {
+                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
                             (outcome_type, odds)
                         })),
                     );
                 }
-                SoccerMarket::FirstGoalScorer(scorers) => {
+                SoccerMarket::FirstGoalScorer(players) => {
                     offerings.insert(
                         OfferType::FirstGoalscorer,
-                        HashMap::from_iter(scorers.into_iter().map(|scorer| {
-                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(scorer);
+                        HashMap::from_iter(players.into_iter().map(|player| {
+                            if player.side.is_none() {
+                                println!("PLAYER {player:?}");
+                            }
+                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
                             (outcome_type, odds)
                         })),
                     );
@@ -102,15 +105,15 @@ impl From<ContestModel> for ContestSummary {
                         })),
                     );
                 }
-                SoccerMarket::TotalGoalsOddEven(_) => {
-                    //TODO
-                }
-                SoccerMarket::FirstHalfGoalsOddEven(_) => {
-                    //TODO
-                }
-                SoccerMarket::SecondHalfGoalOddEven(_) => {
-                    //TODO
-                }
+                // SoccerMarket::TotalGoalsOddEven(_) => {
+                //     //TODO
+                // }
+                // SoccerMarket::FirstHalfGoalsOddEven(_) => {
+                //     //TODO
+                // }
+                // SoccerMarket::SecondHalfGoalOddEven(_) => {
+                //     //TODO
+                // }
                 SoccerMarket::Score2GoalsOrMore(_) => {
                     //TODO
                 }
@@ -154,15 +157,28 @@ impl From<ContestModel> for ContestSummary {
                         ]),
                     );
                 }
-                SoccerMarket::PlayerAssist(_) => {}
+                SoccerMarket::PlayerAssist(players, at_least) => {
+                    if at_least == 1 {
+                        offerings.insert(
+                            OfferType::AnytimeAssist,
+                            HashMap::from_iter(players.into_iter().map(|player| {
+                                let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
+                                (outcome_type, odds)
+                            })),
+                        );
+                    }
+                }
                 SoccerMarket::TotalCardsOverUnder(_, _) => {}
                 SoccerMarket::FirstHalfCardsOverUnder(_, _) => {}
                 SoccerMarket::SecondHalfCardsOverUnder(_, _) => {}
-                SoccerMarket::PlayerCard(_) => {}
                 SoccerMarket::PlayerShotsWoodwork(_, _) => {}
                 SoccerMarket::PlayerTotalShots(_, _) => {}
                 SoccerMarket::PlayerShotsOnTarget(_, _) => {}
                 SoccerMarket::TotalCornersOverUnder(_, _) => {}
+                SoccerMarket::PlayerShownCard(_) => {}
+                SoccerMarket::PlayerShotsOutsideBox(_, _) => {}
+                SoccerMarket::FirstHalfCornersOverUnder(_, _) => {}
+                SoccerMarket::SecondHalfCornersOverUnder(_, _) => {}
             }
         }
         Self {
@@ -194,10 +210,10 @@ impl From<ScraperPlayer> for OutcomeOdds {
     }
 }
 
-// #[derive(Debug, Clone)]
-pub struct DataProvider(pub PROVIDER);
+#[derive(Debug, Clone)]
+pub struct DataProvider(pub Provider);
 
-impl From<DataProvider> for PROVIDER {
+impl From<DataProvider> for Provider {
     fn from(value: DataProvider) -> Self {
         value.0
     }
@@ -208,8 +224,8 @@ impl FromStr for DataProvider {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "ladbrokes" => Ok(DataProvider(PROVIDER::Ladbrokes)),
-            "pointsbet" => Ok(DataProvider(PROVIDER::PointsBet)),
+            "ladbrokes" => Ok(DataProvider(Provider::Ladbrokes)),
+            "pointsbet" => Ok(DataProvider(Provider::PointsBet)),
             _ => Err(ProviderParseError(format!("unsupported provider {s}")))
         }
     }

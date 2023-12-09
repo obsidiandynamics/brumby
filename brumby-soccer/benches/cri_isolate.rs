@@ -1,7 +1,7 @@
 use brumby_soccer::domain::{OfferType, OutcomeType, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby_soccer::interval::{explore, Exploration, IntervalConfig, ScoringProbs, PruneThresholds};
+use brumby_soccer::interval::{explore, Exploration, IntervalConfig, ScoringProbs, PruneThresholds, PlayerProbs};
 use brumby_soccer::interval::query::isolate;
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -12,7 +12,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 intervals,
                 h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
                 h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-                players: vec![(player, 0.25)],
+                player_probs: vec![(player, PlayerProbs { goal: Some(0.25), assist: None })],
                 prune_thresholds: PruneThresholds {
                     max_total_goals,
                     min_prob: 1e-6,

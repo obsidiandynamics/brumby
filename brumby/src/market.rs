@@ -88,7 +88,7 @@ impl Market {
     }
 
     pub fn offered_booksum(&self) -> f64 {
-        self.prices.iter().map(|price| 1.0 / price).sum()
+        self.prices.invert().sum()
     }
 
     pub fn fit(method: &OverroundMethod, prices: Vec<f64>, fair_sum: f64) -> Self {

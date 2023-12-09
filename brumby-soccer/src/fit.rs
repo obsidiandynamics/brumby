@@ -13,12 +13,12 @@ use brumby::{factorial, poisson};
 use crate::domain::Player::Named;
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::interval::query::isolate;
-use crate::interval::{explore, Expansions, IntervalConfig, PruneThresholds, ScoringProbs};
+use crate::interval::{explore, Expansions, IntervalConfig, PruneThresholds, ScoringProbs, PlayerProbs};
 use crate::scoregrid;
 
 // const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 // const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
-const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
+// const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
 const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
@@ -145,15 +145,16 @@ pub fn fit_first_goalscorer_all(
                     init_estimate,
                     first_gs.market.probs[index],
                 );
-                // println!("for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", first_gs.market.probs[index]);
+                // println!("goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", first_gs.market.probs[index]);
                 fitted_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_value);
             }
-            OutcomeType::None => {}
+            OutcomeType::None => {
+            }
             _ => unreachable!(),
         }
     }
     let elapsed = start.elapsed();
-    println!("player fitting took {elapsed:?}");
+    println!("first goalscorer fitting took {elapsed:?}");
     fitted_goalscorer_probs
 }
 
@@ -168,7 +169,7 @@ fn fit_first_goalscorer_one(
         intervals: INTERVALS as u8,
         h1_probs: h1_probs.clone(),
         h2_probs: h2_probs.clone(),
-        players: vec![(player.clone(), 0.0)],
+        player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.0), assist: None })],
         prune_thresholds: PruneThresholds {
             max_total_goals: MAX_TOTAL_GOALS_FULL,
             min_prob: GOALSCORER_MIN_PROB,
@@ -176,8 +177,9 @@ fn fit_first_goalscorer_one(
         expansions: Expansions {
             ht_score: false,
             ft_score: false,
-            player_stats: false,
-            player_split_stats: false,
+            player_goal_stats: false,
+            player_split_goal_stats: false,
+            max_player_assists: 0,
             first_goalscorer: true,
         },
     };
@@ -191,10 +193,104 @@ fn fit_first_goalscorer_one(
             acceptable_residual: 1e-9,
         },
         |value| {
-            config.players[0].1 = value;
+            config.player_probs[0].1.goal = Some(value);
             let exploration = explore(&config, 0..INTERVALS as u8);
             let isolated_prob = isolate(
                 &OfferType::FirstGoalscorer,
+                &outcome_type,
+                &exploration.prospects,
+                &exploration.player_lookup,
+            );
+            ERROR_TYPE.calculate(expected_prob, isolated_prob)
+        },
+    )
+}
+
+pub fn fit_anytime_assist_all(
+    h1_probs: &ScoringProbs,
+    h2_probs: &ScoringProbs,
+    anytime_assist: &Offer,
+    draw_prob: f64,
+    booksum: f64,
+) -> BTreeMap<Player, f64> {
+    let home_rate = (h1_probs.home_prob + h2_probs.home_prob) / 2.0;
+    let away_rate = (h1_probs.away_prob + h2_probs.away_prob) / 2.0;
+    let common_rate = (h1_probs.common_prob + h2_probs.common_prob) / 2.0;
+    let rate_sum = home_rate + away_rate + common_rate;
+    let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
+    let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
+    // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
+    let mut fitted_assist_probs = BTreeMap::new();
+    let start = Instant::now();
+    for (index, outcome) in anytime_assist.outcomes.items().iter().enumerate() {
+        match outcome {
+            OutcomeType::Player(player) => {
+                let side_ratio = match player {
+                    Named(side, _) => match side {
+                        Side::Home => home_ratio,
+                        Side::Away => away_ratio,
+                    },
+                    Player::Other => unreachable!(),
+                };
+                let init_estimate = anytime_assist.market.probs[index] / booksum / side_ratio;
+                let player_search_outcome = fit_anytime_assist_one(
+                    h1_probs,
+                    h2_probs,
+                    player,
+                    init_estimate,
+                    anytime_assist.market.probs[index],
+                );
+                // println!("assist for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", anytime_assist.market.probs[index]);
+                fitted_assist_probs.insert(player.clone(), player_search_outcome.optimal_value);
+            }
+            OutcomeType::None => {}
+            _ => unreachable!(),
+        }
+    }
+    let elapsed = start.elapsed();
+    println!("anytime assist fitting took {elapsed:?}");
+    fitted_assist_probs
+}
+
+fn fit_anytime_assist_one(
+    h1_probs: &ScoringProbs,
+    h2_probs: &ScoringProbs,
+    player: &Player,
+    init_estimate: f64,
+    expected_prob: f64,
+) -> UnivariateDescentOutcome {
+    let mut config = IntervalConfig {
+        intervals: INTERVALS as u8,
+        h1_probs: h1_probs.clone(),
+        h2_probs: h2_probs.clone(),
+        player_probs: vec![(player.clone(), PlayerProbs { goal: None, assist: Some(0.0) })],
+        prune_thresholds: PruneThresholds {
+            max_total_goals: MAX_TOTAL_GOALS_FULL,
+            min_prob: GOALSCORER_MIN_PROB,
+        },
+        expansions: Expansions {
+            ht_score: false,
+            ft_score: false,
+            player_goal_stats: false,
+            player_split_goal_stats: false,
+            max_player_assists: 1,
+            first_goalscorer: false,
+        },
+    };
+    let outcome_type = OutcomeType::Player(player.clone());
+    univariate_descent(
+        &UnivariateDescentConfig {
+            init_value: init_estimate,
+            init_step: init_estimate * 0.1,
+            min_step: init_estimate * 0.001,
+            max_steps: 100,
+            acceptable_residual: 1e-9,
+        },
+        |value| {
+            config.player_probs[0].1.assist = Some(value);
+            let exploration = explore(&config, 0..INTERVALS as u8);
+            let isolated_prob = isolate(
+                &OfferType::AnytimeAssist,
                 &outcome_type,
                 &exploration.prospects,
                 &exploration.player_lookup,

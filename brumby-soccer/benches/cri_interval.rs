@@ -10,7 +10,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 intervals,
                 h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
                 h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-                players: vec![],
+                player_probs: vec![],
                 prune_thresholds: PruneThresholds {
                     max_total_goals,
                     min_prob: 1e-6,

@@ -163,7 +163,7 @@ pub fn from_interval(
             intervals,
             h1_probs,
             h2_probs,
-            players: vec![],
+            player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals,
                 min_prob: 0.0,
@@ -171,8 +171,9 @@ pub fn from_interval(
             expansions: Expansions {
                 ft_score: true,
                 ht_score: false,
-                player_stats: false,
-                player_split_stats: false,
+                player_goal_stats: false,
+                player_split_goal_stats: false,
+                max_player_assists: 0,
                 first_goalscorer: false,
             }
         },
