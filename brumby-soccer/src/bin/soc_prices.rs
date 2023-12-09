@@ -1,43 +1,38 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
-use std::ops::Range;
 use std::path::PathBuf;
-use std::time::Instant;
 
 use anyhow::bail;
 use clap::Parser;
+use racing_scraper::sports::PROVIDER;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
-use stanza::style::HAlign;
 use tracing::{debug, info};
+use brumby::feed_id::FeedId;
 
 use brumby::hash_lookup::HashLookup;
-use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
-use brumby::opt::{univariate_descent, UnivariateDescentConfig, UnivariateDescentOutcome};
 use brumby::probs::SliceExt;
-use brumby_soccer::data::{download_by_id, ContestSummary};
-use brumby_soccer::domain::Player::Named;
+use brumby_soccer::{fit, print};
+use brumby_soccer::data::{ContestSummary, DataProvider, download_by_id};
 use brumby_soccer::domain::{
-    FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Player, Score, Side,
+    FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Score,
 };
 use brumby_soccer::fit::ErrorType;
-use brumby_soccer::interval::query::isolate;
 use brumby_soccer::interval::{
-    explore, Expansions, Exploration, IntervalConfig, PruneThresholds, ScoringProbs,
+    Expansions, Exploration, explore, IntervalConfig, PruneThresholds, ScoringProbs,
 };
-use brumby_soccer::scoregrid::{from_correct_score, home_away_expectations};
-use brumby_soccer::{fit, print, scoregrid};
+use brumby_soccer::interval::query::isolate;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
 const FIRST_GOALSCORER_BOOKSUM: f64 = 1.0;
 const INTERVALS: usize = 18;
-const MAX_TOTAL_GOALS_HALF: u16 = 4;
+// const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
 const GOALSCORER_MIN_PROB: f64 = 0.0;
-const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
+// const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -48,6 +43,7 @@ struct Args {
     /// download contest data by ID
     #[clap(short = 'd', long)]
     download: Option<String>,
+    // download: Option<SoccerFeedId>,
 
     /// print player markets
     #[clap(long = "player-goals")]
@@ -993,7 +989,7 @@ async fn read_contest_data(args: &Args) -> anyhow::Result<ContestSummary> {
             //ContestModel::read_json_file(path)?
             unimplemented!()
         } else if let Some(id) = args.download.as_ref() {
-            download_by_id(id.clone()).await?
+            download_by_id(FeedId::new(DataProvider(PROVIDER::PointsBet), id.clone())).await?
         } else {
             unreachable!()
         }

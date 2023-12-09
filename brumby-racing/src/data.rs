@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
-use racing_scraper::get_racing_data;
-use racing_scraper::models::{EventDetail, EventType};
+use racing_scraper::racing::get_racing_data;
+use racing_scraper::racing::sports_bet::models::{EventDetail, EventType};
 
 use brumby::file;
 use brumby::file::ReadJsonFile;

@@ -30,7 +30,7 @@ impl<T: Eq + PartialEq + Hash> HashLookup<T> {
     }
 
     pub fn index_of(&self, item: &T) -> Option<usize> {
-        self.item_to_index.get(&item).copied()
+        self.item_to_index.get(item).copied()
     }
 
     pub fn len(&self) -> usize {

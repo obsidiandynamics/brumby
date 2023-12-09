@@ -4,14 +4,15 @@
 
 #![allow(clippy::too_many_arguments)]
 
-pub mod hash_lookup;
 pub mod capture;
 pub mod comb;
 pub mod csv;
 pub mod display;
 pub mod factorial;
+pub mod feed_id;
 pub mod file;
 pub mod harville;
+pub mod hash_lookup;
 pub mod linear;
 pub mod market;
 pub mod mc;

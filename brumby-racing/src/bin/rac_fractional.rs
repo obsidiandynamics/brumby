@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use clap::Parser;
-use racing_scraper::models::EventDetail;
+use racing_scraper::racing::sports_bet::models::EventDetail;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::{HAlign, MinWidth, Separator, Styles};

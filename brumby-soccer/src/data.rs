@@ -1,8 +1,12 @@
 use crate::domain::{OfferType, OutcomeType, Over, Period, Player, Score, Side};
-use racing_scraper::get_sports_contest;
 use racing_scraper::sports::soccer::contest_model::ContestModel;
-use racing_scraper::sports::soccer::market_model::{HomeAway, Scorer, SoccerMarket};
+use racing_scraper::sports::soccer::market_model::{HomeAway, Player as ScraperPlayer, SoccerMarket};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+use racing_scraper::sports::{get_sports_contest, PROVIDER};
+use thiserror::Error;
+use brumby::feed_id::FeedId;
 
 #[derive(Debug)]
 pub struct ContestSummary {
@@ -150,6 +154,15 @@ impl From<ContestModel> for ContestSummary {
                         ]),
                     );
                 }
+                SoccerMarket::PlayerAssist(_) => {}
+                SoccerMarket::TotalCardsOverUnder(_, _) => {}
+                SoccerMarket::FirstHalfCardsOverUnder(_, _) => {}
+                SoccerMarket::SecondHalfCardsOverUnder(_, _) => {}
+                SoccerMarket::PlayerCard(_) => {}
+                SoccerMarket::PlayerShotsWoodwork(_, _) => {}
+                SoccerMarket::PlayerTotalShots(_, _) => {}
+                SoccerMarket::PlayerShotsOnTarget(_, _) => {}
+                SoccerMarket::TotalCornersOverUnder(_, _) => {}
             }
         }
         Self {
@@ -171,17 +184,50 @@ impl From<HomeAway> for Side {
 
 struct OutcomeOdds(OutcomeType, f64);
 
-impl From<Scorer> for OutcomeOdds {
-    fn from(scorer: Scorer) -> Self {
-        let outcome_type = match scorer.side {
+impl From<ScraperPlayer> for OutcomeOdds {
+    fn from(player: ScraperPlayer) -> Self {
+        let outcome_type = match player.side {
             None => OutcomeType::None,
-            Some(side) => OutcomeType::Player(Player::Named(side.into(), scorer.name)),
+            Some(side) => OutcomeType::Player(Player::Named(side.into(), player.name)),
         };
-        OutcomeOdds(outcome_type, scorer.odds)
+        OutcomeOdds(outcome_type, player.odds)
     }
 }
 
-pub async fn download_by_id(id: String) -> anyhow::Result<ContestModel> {
-    let contest = get_sports_contest(id).await?;
+// #[derive(Debug, Clone)]
+pub struct DataProvider(pub PROVIDER);
+
+impl From<DataProvider> for PROVIDER {
+    fn from(value: DataProvider) -> Self {
+        value.0
+    }
+}
+
+impl FromStr for DataProvider {
+    type Err = ProviderParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "ladbrokes" => Ok(DataProvider(PROVIDER::Ladbrokes)),
+            "pointsbet" => Ok(DataProvider(PROVIDER::PointsBet)),
+            _ => Err(ProviderParseError(format!("unsupported provider {s}")))
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub struct ProviderParseError(String);
+
+impl Display for ProviderParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub type SoccerFeedId = FeedId<DataProvider>;
+
+pub async fn download_by_id(id: SoccerFeedId) -> anyhow::Result<ContestModel> {
+    let (provider, entity_id) = id.take();
+    let contest = get_sports_contest(provider.into(), entity_id).await?;
     Ok(contest)
 }

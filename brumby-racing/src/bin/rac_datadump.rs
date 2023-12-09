@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 use clap::Parser;
-use racing_scraper::models::EventType;
+use racing_scraper::racing::sports_bet::models::EventType;
 use strum::{EnumCount, IntoEnumIterator};
 use tracing::{debug, info};
 
