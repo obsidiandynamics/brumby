@@ -27,8 +27,10 @@ fn explore_2x2() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![],
             prune_thresholds: Default::default(),
             expansions: Default::default(),
@@ -240,8 +242,10 @@ fn explore_2x2_pruned_2_goals() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: 2,
@@ -379,8 +383,10 @@ fn explore_3x3() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 3,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![],
             prune_thresholds: Default::default(),
             expansions: Default::default(),
@@ -398,8 +404,10 @@ fn explore_4x4() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 4,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![],
             prune_thresholds: Default::default(),
             expansions: Default::default(),
@@ -418,8 +426,10 @@ fn explore_1x1_player_goal() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 1,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),
             expansions: Default::default(),
@@ -596,8 +606,10 @@ fn explore_2x2_player_goal() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
-            h2_probs: ScoringProbs { home_prob: 0.25, away_prob: 0.25, common_prob: 0.25 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+            },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),
             expansions: Default::default(),
@@ -639,8 +651,10 @@ fn explore_2x2_player_goal_asymmetric() {
     let exploration = explore(
         &IntervalConfig {
             intervals: 2,
-            h1_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
-            h2_probs: ScoringProbs { home_prob: 0.3, away_prob: 0.2, common_prob: 0.1 },
+            team_probs: TeamProbs {
+                h1_goals: BivariateProbs { home: 0.3, away: 0.2, common: 0.1 },
+                h2_goals: BivariateProbs { home: 0.3, away: 0.2, common: 0.1 },
+            },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),
             expansions: Default::default(),

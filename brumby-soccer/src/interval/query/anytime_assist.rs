@@ -42,7 +42,7 @@ pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
 mod tests {
     use super::*;
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, PlayerProbs, ScoringProbs};
+    use crate::interval::{explore, IntervalConfig, PlayerProbs, BivariateProbs, TeamProbs};
 
     fn print_prospects(prospects: &Prospects) {
         for (prospect, prob) in prospects {
@@ -57,15 +57,17 @@ mod tests {
         let exploration = explore(
             &IntervalConfig {
                 intervals: 1,
-                h1_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
-                },
-                h2_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    h2_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
                 },
                 player_probs: vec![
                     (
@@ -144,15 +146,17 @@ mod tests {
         let exploration = explore(
             &IntervalConfig {
                 intervals: 1,
-                h1_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
-                },
-                h2_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    h2_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
                 },
                 player_probs: vec![
                     (

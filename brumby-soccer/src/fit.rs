@@ -13,7 +13,7 @@ use brumby::{factorial, poisson};
 use crate::domain::Player::Named;
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::interval::query::isolate;
-use crate::interval::{explore, Expansions, IntervalConfig, PruneThresholds, ScoringProbs, PlayerProbs};
+use crate::interval::{explore, Expansions, IntervalConfig, PruneThresholds, BivariateProbs, PlayerProbs, TeamProbs};
 use crate::scoregrid;
 
 // const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
@@ -113,14 +113,14 @@ pub fn fit_scoregrid_full(offers: &[&Offer]) -> HypergridSearchOutcome {
 }
 
 pub fn fit_first_goalscorer_all(
-    h1_probs: &ScoringProbs,
-    h2_probs: &ScoringProbs,
+    h1_probs: &BivariateProbs,
+    h2_probs: &BivariateProbs,
     first_gs: &Offer,
     draw_prob: f64,
 ) -> BTreeMap<Player, f64> {
-    let home_rate = (h1_probs.home_prob + h2_probs.home_prob) / 2.0;
-    let away_rate = (h1_probs.away_prob + h2_probs.away_prob) / 2.0;
-    let common_rate = (h1_probs.common_prob + h2_probs.common_prob) / 2.0;
+    let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
+    let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
+    let common_rate = (h1_probs.common + h2_probs.common) / 2.0;
     let rate_sum = home_rate + away_rate + common_rate;
     let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
     let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
@@ -159,16 +159,18 @@ pub fn fit_first_goalscorer_all(
 }
 
 fn fit_first_goalscorer_one(
-    h1_probs: &ScoringProbs,
-    h2_probs: &ScoringProbs,
+    h1_goals: &BivariateProbs,
+    h2_goals: &BivariateProbs,
     player: &Player,
     init_estimate: f64,
     expected_prob: f64,
 ) -> UnivariateDescentOutcome {
     let mut config = IntervalConfig {
         intervals: INTERVALS as u8,
-        h1_probs: h1_probs.clone(),
-        h2_probs: h2_probs.clone(),
+        team_probs: TeamProbs {
+            h1_goals: h1_goals.clone(),
+            h2_goals: h2_goals.clone(),
+        },
         player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.0), assist: None })],
         prune_thresholds: PruneThresholds {
             max_total_goals: MAX_TOTAL_GOALS_FULL,
@@ -207,15 +209,15 @@ fn fit_first_goalscorer_one(
 }
 
 pub fn fit_anytime_assist_all(
-    h1_probs: &ScoringProbs,
-    h2_probs: &ScoringProbs,
+    h1_probs: &BivariateProbs,
+    h2_probs: &BivariateProbs,
     anytime_assist: &Offer,
     draw_prob: f64,
     booksum: f64,
 ) -> BTreeMap<Player, f64> {
-    let home_rate = (h1_probs.home_prob + h2_probs.home_prob) / 2.0;
-    let away_rate = (h1_probs.away_prob + h2_probs.away_prob) / 2.0;
-    let common_rate = (h1_probs.common_prob + h2_probs.common_prob) / 2.0;
+    let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
+    let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
+    let common_rate = (h1_probs.common + h2_probs.common) / 2.0;
     let rate_sum = home_rate + away_rate + common_rate;
     let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
     let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
@@ -253,16 +255,18 @@ pub fn fit_anytime_assist_all(
 }
 
 fn fit_anytime_assist_one(
-    h1_probs: &ScoringProbs,
-    h2_probs: &ScoringProbs,
+    h1_goals: &BivariateProbs,
+    h2_goals: &BivariateProbs,
     player: &Player,
     init_estimate: f64,
     expected_prob: f64,
 ) -> UnivariateDescentOutcome {
     let mut config = IntervalConfig {
         intervals: INTERVALS as u8,
-        h1_probs: h1_probs.clone(),
-        h2_probs: h2_probs.clone(),
+        team_probs: TeamProbs {
+            h1_goals: h1_goals.clone(),
+            h2_goals: h2_goals.clone(),
+        },
         player_probs: vec![(player.clone(), PlayerProbs { goal: None, assist: Some(0.0) })],
         prune_thresholds: PruneThresholds {
             max_total_goals: MAX_TOTAL_GOALS_FULL,

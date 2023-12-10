@@ -41,19 +41,35 @@ pub fn init_prospects(capacity: usize) -> Prospects {
 }
 
 #[derive(Debug, Clone)]
-pub struct ScoringProbs {
-    pub home_prob: f64,
-    pub away_prob: f64,
-    pub common_prob: f64,
+pub struct UnivariateProbs {
+    pub home: f64,
+    pub away: f64,
 }
 
-impl<'a> From<&'a [f64]> for ScoringProbs {
+impl<'a> From<&'a [f64]> for UnivariateProbs {
+    fn from(params: &'a [f64]) -> Self {
+        assert_eq!(2, params.len());
+        Self {
+            home: params[0],
+            away: params[1],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BivariateProbs {
+    pub home: f64,
+    pub away: f64,
+    pub common: f64,
+}
+
+impl<'a> From<&'a [f64]> for BivariateProbs {
     fn from(params: &'a [f64]) -> Self {
         assert_eq!(3, params.len());
         Self {
-            home_prob: params[0],
-            away_prob: params[1],
-            common_prob: params[2],
+            home: params[0],
+            away: params[1],
+            common: params[2],
         }
     }
 }
@@ -110,10 +126,15 @@ impl Default for PruneThresholds {
 }
 
 #[derive(Debug)]
+pub struct TeamProbs {
+    pub h1_goals: BivariateProbs,
+    pub h2_goals: BivariateProbs
+}
+
+#[derive(Debug)]
 pub struct IntervalConfig {
     pub intervals: u8,
-    pub h1_probs: ScoringProbs,
-    pub h2_probs: ScoringProbs,
+    pub team_probs: TeamProbs,
     pub player_probs: Vec<(Player, PlayerProbs)>,
     pub prune_thresholds: PruneThresholds,
     pub expansions: Expansions,
@@ -214,11 +235,11 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
             Half::Second
         };
         let params = match half {
-            Half::First => &config.h1_probs,
-            Half::Second => &config.h2_probs,
+            Half::First => &config.team_probs.h1_goals,
+            Half::Second => &config.team_probs.h2_goals,
         };
 
-        let neither_prob = 1.0 - params.home_prob - params.away_prob - params.common_prob;
+        let neither_prob = 1.0 - params.home - params.away - params.common;
         let mut next_prospects = init_prospects((current_prospects.len() as f64 * 1.1) as usize);
 
         for (current_prospect, current_prob) in current_prospects {
@@ -266,7 +287,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                             home_assister: Some(*assister_index),
                             away_assister: None,
                             first_scoring_side: Some(&Side::Home),
-                            prob: params.home_prob * player_score_prob * player_assist_prob,
+                            prob: params.home * player_score_prob * player_assist_prob,
                         };
                         merge(
                             &config.expansions,
@@ -298,7 +319,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                             home_assister: None,
                             away_assister: Some(*assister_index),
                             first_scoring_side: Some(&Side::Away),
-                            prob: params.away_prob * player_score_prob * player_assist_prob,
+                            prob: params.away * player_score_prob * player_assist_prob,
                         };
                         merge(
                             &config.expansions,
@@ -311,7 +332,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                     }
                 }
             } else {
-                pruned += current_prob * (params.home_prob + params.away_prob);
+                pruned += current_prob * (params.home + params.away);
             }
 
             // at least two more goals allowed before pruning
@@ -350,7 +371,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                                         home_assister: Some(*home_assister_index),
                                         away_assister: Some(*away_assister_index),
                                         first_scoring_side: Some(first_scoring_side),
-                                        prob: params.common_prob
+                                        prob: params.common
                                             * 0.5
                                             * home_player_score_prob
                                             * away_player_score_prob
@@ -371,7 +392,7 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                     }
                 }
             } else {
-                pruned += current_prob * params.common_prob;
+                pruned += current_prob * params.common;
             }
         }
 

@@ -107,7 +107,7 @@ pub fn isolate_set(
 #[cfg(test)]
 mod tests {
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, ScoringProbs};
+    use crate::interval::{explore, IntervalConfig, BivariateProbs, TeamProbs};
 
     use super::*;
 
@@ -116,15 +116,9 @@ mod tests {
         let exploration = explore(
             &IntervalConfig {
                 intervals: 4,
-                h1_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
-                },
-                h2_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),
@@ -163,15 +157,9 @@ mod tests {
         let exploration = explore(
             &IntervalConfig {
                 intervals: 4,
-                h1_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
-                },
-                h2_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),
@@ -230,15 +218,9 @@ mod tests {
         let exploration = explore(
             &IntervalConfig {
                 intervals: 4,
-                h1_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
-                },
-                h2_probs: ScoringProbs {
-                    home_prob: 0.25,
-                    away_prob: 0.25,
-                    common_prob: 0.25,
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),

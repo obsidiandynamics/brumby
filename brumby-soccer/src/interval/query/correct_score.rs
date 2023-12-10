@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::{Period, Side};
+use crate::domain::Period;
 
 #[inline]
 #[must_use]

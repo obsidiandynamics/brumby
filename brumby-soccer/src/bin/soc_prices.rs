@@ -5,27 +5,28 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use clap::Parser;
-use racing_scraper::sports::Provider;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use tracing::{debug, info};
-use brumby::feed_id::FeedId;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::probs::SliceExt;
-use brumby_soccer::{fit, print};
-use brumby_soccer::data::{ContestSummary, DataProvider, download_by_id, SoccerFeedId};
+use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{
-    FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Score,
+    FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Player, Score, Side,
 };
 use brumby_soccer::fit::ErrorType;
-use brumby_soccer::interval::{Expansions, Exploration, explore, IntervalConfig, PlayerProbs, PruneThresholds, ScoringProbs};
 use brumby_soccer::interval::query::isolate;
+use brumby_soccer::interval::{
+    explore, BivariateProbs, Expansions, Exploration, IntervalConfig, PlayerProbs, PruneThresholds,
+    TeamProbs,
+};
+use brumby_soccer::{fit, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
-const FIRST_GOALSCORER_BOOKSUM: f64 = 1.9;
+const FIRST_GOALSCORER_BOOKSUM: f64 = 1.5;
 const INTERVALS: usize = 18;
 // const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
@@ -152,8 +153,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // h2_search_outcome.optimal_values.normalise(ft_gamma_sum * 1.0);
 
     let exploration = explore_scores(
-        ScoringProbs::from(adj_optimal_h1.as_slice()),
-        ScoringProbs::from(adj_optimal_h2.as_slice()),
+        BivariateProbs::from(adj_optimal_h1.as_slice()),
+        BivariateProbs::from(adj_optimal_h2.as_slice()),
     );
 
     // let mut ft_scoregrid = allocate_scoregrid(MAX_TOTAL_GOALS_FULL);
@@ -385,6 +386,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         FIRST_GOALSCORER_BOOKSUM,
     );
     let anytime_gs = fit_offer(OfferType::AnytimeGoalscorer, &anytime_gs, 1.0);
+    let home_goalscorer_booksum = first_gs
+        .market
+        .probs
+        .iter()
+        .zip(first_gs.outcomes.items().iter())
+        .filter(|(_, outcome_type)| {
+            matches!(
+                outcome_type,
+                OutcomeType::Player(Player::Named(Side::Home, _))
+            )
+        })
+        .map(|(prob, _)| prob)
+        .sum::<f64>();
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
     let draw_prob = isolate(
@@ -434,8 +448,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // let elapsed = start.elapsed();
     // println!("player fitting took {elapsed:?}");
     let fitted_goalscorer_probs = fit::fit_first_goalscorer_all(
-        &ScoringProbs::from(adj_optimal_h1.as_slice()),
-        &ScoringProbs::from(adj_optimal_h2.as_slice()),
+        &BivariateProbs::from(adj_optimal_h1.as_slice()),
+        &BivariateProbs::from(adj_optimal_h2.as_slice()),
         &first_gs,
         draw_prob,
     );
@@ -445,11 +459,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                // h1_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                // h2_probs: ModelParams { home_prob: ft_search_outcome.optimal_values[0], away_prob: ft_search_outcome.optimal_values[1], common_prob: ft_search_outcome.optimal_values[2] },
-                h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
-                h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                player_probs: vec![(player.clone(), PlayerProbs { goal: Some(*prob), assist: None })],
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
+                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                },
+                player_probs: vec![(
+                    player.clone(),
+                    PlayerProbs {
+                        goal: Some(*prob),
+                        assist: None,
+                    },
+                )],
                 prune_thresholds: PruneThresholds {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
@@ -474,9 +494,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_first_goalscorer_probs.push(isolated_prob);
         // println!("first scorer {player:?}, prob: {isolated_prob:.3}");
     }
-    fitted_first_goalscorer_probs.push(draw_prob);
-    fitted_first_goalscorer_probs.normalise(FIRST_GOALSCORER_BOOKSUM);
-    // fitted_first_goalscorer_probs.push(1.0 - fitted_first_goalscorer_probs.sum());
+
+    // fitted_first_goalscorer_probs.push(draw_prob);
+    // fitted_first_goalscorer_probs.normalise(FIRST_GOALSCORER_BOOKSUM);
+    fitted_first_goalscorer_probs.push(FIRST_GOALSCORER_BOOKSUM - fitted_first_goalscorer_probs.sum());
 
     let fitted_first_goalscorer = Offer {
         offer_type: OfferType::FirstGoalscorer,
@@ -491,14 +512,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.player_goals {
         println!(
             "sample first goalscorer σ={:.3}",
-            implied_booksum(&first_gs.market.prices)
+            first_gs.market.offered_booksum(),
         );
         let table_first_goalscorer = print::tabulate_offer(&fitted_first_goalscorer);
         println!(
             "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
             fitted_first_goalscorer.offer_type,
             fitted_first_goalscorer.market.probs.sum(),
-            implied_booksum(&fitted_first_goalscorer.market.prices),
+            fitted_first_goalscorer.market.offered_booksum(),
             fitted_first_goalscorer.market.probs.len(),
             Console::default().render(&table_first_goalscorer)
         );
@@ -512,9 +533,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
-                h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                player_probs: vec![(player.clone(), PlayerProbs { goal: Some(*prob), assist: None })],
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
+                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                },
+                player_probs: vec![(
+                    player.clone(),
+                    PlayerProbs {
+                        goal: Some(*prob),
+                        assist: None,
+                    },
+                )],
                 prune_thresholds: PruneThresholds {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
@@ -543,7 +572,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let anytime_goalscorer_overround = Overround {
         method: OVERROUND_METHOD,
-        value: anytime_gs.market.offered_booksum() / fitted_anytime_goalscorer_probs.sum()
+        value: anytime_gs.market.offered_booksum() / fitted_anytime_goalscorer_probs.sum(),
     };
     let fitted_anytime_goalscorer = Offer {
         offer_type: OfferType::AnytimeGoalscorer,
@@ -558,46 +587,58 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.player_goals {
         println!(
             "sample anytime goalscorer σ={:.3}",
-            implied_booksum(&anytime_gs.market.prices)
+            anytime_gs.market.offered_booksum(),
         );
         let table_anytime_goalscorer = print::tabulate_offer(&fitted_anytime_goalscorer);
         println!(
             "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
             fitted_anytime_goalscorer.offer_type,
             fitted_anytime_goalscorer.market.probs.sum(),
-            implied_booksum(&fitted_anytime_goalscorer.market.prices),
+            fitted_anytime_goalscorer.market.offered_booksum(),
             fitted_anytime_goalscorer.market.probs.len(),
             Console::default().render(&table_anytime_goalscorer)
         );
     }
 
-    let sample_anytime_assist_booksum = anytime_assist.values().map(|price| 1.0 / price).sum::<f64>();
+    let sample_anytime_assist_booksum = anytime_assist
+        .values()
+        .map(|price| 1.0 / price)
+        .sum::<f64>();
+
+    let per_outcome_overround = (anytime_goalscorer_overround.value - 1.0) / anytime_gs.outcomes.len() as f64;
 
     let anytime_assist = fit_offer(
         OfferType::AnytimeAssist,
         &anytime_assist,
-        sample_anytime_assist_booksum / anytime_goalscorer_overround.value,
+        sample_anytime_assist_booksum / (1.0 + per_outcome_overround * anytime_assist.len() as f64)
     );
 
     let fitted_assist_probs = fit::fit_anytime_assist_all(
-        &ScoringProbs::from(adj_optimal_h1.as_slice()),
-        &ScoringProbs::from(adj_optimal_h2.as_slice()),
+        &BivariateProbs::from(adj_optimal_h1.as_slice()),
+        &BivariateProbs::from(adj_optimal_h2.as_slice()),
         &anytime_assist,
         draw_prob,
-        anytime_assist.market.fair_booksum()
+        anytime_assist.market.fair_booksum(),
     );
 
-    let mut fitted_anytime_assist_outcomes =
-        HashLookup::with_capacity(fitted_assist_probs.len());
+    let mut fitted_anytime_assist_outcomes = HashLookup::with_capacity(fitted_assist_probs.len());
     let mut fitted_anytime_assist_probs = Vec::with_capacity(fitted_assist_probs.len());
     for (player, prob) in &fitted_assist_probs {
         fitted_anytime_assist_outcomes.push(OutcomeType::Player(player.clone()));
         let exploration = explore(
             &IntervalConfig {
                 intervals: INTERVALS as u8,
-                h1_probs: ScoringProbs::from(adj_optimal_h1.as_slice()),
-                h2_probs: ScoringProbs::from(adj_optimal_h2.as_slice()),
-                player_probs: vec![(player.clone(), PlayerProbs { goal: None, assist: Some(*prob) })],
+                team_probs: TeamProbs {
+                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
+                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                },
+                player_probs: vec![(
+                    player.clone(),
+                    PlayerProbs {
+                        goal: None,
+                        assist: Some(*prob),
+                    },
+                )],
                 prune_thresholds: PruneThresholds {
                     max_total_goals: MAX_TOTAL_GOALS_FULL,
                     min_prob: GOALSCORER_MIN_PROB,
@@ -621,13 +662,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
         fitted_anytime_assist_probs.push(isolated_prob);
     }
-    fitted_anytime_assist_outcomes.push(OutcomeType::None);
-    fitted_anytime_assist_probs.push(draw_prob);
 
     let anytime_assist_overround = Overround {
         method: OVERROUND_METHOD,
-        value: anytime_assist.market.offered_booksum() / fitted_anytime_assist_probs.sum()
+        value: anytime_assist.market.offered_booksum() / fitted_anytime_assist_probs.sum(),
     };
+    fitted_anytime_assist_outcomes.push(OutcomeType::None);
+    fitted_anytime_assist_probs.push(draw_prob);
+
     let fitted_anytime_assist = Offer {
         offer_type: OfferType::AnytimeAssist,
         outcomes: fitted_anytime_assist_outcomes,
@@ -641,14 +683,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.player_assists {
         println!(
             "sample anytime assists σ={:.3}",
-            implied_booksum(&anytime_assist.market.prices)
+            anytime_assist.market.offered_booksum(),
         );
         let table_anytime_assist = print::tabulate_offer(&fitted_anytime_assist);
         println!(
             "{:?}: [Σ={:.3}, σ={:.3}, n={}]\n{}",
             fitted_anytime_assist.offer_type,
             fitted_anytime_assist.market.probs.sum(),
-            implied_booksum(&fitted_anytime_assist.market.prices),
+            fitted_anytime_assist.market.offered_booksum(),
             fitted_anytime_assist.market.probs.len(),
             Console::default().render(&table_anytime_assist)
         );
@@ -747,9 +789,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn implied_booksum(prices: &[f64]) -> f64 {
-    prices.invert().sum()
-}
+// fn implied_booksum(prices: &[f64]) -> f64 {
+//     prices.invert().sum()
+// }
 
 fn fit_offer(offer_type: OfferType, map: &HashMap<OutcomeType, f64>, normal: f64) -> Offer {
     let mut entries = map.iter().collect::<Vec<_>>();
@@ -935,12 +977,11 @@ fn fit_offer(offer_type: OfferType, map: &HashMap<OutcomeType, f64>, normal: f64
 //     // scoregrid::inflate_zero(ZERO_INFLATION, &mut scoregrid);
 // }
 
-fn explore_scores(h1_probs: ScoringProbs, h2_probs: ScoringProbs) -> Exploration {
+fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Exploration {
     explore(
         &IntervalConfig {
             intervals: INTERVALS as u8,
-            h1_probs,
-            h2_probs,
+            team_probs: TeamProbs { h1_goals, h2_goals },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: MAX_TOTAL_GOALS_FULL,

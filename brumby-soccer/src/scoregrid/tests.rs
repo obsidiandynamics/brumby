@@ -74,15 +74,15 @@ pub fn interval() {
         INTERVALS as u8,
         0..INTERVALS as u8,
         u16::MAX,
-        ScoringProbs {
-            home_prob: 0.25,
-            away_prob: 0.25,
-            common_prob: 0.25,
+        BivariateProbs {
+            home: 0.25,
+            away: 0.25,
+            common: 0.25,
         },
-        ScoringProbs {
-            home_prob: 0.25,
-            away_prob: 0.25,
-            common_prob: 0.25,
+        BivariateProbs {
+            home: 0.25,
+            away: 0.25,
+            common: 0.25,
         },
         &mut scoregrid,
     );
@@ -240,15 +240,15 @@ pub fn bivariate_binomial_interval_equivalence() {
         INTERVALS as u8,
         0..INTERVALS as u8,
         u16::MAX,
-        ScoringProbs {
-            home_prob: INTERVAL_HOME_PROB,
-            away_prob: INTERVAL_AWAY_PROB,
-            common_prob: INTERVAL_COMMON_PROB,
+        BivariateProbs {
+            home: INTERVAL_HOME_PROB,
+            away: INTERVAL_AWAY_PROB,
+            common: INTERVAL_COMMON_PROB,
         },
-        ScoringProbs {
-            home_prob: INTERVAL_HOME_PROB,
-            away_prob: INTERVAL_AWAY_PROB,
-            common_prob: INTERVAL_COMMON_PROB,
+        BivariateProbs {
+            home: INTERVAL_HOME_PROB,
+            away: INTERVAL_AWAY_PROB,
+            common: INTERVAL_COMMON_PROB,
         },
         &mut interval,
     );

@@ -1,14 +1,14 @@
 use rustc_hash::FxHashMap;
 
 use crate::domain::{Offer, OfferType, Player};
-use crate::interval::{PlayerProbs, ScoringProbs};
+use crate::interval::{PlayerProbs, BivariateProbs};
 
 pub mod period_fitter;
 
 #[derive(Debug)]
 pub struct SplitScoringProbs {
-    pub h1: ScoringProbs,
-    pub h2: ScoringProbs,
+    pub h1: BivariateProbs,
+    pub h2: BivariateProbs,
 }
 
 #[derive(Debug)]

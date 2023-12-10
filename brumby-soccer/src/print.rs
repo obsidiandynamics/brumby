@@ -29,7 +29,7 @@ pub fn tabulate_errors(errors: &[(&OfferType, FittingErrors)]) -> Table {
         ])
         .with_row(Row::new(
             Styles::default().with(Header(true)),
-            vec!["Market".into(), "RMSRE".into(), "RMSE".into()],
+            vec!["Offer type".into(), "RMSRE".into(), "RMSE".into()],
         ));
     for (offer_type, error) in errors {
         table.push_row(Row::new(
@@ -48,13 +48,21 @@ pub fn tabulate_overrounds(offers: &[Offer]) -> Table {
     let mut table = Table::default().with_cols(vec![
         Col::new(Styles::default().with(MinWidth(10)).with(Left)),
         Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
-    ]);
-    for market in offers {
+        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+        Col::new(Styles::default().with(MinWidth(5)).with(HAlign::Right)),
+    ])
+    .with_row(Row::new(
+        Styles::default().with(Header(true)),
+        vec!["Offer type".into(), "Overround".into(), "Outcomes".into(), "Increment".into()],
+    ));
+    for offer in offers {
         table.push_row(Row::new(
             Styles::default(),
             vec![
-                format!("{:?}", market.offer_type).into(),
-                format!("{:.3}", market.market.overround.value).into(),
+                format!("{:?}", offer.offer_type).into(),
+                format!("{:.3}", offer.market.overround.value).into(),
+                format!("{}", offer.outcomes.len()).into(),
+                format!("{:.3}", (offer.market.overround.value - 1.0) / offer.outcomes.len() as f64).into(),
             ],
         ));
     }

@@ -6,7 +6,7 @@ use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
 use crate::domain::{OutcomeType, Score, Side};
-use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, ScoringProbs};
+use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, BivariateProbs, TeamProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
@@ -153,16 +153,18 @@ pub fn from_interval(
     intervals: u8,
     explore_intervals: Range<u8>,
     max_total_goals: u16,
-    h1_probs: ScoringProbs,
-    h2_probs: ScoringProbs,
+    h1_goals: BivariateProbs,
+    h2_goals: BivariateProbs,
     scoregrid: &mut Matrix<f64>,
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
     let exploration = explore(
         &IntervalConfig {
             intervals,
-            h1_probs,
-            h2_probs,
+            team_probs: TeamProbs {
+                h1_goals,
+                h2_goals,
+            },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals,
@@ -175,7 +177,7 @@ pub fn from_interval(
                 player_split_goal_stats: false,
                 max_player_assists: 0,
                 first_goalscorer: false,
-            }
+            },
         },
         explore_intervals,
     );
