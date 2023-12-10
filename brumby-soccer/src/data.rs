@@ -69,9 +69,9 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::FirstGoalscorer,
                         HashMap::from_iter(players.into_iter().map(|player| {
-                            if player.side.is_none() {
-                                println!("PLAYER {player:?}");
-                            }
+                            // if player.side.is_none() {
+                            //     println!("PLAYER {player:?}");
+                            // }
                             let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
                             (outcome_type, odds)
                         })),

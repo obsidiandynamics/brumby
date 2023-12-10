@@ -40,9 +40,10 @@ pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use assert_float_eq::*;
     use super::*;
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, PlayerProbs, BivariateProbs, TeamProbs};
+    use crate::interval::{explore, IntervalConfig, PlayerProbs, BivariateProbs, TeamProbs, UnivariateProbs};
 
     fn print_prospects(prospects: &Prospects) {
         for (prospect, prob) in prospects {
@@ -68,6 +69,7 @@ mod tests {
                         away: 0.25,
                         common: 0.25,
                     },
+                    assists: UnivariateProbs { home: 0.5, away: 1.0 },
                 },
                 player_probs: vec![
                     (
@@ -98,6 +100,7 @@ mod tests {
             0..1,
         );
         print_prospects(&exploration.prospects);
+        assert_float_relative_eq!(1.0, exploration.prospects.values().sum::<f64>());
 
         let alice_to_bob = isolate_set(
             &[
@@ -110,7 +113,7 @@ mod tests {
             &exploration.prospects,
             &exploration.player_lookup,
         );
-        assert_eq!((0.25 + 0.25) * 0.4 * 0.25, alice_to_bob, "{alice_to_bob}");
+        assert_eq!((0.25 + 0.25) * 0.4 * 0.25 * 0.5, alice_to_bob, "{alice_to_bob}");
 
         let bob_to_alice = isolate_set(
             &[
@@ -123,7 +126,7 @@ mod tests {
             &exploration.prospects,
             &exploration.player_lookup,
         );
-        assert_eq!((0.25 + 0.25) * 0.25 * 0.4, bob_to_alice, "{bob_to_alice}");
+        assert_eq!((0.25 + 0.25) * 0.25 * 0.4 * 0.5, bob_to_alice, "{bob_to_alice}");
 
         let alice_to_alice = isolate_set(
             &[
@@ -157,6 +160,7 @@ mod tests {
                         away: 0.25,
                         common: 0.25,
                     },
+                    assists: UnivariateProbs { home: 0.3, away: 0.4 },
                 },
                 player_probs: vec![
                     (
@@ -187,6 +191,7 @@ mod tests {
             0..1,
         );
         print_prospects(&exploration.prospects);
+        assert_float_relative_eq!(1.0, exploration.prospects.values().sum::<f64>());
 
         let alice_to_bob = isolate_set(
             &[

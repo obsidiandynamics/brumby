@@ -30,6 +30,7 @@ fn explore_2x2() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![],
             prune_thresholds: Default::default(),
@@ -245,6 +246,7 @@ fn explore_2x2_pruned_2_goals() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {
@@ -386,6 +388,7 @@ fn explore_3x3() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![],
             prune_thresholds: Default::default(),
@@ -407,6 +410,7 @@ fn explore_4x4() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![],
             prune_thresholds: Default::default(),
@@ -429,6 +433,7 @@ fn explore_1x1_player_goal() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),
@@ -609,6 +614,7 @@ fn explore_2x2_player_goal() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                 h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                assists: UnivariateProbs { home: 0.5, away: 0.5 },
             },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),
@@ -654,6 +660,7 @@ fn explore_2x2_player_goal_asymmetric() {
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.3, away: 0.2, common: 0.1 },
                 h2_goals: BivariateProbs { home: 0.3, away: 0.2, common: 0.1 },
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![(player.clone(), PlayerProbs { goal: Some(0.25), assist: None })],
             prune_thresholds: Default::default(),

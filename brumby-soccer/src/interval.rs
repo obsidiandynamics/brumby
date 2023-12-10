@@ -92,7 +92,11 @@ impl Expansions {
             );
         }
         assert!(
-            self.ft_score || self.ht_score || self.player_goal_stats || self.first_goalscorer || self.max_player_assists > 0,
+            self.ft_score
+                || self.ht_score
+                || self.player_goal_stats
+                || self.first_goalscorer
+                || self.max_player_assists > 0,
             "at least one expansion must be enabled"
         )
     }
@@ -128,7 +132,8 @@ impl Default for PruneThresholds {
 #[derive(Debug)]
 pub struct TeamProbs {
     pub h1_goals: BivariateProbs,
-    pub h2_goals: BivariateProbs
+    pub h2_goals: BivariateProbs,
+    pub assists: UnivariateProbs,
 }
 
 #[derive(Debug)]
@@ -143,7 +148,7 @@ pub struct IntervalConfig {
 #[derive(Debug)]
 pub struct PlayerProbs {
     pub goal: Option<f64>,
-    pub assist: Option<f64>
+    pub assist: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -219,8 +224,14 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
     }
     player_lookup.push(Player::Other);
     let other_player_index = config.player_probs.len();
-    home_scorers.push((config.player_probs.len(), 1.0 - combined_home_player_goal_prob));
-    away_scorers.push((config.player_probs.len(), 1.0 - combined_away_player_goal_prob));
+    home_scorers.push((
+        config.player_probs.len(),
+        1.0 - combined_home_player_goal_prob,
+    ));
+    away_scorers.push((
+        config.player_probs.len(),
+        1.0 - combined_away_player_goal_prob,
+    ));
     home_assisters.push((config.player_probs.len(), f64::NAN)); // the probability for 'other' is derived on the fly
     away_assisters.push((config.player_probs.len(), f64::NAN));
 
@@ -281,23 +292,55 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                             remaining_player_assist_prob -= player_assist_prob;
                             *player_assist_prob
                         };
-                        let partial = PartialProspect {
-                            home_scorer: Some(*scorer_index),
-                            away_scorer: None,
-                            home_assister: Some(*assister_index),
-                            away_assister: None,
-                            first_scoring_side: Some(&Side::Home),
-                            prob: params.home * player_score_prob * player_assist_prob,
-                        };
-                        merge(
-                            &config.expansions,
-                            &half,
-                            &current_prospect,
-                            current_prob,
-                            partial,
-                            &mut next_prospects,
-                        );
+
+                        for (assister, assist_prob) in [
+                            (Some(*assister_index), config.team_probs.assists.home * player_assist_prob),
+                            (None, (1.0 - config.team_probs.assists.home) * player_assist_prob)
+                        ] {
+                            if assist_prob == 0.0 {
+                                continue;
+                            }
+                            merge(
+                                &config.expansions,
+                                &half,
+                                &current_prospect,
+                                current_prob,
+                                PartialProspect {
+                                    home_scorer: Some(*scorer_index),
+                                    away_scorer: None,
+                                    home_assister: assister,
+                                    away_assister: None,
+                                    first_scoring_side: Some(&Side::Home),
+                                    prob: params.home
+                                        * player_score_prob
+                                        * assist_prob,
+                                },
+                                &mut next_prospects,
+                            );
+                        }
                     }
+
+                    // // without assist
+                    // if config.team_probs.assists.home != 1.0 {
+                    //     let partial = PartialProspect {
+                    //         home_scorer: Some(*scorer_index),
+                    //         away_scorer: None,
+                    //         home_assister: None,
+                    //         away_assister: None,
+                    //         first_scoring_side: Some(&Side::Home),
+                    //         prob: params.home
+                    //             * player_score_prob
+                    //             * (1.0 - config.team_probs.assists.home),
+                    //     };
+                    //     merge(
+                    //         &config.expansions,
+                    //         &half,
+                    //         &current_prospect,
+                    //         current_prob,
+                    //         partial,
+                    //         &mut next_prospects,
+                    //     );
+                    // }
                 }
 
                 // only the away team scores
@@ -313,23 +356,55 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                             remaining_player_assist_prob -= player_assist_prob;
                             *player_assist_prob
                         };
-                        let partial = PartialProspect {
-                            home_scorer: None,
-                            away_scorer: Some(*scorer_index),
-                            home_assister: None,
-                            away_assister: Some(*assister_index),
-                            first_scoring_side: Some(&Side::Away),
-                            prob: params.away * player_score_prob * player_assist_prob,
-                        };
-                        merge(
-                            &config.expansions,
-                            &half,
-                            &current_prospect,
-                            current_prob,
-                            partial,
-                            &mut next_prospects,
-                        );
+
+                        for (assister, assist_prob) in [
+                            (Some(*assister_index), config.team_probs.assists.away * player_assist_prob),
+                            (None, (1.0 - config.team_probs.assists.away) * player_assist_prob)
+                        ] {
+                            if assist_prob == 0.0 {
+                                continue;
+                            }
+                            merge(
+                                &config.expansions,
+                                &half,
+                                &current_prospect,
+                                current_prob,
+                                PartialProspect {
+                                    home_scorer: None,
+                                    away_scorer: Some(*scorer_index),
+                                    home_assister: None,
+                                    away_assister: assister,
+                                    first_scoring_side: Some(&Side::Away),
+                                    prob: params.away
+                                        * player_score_prob
+                                        * assist_prob,
+                                },
+                                &mut next_prospects,
+                            );
+                        }
                     }
+
+                    // // without assist
+                    // if config.team_probs.assists.away != 1.0 {
+                    //     let partial = PartialProspect {
+                    //         home_scorer: None,
+                    //         away_scorer: Some(*scorer_index),
+                    //         home_assister: None,
+                    //         away_assister: None,
+                    //         first_scoring_side: Some(&Side::Away),
+                    //         prob: params.away
+                    //             * player_score_prob
+                    //             * (1.0 - config.team_probs.assists.away),
+                    //     };
+                    //     merge(
+                    //         &config.expansions,
+                    //         &half,
+                    //         &current_prospect,
+                    //         current_prob,
+                    //         partial,
+                    //         &mut next_prospects,
+                    //     );
+                    // }
                 }
             } else {
                 pruned += current_prob * (params.home + params.away);
@@ -343,51 +418,242 @@ pub fn explore(config: &IntervalConfig, include_intervals: Range<u8>) -> Explora
                         for first_scoring_side in [&Side::Home, &Side::Away] {
                             let mut remaining_home_player_assist_prob = 1.0;
                             for (home_assister_index, home_player_assist_prob) in &home_assisters {
-                                if *home_scorer_index != other_player_index && home_assister_index == home_scorer_index {
+                                if *home_scorer_index != other_player_index
+                                    && home_assister_index == home_scorer_index
+                                {
                                     continue;
                                 }
-                                let home_player_assist_prob = if home_assister_index == &other_player_index {
+                                let home_player_assist_prob = if home_assister_index
+                                    == &other_player_index
+                                {
                                     remaining_home_player_assist_prob
                                 } else {
                                     remaining_home_player_assist_prob -= home_player_assist_prob;
                                     *home_player_assist_prob
                                 };
 
+                                // with assist
                                 let mut remaining_away_player_assist_prob = 1.0;
-                                for (away_assister_index, away_player_assist_prob) in &away_assisters {
-                                    if *away_scorer_index != other_player_index && away_assister_index == away_scorer_index {
+                                for (away_assister_index, away_player_assist_prob) in
+                                    &away_assisters
+                                {
+                                    if *away_scorer_index != other_player_index
+                                        && away_assister_index == away_scorer_index
+                                    {
                                         continue;
                                     }
-                                    let away_player_assist_prob = if away_assister_index == &other_player_index {
-                                        remaining_away_player_assist_prob
-                                    } else {
-                                        remaining_away_player_assist_prob -= away_player_assist_prob;
-                                        *away_player_assist_prob
-                                    };
+                                    let away_player_assist_prob =
+                                        if away_assister_index == &other_player_index {
+                                            remaining_away_player_assist_prob
+                                        } else {
+                                            remaining_away_player_assist_prob -=
+                                                away_player_assist_prob;
+                                            *away_player_assist_prob
+                                        };
 
-                                    let partial = PartialProspect {
-                                        home_scorer: Some(*home_scorer_index),
-                                        away_scorer: Some(*away_scorer_index),
-                                        home_assister: Some(*home_assister_index),
-                                        away_assister: Some(*away_assister_index),
-                                        first_scoring_side: Some(first_scoring_side),
-                                        prob: params.common
-                                            * 0.5
-                                            * home_player_score_prob
-                                            * away_player_score_prob
-                                            * home_player_assist_prob
-                                            * away_player_assist_prob,
-                                    };
-                                    merge(
-                                        &config.expansions,
-                                        &half,
-                                        &current_prospect,
-                                        current_prob,
-                                        partial,
-                                        &mut next_prospects,
-                                    );
+                                    for (home_assister, away_assister, assist_prob) in [
+                                        (
+                                            Some(*home_assister_index),
+                                            Some(*away_assister_index),
+                                            config.team_probs.assists.home
+                                                * home_player_assist_prob
+                                                * config.team_probs.assists.away
+                                                * away_player_assist_prob,
+                                        ),
+                                        (
+                                            Some(*home_assister_index),
+                                            None,
+                                            config.team_probs.assists.home
+                                                * home_player_assist_prob
+                                                * (1.0 - config.team_probs.assists.away)
+                                                * away_player_assist_prob,
+                                        ),
+                                        (
+                                            None,
+                                            Some(*away_assister_index),
+                                            (1.0 - config.team_probs.assists.home)
+                                                * home_player_assist_prob
+                                                * config.team_probs.assists.away
+                                                * away_player_assist_prob,
+                                        ),
+                                        (
+                                            None,
+                                            None,
+                                            (1.0 - config.team_probs.assists.home)
+                                                * home_player_assist_prob
+                                                * (1.0 - config.team_probs.assists.away)
+                                                * away_player_assist_prob,
+                                        ),
+                                    ] {
+                                        if assist_prob == 0.0 {
+                                            continue;
+                                        }
+
+                                        merge(
+                                            &config.expansions,
+                                            &half,
+                                            &current_prospect,
+                                            current_prob,
+                                            PartialProspect {
+                                                home_scorer: Some(*home_scorer_index),
+                                                away_scorer: Some(*away_scorer_index),
+                                                home_assister,
+                                                away_assister,
+                                                first_scoring_side: Some(first_scoring_side),
+                                                prob: params.common
+                                                    * 0.5
+                                                    * home_player_score_prob
+                                                    * away_player_score_prob
+                                                    * assist_prob,
+                                            },
+                                            &mut next_prospects,
+                                        );
+                                    }
+
+                                    // // with home and away assist
+                                    // merge(
+                                    //     &config.expansions,
+                                    //     &half,
+                                    //     &current_prospect,
+                                    //     current_prob,
+                                    //     PartialProspect {
+                                    //         home_scorer: Some(*home_scorer_index),
+                                    //         away_scorer: Some(*away_scorer_index),
+                                    //         home_assister: Some(*home_assister_index),
+                                    //         away_assister: Some(*away_assister_index),
+                                    //         first_scoring_side: Some(first_scoring_side),
+                                    //         prob: params.common
+                                    //             * 0.5
+                                    //             * home_player_score_prob
+                                    //             * away_player_score_prob
+                                    //             * config.team_probs.assists.home
+                                    //             * home_player_assist_prob
+                                    //             * config.team_probs.assists.away
+                                    //             * away_player_assist_prob,
+                                    //     },
+                                    //     &mut next_prospects,
+                                    // );
+                                    //
+                                    // // with home assist only
+                                    // merge(
+                                    //     &config.expansions,
+                                    //     &half,
+                                    //     &current_prospect,
+                                    //     current_prob,
+                                    //     PartialProspect {
+                                    //         home_scorer: Some(*home_scorer_index),
+                                    //         away_scorer: Some(*away_scorer_index),
+                                    //         home_assister: Some(*home_assister_index),
+                                    //         away_assister: None,
+                                    //         first_scoring_side: Some(first_scoring_side),
+                                    //         prob: params.common
+                                    //             * 0.5
+                                    //             * home_player_score_prob
+                                    //             * away_player_score_prob
+                                    //             * config.team_probs.assists.home
+                                    //             * home_player_assist_prob
+                                    //             * (1.0 - config.team_probs.assists.away)
+                                    //             * away_player_assist_prob,
+                                    //     },
+                                    //     &mut next_prospects,
+                                    // );
+                                    //
+                                    // // with away assist only
+                                    // merge(
+                                    //     &config.expansions,
+                                    //     &half,
+                                    //     &current_prospect,
+                                    //     current_prob,
+                                    //     PartialProspect {
+                                    //         home_scorer: Some(*home_scorer_index),
+                                    //         away_scorer: Some(*away_scorer_index),
+                                    //         home_assister: None,
+                                    //         away_assister: Some(*away_assister_index),
+                                    //         first_scoring_side: Some(first_scoring_side),
+                                    //         prob: params.common
+                                    //             * 0.5
+                                    //             * home_player_score_prob
+                                    //             * away_player_score_prob
+                                    //             * (1.0 - config.team_probs.assists.home)
+                                    //             * home_player_assist_prob
+                                    //             * config.team_probs.assists.away
+                                    //             * away_player_assist_prob,
+                                    //     },
+                                    //     &mut next_prospects,
+                                    // );
+                                    //
+                                    // // without assist
+                                    // merge(
+                                    //     &config.expansions,
+                                    //     &half,
+                                    //     &current_prospect,
+                                    //     current_prob,
+                                    //     PartialProspect {
+                                    //         home_scorer: Some(*home_scorer_index),
+                                    //         away_scorer: Some(*away_scorer_index),
+                                    //         home_assister: None,
+                                    //         away_assister: None,
+                                    //         first_scoring_side: Some(first_scoring_side),
+                                    //         prob: params.common
+                                    //             * 0.5
+                                    //             * home_player_score_prob
+                                    //             * away_player_score_prob
+                                    //             * (1.0 - config.team_probs.assists.home)
+                                    //             * home_player_assist_prob
+                                    //             * (1.0 - config.team_probs.assists.away)
+                                    //             * away_player_assist_prob,
+                                    //     },
+                                    //     &mut next_prospects,
+                                    // );
                                 }
+                                //
+                                // // without assist
+                                // let partial = PartialProspect {
+                                //     home_scorer: Some(*home_scorer_index),
+                                //     away_scorer: Some(*away_scorer_index),
+                                //     home_assister: Some(*home_assister_index),
+                                //     away_assister: None,
+                                //     first_scoring_side: Some(first_scoring_side),
+                                //     prob: params.common
+                                //         * 0.5
+                                //         * home_player_score_prob
+                                //         * away_player_score_prob
+                                //         * config.team_probs.assists.home
+                                //         * home_player_assist_prob
+                                //         * (1.0 - config.team_probs.assists.away)
+                                // };
+                                // merge(
+                                //     &config.expansions,
+                                //     &half,
+                                //     &current_prospect,
+                                //     current_prob,
+                                //     partial,
+                                //     &mut next_prospects,
+                                // );
                             }
+
+                            // // without assist
+                            // let partial = PartialProspect {
+                            //     home_scorer: Some(*home_scorer_index),
+                            //     away_scorer: Some(*away_scorer_index),
+                            //     home_assister: None,
+                            //     away_assister: None,
+                            //     first_scoring_side: Some(first_scoring_side),
+                            //     prob: params.common
+                            //         * 0.5
+                            //         * home_player_score_prob
+                            //         * away_player_score_prob
+                            //         * (1.0 - config.team_probs.assists.home)
+                            //         * (1.0 - config.team_probs.assists.away)
+                            // };
+                            // merge(
+                            //     &config.expansions,
+                            //     &half,
+                            //     &current_prospect,
+                            //     current_prob,
+                            //     partial,
+                            //     &mut next_prospects,
+                            // );
                         }
                     }
                 }

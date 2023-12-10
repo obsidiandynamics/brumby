@@ -107,7 +107,7 @@ pub fn isolate_set(
 #[cfg(test)]
 mod tests {
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, BivariateProbs, TeamProbs};
+    use crate::interval::{explore, IntervalConfig, BivariateProbs, TeamProbs, UnivariateProbs};
 
     use super::*;
 
@@ -119,6 +119,7 @@ mod tests {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                     h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),
@@ -160,6 +161,7 @@ mod tests {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                     h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),
@@ -221,6 +223,7 @@ mod tests {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                     h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
+                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
                 },
                 player_probs: vec![],
                 prune_thresholds: Default::default(),

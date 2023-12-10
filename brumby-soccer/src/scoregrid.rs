@@ -6,7 +6,7 @@ use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
 use crate::domain::{OutcomeType, Score, Side};
-use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, BivariateProbs, TeamProbs};
+use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
@@ -164,6 +164,7 @@ pub fn from_interval(
             team_probs: TeamProbs {
                 h1_goals,
                 h2_goals,
+                assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {

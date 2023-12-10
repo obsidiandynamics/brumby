@@ -13,14 +13,12 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::probs::SliceExt;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
-use brumby_soccer::domain::{
-    FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Player, Score, Side,
-};
-use brumby_soccer::fit::ErrorType;
+use brumby_soccer::domain::{FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Score};
+use brumby_soccer::fit::{away_booksum, home_booksum, ErrorType};
 use brumby_soccer::interval::query::isolate;
 use brumby_soccer::interval::{
     explore, BivariateProbs, Expansions, Exploration, IntervalConfig, PlayerProbs, PruneThresholds,
-    TeamProbs,
+    TeamProbs, UnivariateProbs,
 };
 use brumby_soccer::{fit, print};
 
@@ -82,11 +80,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("offered {offer_type:?}");
     }
 
-    let ft_correct_score_prices =
-        contest.offerings[&OfferType::CorrectScore(Period::FullTime)].clone();
     let ft_h2h_prices = contest.offerings[&OfferType::HeadToHead(Period::FullTime)].clone();
     let ft_goals_ou_prices =
         contest.offerings[&OfferType::TotalGoals(Period::FullTime, Over(2))].clone();
+    let ft_correct_score_prices =
+        contest.offerings[&OfferType::CorrectScore(Period::FullTime)].clone();
     let h1_h2h_prices = contest.offerings[&OfferType::HeadToHead(Period::FirstHalf)].clone();
     let h1_goals_ou_prices =
         contest.offerings[&OfferType::TotalGoals(Period::FirstHalf, Over(2))].clone();
@@ -98,11 +96,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let anytime_assist = contest.offerings[&OfferType::AnytimeAssist].clone();
 
     let ft_h2h = fit_offer(OfferType::HeadToHead(Period::FullTime), &ft_h2h_prices, 1.0);
+    // println!("ft_h2h: {ft_h2h:?}");
     let ft_goals_ou = fit_offer(
         OfferType::TotalGoals(Period::FullTime, Over(2)),
         &ft_goals_ou_prices,
         1.0,
     );
+    // println!("ft_goals_ou: {ft_goals_ou:?}");
     let ft_correct_score = fit_offer(
         OfferType::CorrectScore(Period::FullTime),
         &ft_correct_score_prices,
@@ -137,13 +137,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut adj_optimal_h1 = [0.0; 3];
     let mut adj_optimal_h2 = [0.0; 3];
-    for (i, orig_h1) in h1_search_outcome.optimal_values.iter().enumerate() {
+    // only adjust the home and away scoring probs; common prob is locked to the full-time one
+    for (i, orig_h1) in h1_search_outcome.optimal_values.iter().take(2).enumerate() {
         let orig_h2 = h2_search_outcome.optimal_values[i];
         let ft = ft_search_outcome.optimal_values[i];
         let avg_h1_h2 = (orig_h1 + orig_h2) / 2.0;
-        adj_optimal_h1[i] = orig_h1 / (avg_h1_h2 / ft);
-        adj_optimal_h2[i] = orig_h2 / (avg_h1_h2 / ft);
+        if avg_h1_h2 > 0.0 {
+            adj_optimal_h1[i] = orig_h1 / (avg_h1_h2 / ft);
+            adj_optimal_h2[i] = orig_h2 / (avg_h1_h2 / ft);
+        } else {
+            adj_optimal_h1[i] = ft;
+            adj_optimal_h2[i] = ft;
+        }
     }
+    adj_optimal_h1[2] = ft_search_outcome.optimal_values[2];
+    adj_optimal_h2[2] = ft_search_outcome.optimal_values[2];
     println!("adjusted optimal_h1={adj_optimal_h1:?}, optimal_h2={adj_optimal_h2:?}");
     // let adj_optimal_h1 = h1_search_outcome.optimal_values;
     // let adj_optimal_h2 = h2_search_outcome.optimal_values;
@@ -386,19 +394,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         FIRST_GOALSCORER_BOOKSUM,
     );
     let anytime_gs = fit_offer(OfferType::AnytimeGoalscorer, &anytime_gs, 1.0);
-    let home_goalscorer_booksum = first_gs
-        .market
-        .probs
-        .iter()
-        .zip(first_gs.outcomes.items().iter())
-        .filter(|(_, outcome_type)| {
-            matches!(
-                outcome_type,
-                OutcomeType::Player(Player::Named(Side::Home, _))
-            )
-        })
-        .map(|(prob, _)| prob)
-        .sum::<f64>();
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
     let draw_prob = isolate(
@@ -462,6 +457,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    assists: UnivariateProbs {
+                        home: 1.0,
+                        away: 1.0,
+                    },
                 },
                 player_probs: vec![(
                     player.clone(),
@@ -497,7 +496,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // fitted_first_goalscorer_probs.push(draw_prob);
     // fitted_first_goalscorer_probs.normalise(FIRST_GOALSCORER_BOOKSUM);
-    fitted_first_goalscorer_probs.push(FIRST_GOALSCORER_BOOKSUM - fitted_first_goalscorer_probs.sum());
+    fitted_first_goalscorer_probs
+        .push(FIRST_GOALSCORER_BOOKSUM - fitted_first_goalscorer_probs.sum());
 
     let fitted_first_goalscorer = Offer {
         offer_type: OfferType::FirstGoalscorer,
@@ -536,6 +536,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    assists: UnivariateProbs {
+                        home: 1.0,
+                        away: 1.0,
+                    },
                 },
                 player_probs: vec![(
                     player.clone(),
@@ -605,17 +609,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|price| 1.0 / price)
         .sum::<f64>();
 
-    let per_outcome_overround = (anytime_goalscorer_overround.value - 1.0) / anytime_gs.outcomes.len() as f64;
+    let per_outcome_overround =
+        (anytime_goalscorer_overround.value - 1.0) / anytime_gs.outcomes.len() as f64;
 
     let anytime_assist = fit_offer(
         OfferType::AnytimeAssist,
         &anytime_assist,
-        sample_anytime_assist_booksum / (1.0 + per_outcome_overround * anytime_assist.len() as f64)
+        sample_anytime_assist_booksum / (1.0 + per_outcome_overround * anytime_assist.len() as f64),
     );
+
+    let home_goalscorer_booksum = home_booksum(&fitted_anytime_goalscorer);
+    let away_goalscorer_booksum = away_booksum(&fitted_anytime_goalscorer);
+    println!("partial goalscorer booksums: home: {home_goalscorer_booksum:.3}, away: {away_goalscorer_booksum:.3}");
+
+    let home_assister_booksum = home_booksum(&anytime_assist);
+    let away_assister_booksum = away_booksum(&anytime_assist);
+    println!("partial assister booksums: home: {home_assister_booksum:.3}, away: {away_assister_booksum:.3}");
+    let assist_probs = UnivariateProbs {
+        home: home_assister_booksum / home_goalscorer_booksum,
+        away: away_assister_booksum / away_goalscorer_booksum,
+    };
+    println!("assist_probs: {assist_probs:?}");
 
     let fitted_assist_probs = fit::fit_anytime_assist_all(
         &BivariateProbs::from(adj_optimal_h1.as_slice()),
         &BivariateProbs::from(adj_optimal_h2.as_slice()),
+        &assist_probs,
         &anytime_assist,
         draw_prob,
         anytime_assist.market.fair_booksum(),
@@ -631,6 +650,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    assists: assist_probs.clone(),
                 },
                 player_probs: vec![(
                     player.clone(),
@@ -981,7 +1001,14 @@ fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Explora
     explore(
         &IntervalConfig {
             intervals: INTERVALS as u8,
-            team_probs: TeamProbs { h1_goals, h2_goals },
+            team_probs: TeamProbs {
+                h1_goals,
+                h2_goals,
+                assists: UnivariateProbs {
+                    home: 1.0,
+                    away: 1.0,
+                },
+            },
             player_probs: vec![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: MAX_TOTAL_GOALS_FULL,
