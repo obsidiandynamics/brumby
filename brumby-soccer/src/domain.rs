@@ -52,6 +52,32 @@ pub enum OfferType {
     PlayerShotsOnTarget(Over),
     AnytimeAssist
 }
+impl OfferType {
+    pub fn category(&self) -> OfferCategory {
+        match self {
+            OfferType::HeadToHead(_) => OfferCategory::HeadToHead,
+            OfferType::TotalGoals(_, _) => OfferCategory::TotalGoals,
+            OfferType::CorrectScore(_) => OfferCategory::CorrectScore,
+            OfferType::DrawNoBet => OfferCategory::DrawNoBet,
+            OfferType::AnytimeGoalscorer => OfferCategory::AnytimeGoalscorer,
+            OfferType::FirstGoalscorer => OfferCategory::FirstGoalscorer,
+            OfferType::PlayerShotsOnTarget(_) => OfferCategory::PlayerShotsOnTarget,
+            OfferType::AnytimeAssist => OfferCategory::AnytimeAssist
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OfferCategory {
+    HeadToHead,
+    TotalGoals,
+    CorrectScore,
+    DrawNoBet,
+    AnytimeGoalscorer,
+    FirstGoalscorer,
+    PlayerShotsOnTarget,
+    AnytimeAssist
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Side {

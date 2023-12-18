@@ -146,7 +146,7 @@ pub struct IntervalConfig {
     pub expansions: Expansions,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PlayerProbs {
     pub goal: Option<f64>,
     pub assist: Option<f64>,

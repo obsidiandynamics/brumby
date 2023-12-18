@@ -24,7 +24,7 @@ impl<T: Eq + PartialEq + Hash> HashLookup<T> {
         Self::insert_unique(&mut self.item_to_index, &item, self.index_to_item.len());
         self.index_to_item.push(item);
     }
-
+    
     pub fn item_at(&self, index: usize) -> Option<&T> {
         self.index_to_item.get(index)
     }

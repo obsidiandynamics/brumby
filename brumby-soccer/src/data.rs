@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use racing_scraper::sports::{get_sports_contest, Provider};
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 use brumby::feed_id::FeedId;
 
@@ -12,14 +13,14 @@ use brumby::feed_id::FeedId;
 pub struct ContestSummary {
     pub id: String,
     pub name: String,
-    pub offerings: HashMap<OfferType, HashMap<OutcomeType, f64>>,
+    pub offerings: FxHashMap<OfferType, HashMap<OutcomeType, f64>>,
 }
 
 impl From<ContestModel> for ContestSummary {
     fn from(external: ContestModel) -> Self {
         let id = external.id;
         let name = external.name;
-        let mut offerings = HashMap::with_capacity(external.markets.len());
+        let mut offerings = FxHashMap::with_capacity_and_hasher(external.markets.len(), Default::default());
         for market in external.markets {
             match market {
                 SoccerMarket::CorrectScore(markets) => {

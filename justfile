@@ -5,6 +5,9 @@ _help:
 soc_prices *ARGS:
     cargo run --release --bin soc_prices -- {{ARGS}}
 
+soc_prices2 *ARGS:
+    cargo run --release --bin soc_prices2 -- {{ARGS}}
+
 # produce prices for a race (singles and multis)
 rac_prices *ARGS:
     cargo run --release --bin rac_prices -- {{ARGS}}

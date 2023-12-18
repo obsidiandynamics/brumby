@@ -1,25 +1,24 @@
-use crate::domain::{Offer, OfferType, OutcomeType};
+use crate::domain::{Offer, OfferType, OutcomeType, Player};
 use brumby::hash_lookup::HashLookup;
 use brumby::probs::SliceExt;
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
+use crate::interval::PlayerProbs;
 
 mod head_to_head;
 mod total_goals;
 
 #[derive(Debug, Error)]
 pub enum InvalidOffer {
-    #[error("misaligned offer: {0}")]
+    #[error("{0}")]
     MisalignedOffer(#[from] MisalignedOffer),
 
     #[error("{0}")]
-    MissingOutcome(#[from] MissingOutcome),
+    InvalidOutcome(#[from] InvalidOutcome),
 
     #[error("{0}")]
-    ExtraneousOutcome(#[from] ExtraneousOutcome),
-
-    #[error("wrong booksum: {0}")]
     WrongBooksum(#[from] WrongBooksum),
 }
 
@@ -30,16 +29,47 @@ impl Offer {
             &self.market.probs,
             &self.offer_type,
         )?;
+        self.offer_type.validate(&self.outcomes)?;
         match self.offer_type {
-            OfferType::TotalGoals(_, _) => total_goals::validate(self),
-            OfferType::HeadToHead(_) => head_to_head::validate(self),
+            OfferType::TotalGoals(_, _) => total_goals::validate_probs(&self.offer_type, &self.market.probs),
+            OfferType::HeadToHead(_) => head_to_head::validate_probs(&self.offer_type, &self.market.probs),
             _ => Ok(()),
         }
     }
 }
 
+
 #[derive(Debug, Error)]
-#[error("expected {assertion}, got {actual} for {offer_type:?}")]
+pub enum InvalidOutcome {
+    #[error("{0}")]
+    MissingOutcome(#[from] MissingOutcome),
+
+    #[error("{0}")]
+    ExtraneousOutcome(#[from] ExtraneousOutcome),
+}
+
+impl OfferType {
+    pub fn validate(&self, outcomes: &HashLookup<OutcomeType>) -> Result<(), InvalidOutcome> {
+        match self {
+            OfferType::TotalGoals(_, _) => total_goals::validate_outcomes(self, outcomes),
+            OfferType::HeadToHead(_) => head_to_head::validate_outcomes(self, outcomes),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn create_outcomes(&self, player_probs: &FxHashMap<Player, PlayerProbs>) {
+        todo!()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum FitError {
+    #[error("missing offer {0:?}")]
+    MissingOffer(OfferType),
+}
+
+#[derive(Debug, Error)]
+#[error("expected booksum in {assertion}, got {actual} for {offer_type:?}")]
 pub struct WrongBooksum {
     pub assertion: BooksumAssertion,
     pub actual: f64,
@@ -166,23 +196,23 @@ impl<F: FnMut(&OutcomeType) -> bool> OutcomesMatchAssertion<F> {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum IncompleteOutcomes {
-    #[error("{0}")]
-    MissingOutcome(#[from] MissingOutcome),
-
-    #[error("{0}")]
-    ExtraneousOutcome(#[from] ExtraneousOutcome),
-}
-
-impl From<IncompleteOutcomes> for InvalidOffer {
-    fn from(value: IncompleteOutcomes) -> Self {
-        match value {
-            IncompleteOutcomes::MissingOutcome(nested) => nested.into(),
-            IncompleteOutcomes::ExtraneousOutcome(nested) => nested.into(),
-        }
-    }
-}
+// #[derive(Debug, Error)]
+// pub enum IncompleteOutcomes {
+//     #[error("{0}")]
+//     MissingOutcome(#[from] MissingOutcome),
+//
+//     #[error("{0}")]
+//     ExtraneousOutcome(#[from] ExtraneousOutcome),
+// }
+//
+// impl From<IncompleteOutcomes> for InvalidOutcome {
+//     fn from(value: IncompleteOutcomes) -> Self {
+//         match value {
+//             IncompleteOutcomes::MissingOutcome(nested) => nested.into(),
+//             IncompleteOutcomes::ExtraneousOutcome(nested) => nested.into(),
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct OutcomesCompleteAssertion<'a> {
@@ -193,7 +223,7 @@ impl<'a> OutcomesCompleteAssertion<'a> {
         &self,
         outcomes: &HashLookup<OutcomeType>,
         offer_type: &OfferType,
-    ) -> Result<(), IncompleteOutcomes> {
+    ) -> Result<(), InvalidOutcome> {
         OutcomesIntactAssertion {
             outcomes: self.outcomes,
         }
@@ -228,7 +258,7 @@ mod tests {
             market: Market::frame(&Overround::fair(), vec![0.4], &PRICE_BOUNDS),
         };
         assert_eq!(
-            "misaligned offer: 2:1 outcomes:probabilities mapped for TotalGoals(FullTime, Over(2))",
+            "2:1 outcomes:probabilities mapped for TotalGoals(FullTime, Over(2))",
             offer.validate().unwrap_err().to_string()
         );
     }
@@ -258,7 +288,7 @@ mod tests {
                 .check(&[1.0 - 0.011], &OfferType::FirstGoalscorer)
                 .unwrap_err();
             assert_eq!(
-                "expected 1.0..=2.0 ± 0.01, got 0.989 for FirstGoalscorer",
+                "expected booksum in 1.0..=2.0 ± 0.01, got 0.989 for FirstGoalscorer",
                 err.to_string()
             );
         }
@@ -267,7 +297,7 @@ mod tests {
                 .check(&[2.0 + 0.011], &OfferType::FirstGoalscorer)
                 .unwrap_err();
             assert_eq!(
-                "expected 1.0..=2.0 ± 0.01, got 2.011 for FirstGoalscorer",
+                "expected booksum in 1.0..=2.0 ± 0.01, got 2.011 for FirstGoalscorer",
                 err.to_string()
             );
         }
