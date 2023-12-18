@@ -1,7 +1,8 @@
 use stanza::style::{HAlign, Header, MinWidth, Styles};
 use stanza::style::HAlign::Left;
 use stanza::table::{Col, Row, Table};
-use crate::domain::{FittingErrors, Offer, OfferType};
+use crate::domain::{Offer, OfferType};
+use crate::fit::FittingErrors;
 
 pub fn tabulate_offer(offer: &Offer) -> Table {
     let mut table = Table::default().with_cols(vec![

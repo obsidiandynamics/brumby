@@ -30,6 +30,13 @@ impl Overround {
         }
         Ok(())
     }
+
+    pub fn fair() -> Self {
+        Self {
+            method: OverroundMethod::Multiplicative,
+            value: 1.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

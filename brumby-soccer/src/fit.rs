@@ -13,7 +13,10 @@ use brumby::{factorial, poisson};
 use crate::domain::Player::Named;
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::interval::query::isolate;
-use crate::interval::{explore, BivariateProbs, Expansions, IntervalConfig, PlayerProbs, PruneThresholds, TeamProbs, UnivariateProbs};
+use crate::interval::{
+    explore, BivariateProbs, Expansions, IntervalConfig, PlayerProbs, PruneThresholds, TeamProbs,
+    UnivariateProbs,
+};
 use crate::scoregrid;
 
 // const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
@@ -117,24 +120,117 @@ pub fn fit_scoregrid_half(offers: &[&Offer]) -> HypergridSearchOutcome {
             .collect::<Vec<_>>()
     };
     println!("initial estimates: {init_estimates:?}");
+    HypergridSearchOutcome {
+        steps: 0,
+        optimal_values: init_estimates,
+        optimal_residual: 0.0,
+    }
 
-    let start = Instant::now();
-    let search_outcome = fit_univariate_binomial_scoregrid(
-        offers,
-        &init_estimates,
-        (INTERVALS / 2) as u8,
-        MAX_TOTAL_GOALS_HALF,
-    );
-    let elapsed = start.elapsed();
-    println!("biv-binomial: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-    search_outcome
+    // let start = Instant::now();
+    // let search_outcome = fit_univariate_binomial_scoregrid(
+    //     offers,
+    //     &init_estimates,
+    //     (INTERVALS / 2) as u8,
+    //     MAX_TOTAL_GOALS_HALF,
+    // );
+    // let elapsed = start.elapsed();
+    // println!("biv-binomial: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+    // search_outcome
 }
+//
+// pub fn fit_scoregrid_full(offers: &[&Offer]) -> HypergridSearchOutcome {
+//     let init_estimates = {
+//         println!("*** F/T: fitting bivariate poisson scoregrid ***");
+//         let start = Instant::now();
+//         let search_outcome = fit_bivariate_poisson_scoregrid(offers, MAX_TOTAL_GOALS_FULL);
+//         let elapsed = start.elapsed();
+//         println!(
+//             "F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}",
+//             expectation_from_bivariate_poisson(&search_outcome.optimal_values)
+//         );
+//         search_outcome
+//             .optimal_values
+//             .iter()
+//             .map(|optimal_value| {
+//                 poisson::univariate(
+//                     1,
+//                     optimal_value / INTERVALS as f64,
+//                     &factorial::Calculator,
+//                 )
+//             })
+//             .collect::<Vec<_>>()
+//     };
+//     println!("F/T: initial estimates: {init_estimates:?}");
+//
+//     // HypergridSearchOutcome {
+//     //     steps: 0,
+//     //     optimal_values: init_estimates,
+//     //     optimal_residual: 0.0,
+//     // }
+//
+//     println!("*** F/T: fitting bivariate binomial scoregrid ***");
+//     let start = Instant::now();
+//     let search_outcome = fit_bivariate_binomial_scoregrid(
+//         offers,
+//         &init_estimates,
+//         INTERVALS as u8,
+//         MAX_TOTAL_GOALS_FULL,
+//     );
+//     // let search_outcome = fit_scoregrid(&[&correct_score]);
+//     let elapsed = start.elapsed();
+//     println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+//     search_outcome
+// }
 
-pub fn fit_scoregrid_full(offers: &[&Offer]) -> HypergridSearchOutcome {
+pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer) -> HypergridSearchOutcome {
+    let expected_total_goals_per_side = {
+        println!("*** F/T: fitting poisson total goals ***");
+        let start = Instant::now();
+        let search_outcome =
+            fit_poisson_total_goals_scoregrid(2.5, total_goals, MAX_TOTAL_GOALS_FULL);
+        let elapsed = start.elapsed();
+        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        search_outcome.optimal_value
+    };
+
+    let expected_home_goals = {
+        println!("*** F/T: fitting poisson h2h ***");
+        let start = Instant::now();
+        let search_outcome =
+            fit_poisson_h2h_scoregrid(expected_total_goals_per_side, h2h, MAX_TOTAL_GOALS_FULL);
+        let elapsed = start.elapsed();
+        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        search_outcome.optimal_value
+    };
+
+    let offers = &[h2h, total_goals];
+    let expected_common_goals = {
+        println!("*** F/T: fitting poisson common ***");
+        let start = Instant::now();
+        let search_outcome = fit_poisson_common_scoregrid(
+            expected_home_goals,
+            2.0 * expected_total_goals_per_side - expected_home_goals,
+            h2h,
+            MAX_TOTAL_GOALS_FULL,
+        );
+        let elapsed = start.elapsed();
+        println!("F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
+        search_outcome.optimal_value
+    };
+
+    let est_lambdas = [expected_home_goals - expected_common_goals, 2.0 * expected_total_goals_per_side - expected_home_goals - expected_common_goals, expected_common_goals];
+    println!("est_lambdas: {est_lambdas:?}, expectation: {:.3}", expectation_from_bivariate_poisson(&est_lambdas));
+    // let init_estimates = est_lambdas.iter()
+    //         .map(|optimal_value| {
+    //             1.0 - poisson::univariate(0, optimal_value / INTERVALS as f64, &factorial::Calculator)
+    //         })
+    //         .collect::<Vec<_>>();
+
     let init_estimates = {
         println!("*** F/T: fitting bivariate poisson scoregrid ***");
         let start = Instant::now();
-        let search_outcome = fit_bivariate_poisson_scoregrid(offers, MAX_TOTAL_GOALS_FULL);
+        let expected_away_goals = 2.0 * expected_total_goals_per_side - expected_home_goals;
+        let search_outcome = fit_bivariate_poisson_scoregrid(offers, expected_home_goals, expected_away_goals, expected_common_goals, MAX_TOTAL_GOALS_FULL);
         let elapsed = start.elapsed();
         println!(
             "F/T: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}",
@@ -144,15 +240,17 @@ pub fn fit_scoregrid_full(offers: &[&Offer]) -> HypergridSearchOutcome {
             .optimal_values
             .iter()
             .map(|optimal_value| {
-                1.0 - poisson::univariate(
-                    0,
-                    optimal_value / INTERVALS as f64,
-                    &factorial::Calculator,
-                )
+                1.0 - poisson::univariate(0, optimal_value / INTERVALS as f64, &factorial::Calculator)
             })
             .collect::<Vec<_>>()
     };
     println!("F/T: initial estimates: {init_estimates:?}");
+
+    // HypergridSearchOutcome {
+    //     steps: 0,
+    //     optimal_values: init_estimates,
+    //     optimal_residual: 0.0,
+    // }
 
     println!("*** F/T: fitting bivariate binomial scoregrid ***");
     let start = Instant::now();
@@ -225,7 +323,10 @@ fn fit_first_goalscorer_one(
         team_probs: TeamProbs {
             h1_goals: h1_goals.clone(),
             h2_goals: h2_goals.clone(),
-            assists: UnivariateProbs { home: 1.0, away: 1.0 },
+            assists: UnivariateProbs {
+                home: 1.0,
+                away: 1.0,
+            },
         },
         player_probs: vec![(
             player.clone(),
@@ -282,8 +383,10 @@ pub fn fit_anytime_assist_all(
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
     let common_rate = (h1_probs.common + h2_probs.common) / 2.0;
     let rate_sum = home_rate + away_rate + common_rate;
-    let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.home;
-    let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.away;
+    let home_ratio =
+        (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.home;
+    let away_ratio =
+        (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.away;
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
     let mut fitted_assist_probs = BTreeMap::new();
     let start = Instant::now();
@@ -391,6 +494,89 @@ fn allocate_scoregrid(max_total_goals: u16) -> Matrix<f64> {
     Matrix::allocate(dim, dim)
 }
 
+fn fit_poisson_total_goals_scoregrid(
+    init_estimate: f64,
+    total_goals: &Offer,
+    max_total_goals: u16,
+) -> UnivariateDescentOutcome {
+    let mut scoregrid = allocate_scoregrid(max_total_goals);
+    let offers = [total_goals];
+    univariate_descent(
+        &UnivariateDescentConfig {
+            init_value: init_estimate,
+            init_step: init_estimate * 0.1,
+            min_step: 0.0001,
+            max_steps: 100,
+            acceptable_residual: 1e-6,
+        },
+        |value| {
+            univariate_poisson_scoregrid(value, value, &mut scoregrid);
+            scoregrid_error(&offers, &scoregrid)
+        },
+    )
+}
+
+fn fit_poisson_h2h_scoregrid(
+    init_estimate: f64,
+    h2h: &Offer,
+    max_total_goals: u16,
+) -> UnivariateDescentOutcome {
+    let mut scoregrid = allocate_scoregrid(max_total_goals);
+    let offers = [h2h];
+    univariate_descent(
+        &UnivariateDescentConfig {
+            init_value: init_estimate,
+            init_step: init_estimate * 0.1,
+            min_step: 0.0001,
+            max_steps: 100,
+            acceptable_residual: 1e-6,
+        },
+        |value| {
+            univariate_poisson_scoregrid(value, 2.0 * init_estimate - value, &mut scoregrid);
+            scoregrid_error(&offers, &scoregrid)
+        },
+    )
+}
+
+fn fit_poisson_common_scoregrid(
+    home_goals: f64,
+    away_goals: f64,
+    h2h: &Offer,
+    max_total_goals: u16,
+) -> UnivariateDescentOutcome {
+    let mut scoregrid = allocate_scoregrid(max_total_goals);
+    let offers = [h2h];
+    univariate_descent(&UnivariateDescentConfig {
+        init_value: 0.0,
+        init_step: 0.1,
+        min_step: 0.0001,
+        max_steps: 100,
+        acceptable_residual: 1e-6,
+    }, |value| {
+        bivariate_poisson_scoregrid(home_goals - value, away_goals - value, value, &mut scoregrid);
+        scoregrid_error(&offers, &scoregrid)
+    })
+    // let bounds = [0.01..=0.5];
+    // hypergrid_search(
+    //     &HypergridSearchConfig {
+    //         max_steps: 100,
+    //         acceptable_residual: 1e-6,
+    //         bounds: Capture::Borrowed(&bounds),
+    //         resolution: 100,
+    //     },
+    //     |_| true,
+    //     |values| {
+    //         bivariate_poisson_scoregrid(
+    //             home_goals - values[0],
+    //             away_goals - values[0],
+    //             values[0],
+    //             &mut scoregrid,
+    //         );
+    //         scoregrid_error(&offers, &scoregrid)
+    //     },
+    // )
+}
+
 fn fit_univariate_poisson_scoregrid(
     offers: &[&Offer],
     max_total_goals: u16,
@@ -414,16 +600,21 @@ fn fit_univariate_poisson_scoregrid(
 
 fn fit_bivariate_poisson_scoregrid(
     offers: &[&Offer],
+    home_estimate: f64,
+    away_estimate: f64,
+    common_estimate: f64,
     max_total_goals: u16,
 ) -> HypergridSearchOutcome {
     let mut scoregrid = allocate_scoregrid(max_total_goals);
-    let bounds = [0.2..=3.0, 0.2..=3.0, 0.0..=0.5];
+    // println!("estimates: {home_estimate} and {away_estimate}");
+    let bounds = [home_estimate - 0.5..=home_estimate, away_estimate - 0.5..=away_estimate, common_estimate..=common_estimate + 0.5];
+    // let bounds = [0.2..=3.0, 0.2..=3.0, 0.0..=0.5];
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
             bounds: Capture::Borrowed(&bounds),
-            resolution: 10,
+            resolution: 4,
         },
         |_| true,
         |values| {
@@ -453,12 +644,7 @@ fn fit_univariate_binomial_scoregrid(
         },
         |values| values.sum() <= 1.0,
         |values| {
-            univariate_binomial_scoregrid(
-                intervals,
-                values[0],
-                values[1],
-                &mut scoregrid,
-            );
+            univariate_binomial_scoregrid(intervals, values[0], values[1], &mut scoregrid);
             scoregrid_error(offers, &scoregrid)
         },
     )
@@ -480,7 +666,7 @@ fn fit_bivariate_binomial_scoregrid(
             max_steps: 10,
             acceptable_residual: 1e-6,
             bounds: Capture::Borrowed(&bounds),
-            resolution: 10,
+            resolution: 4,
         },
         |values| values.sum() <= 1.0,
         |values| {
@@ -497,11 +683,7 @@ fn fit_bivariate_binomial_scoregrid(
 }
 
 /// Univariate Poisson.
-fn univariate_poisson_scoregrid(
-    home_rate: f64,
-    away_rate: f64,
-    scoregrid: &mut Matrix<f64>,
-) {
+fn univariate_poisson_scoregrid(home_rate: f64, away_rate: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid.fill(0.0);
     scoregrid::from_univariate_poisson(home_rate, away_rate, scoregrid);
 }
@@ -525,12 +707,7 @@ fn univariate_binomial_scoregrid(
     scoregrid: &mut Matrix<f64>,
 ) {
     scoregrid.fill(0.0);
-    scoregrid::from_binomial(
-        intervals,
-        interval_home_prob,
-        interval_away_prob,
-        scoregrid,
-    );
+    scoregrid::from_binomial(intervals, interval_home_prob, interval_away_prob, scoregrid);
 }
 
 /// Bivariate binomial.
@@ -576,4 +753,10 @@ pub fn compute_error(sample_prices: &[f64], fitted_prices: &[f64], error_type: &
     }
     let mean_error = error_sum / counted as f64;
     error_type.reverse(mean_error)
+}
+
+#[derive(Debug)]
+pub struct FittingErrors {
+    pub rmse: f64,
+    pub rmsre: f64,
 }

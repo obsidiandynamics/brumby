@@ -6,7 +6,7 @@ use brumby::hash_lookup::HashLookup;
 
 use crate::domain::{Player, Score, Side};
 
-pub mod assist;
+mod assist;
 pub mod query;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]

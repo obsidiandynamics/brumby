@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod data;
 pub mod domain;
 pub mod fit;

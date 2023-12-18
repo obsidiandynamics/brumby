@@ -154,6 +154,16 @@ fn fit_odds_ratio() {
 }
 
 #[test]
+fn frame_fair() {
+    let probs = vec![0.1, 0.2, 0.3, 0.4];
+    let market = Market::frame(&Overround::fair(),
+                               probs,
+                               &BOUNDS
+    );
+    assert_slice_f64_relative(&[10.0, 5.0, 3.333, 2.5], &market.prices, 0.001);
+}
+
+#[test]
 fn frame_multiplicative() {
     {
         let probs = vec![0.1, 0.2, 0.3, 0.4];

@@ -60,6 +60,12 @@ impl<T: Eq + PartialEq + Hash> Index<usize> for HashLookup<T> {
     }
 }
 
+// impl<T: Eq + PartialEq + Hash + Clone, const D: usize> From<[T; D]> for HashLookup<T> where Vec<T>: Into<Vec<T>> {
+//     fn from(index_to_item: [T; D]) -> Self {
+//         HashLookup::from(index_to_item.to_vec())
+//     }
+// }
+
 impl<T: Eq + PartialEq + Hash + Clone> From<Vec<T>> for HashLookup<T> {
     fn from(index_to_item: Vec<T>) -> Self {
         let mut item_to_index =

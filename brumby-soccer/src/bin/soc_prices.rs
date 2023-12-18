@@ -13,8 +13,8 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::probs::SliceExt;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
-use brumby_soccer::domain::{FittingErrors, Offer, OfferType, OutcomeType, Over, Period, Score};
-use brumby_soccer::fit::{away_booksum, home_booksum, ErrorType};
+use brumby_soccer::domain::{Offer, OfferType, OutcomeType, Over, Period, Score};
+use brumby_soccer::fit::{away_booksum, home_booksum, ErrorType, FittingErrors};
 use brumby_soccer::interval::query::isolate;
 use brumby_soccer::interval::{
     explore, BivariateProbs, Expansions, Exploration, IntervalConfig, PlayerProbs, PruneThresholds,
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let h1_search_outcome = fit::fit_scoregrid_half(&[&h1_h2h, &h1_goals_ou]);
     println!("*** fitting H2 ***");
     let h2_search_outcome = fit::fit_scoregrid_half(&[&h2_h2h, &h2_goals_ou]);
-    let ft_search_outcome = fit::fit_scoregrid_full(&[&ft_h2h, &ft_goals_ou]);
+    let ft_search_outcome = fit::fit_scoregrid_full(&ft_h2h, &ft_goals_ou);
 
     let mut adj_optimal_h1 = [0.0; 3];
     let mut adj_optimal_h2 = [0.0; 3];
@@ -620,11 +620,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let home_goalscorer_booksum = home_booksum(&fitted_anytime_goalscorer);
     let away_goalscorer_booksum = away_booksum(&fitted_anytime_goalscorer);
-    println!("partial goalscorer booksums: home: {home_goalscorer_booksum:.3}, away: {away_goalscorer_booksum:.3}");
+    // println!("partial goalscorer booksums: home: {home_goalscorer_booksum:.3}, away: {away_goalscorer_booksum:.3}");
 
     let home_assister_booksum = home_booksum(&anytime_assist);
     let away_assister_booksum = away_booksum(&anytime_assist);
-    println!("partial assister booksums: home: {home_assister_booksum:.3}, away: {away_assister_booksum:.3}");
+    // println!("partial assister booksums: home: {home_assister_booksum:.3}, away: {away_assister_booksum:.3}");
     let assist_probs = UnivariateProbs {
         home: home_assister_booksum / home_goalscorer_booksum,
         away: away_assister_booksum / away_goalscorer_booksum,
