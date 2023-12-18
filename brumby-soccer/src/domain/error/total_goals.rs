@@ -1,11 +1,12 @@
-use crate::domain::{assert, InvalidOffer, Offer, OfferType, OutcomeType};
+use crate::domain::{error, Offer, OfferType, OutcomeType};
+use crate::domain::error::InvalidOffer;
 
 pub fn validate(offer: &Offer) -> Result<(), InvalidOffer> {
     match &offer.offer_type {
         OfferType::TotalGoals(_, over) => {
-            assert::BooksumAssertion::with_default_tolerance(1.0..=1.0)
+            error::BooksumAssertion::with_default_tolerance(1.0..=1.0)
                 .check(&offer.market.probs, &offer.offer_type)?;
-            assert::OutcomesCompleteAssertion {
+            error::OutcomesCompleteAssertion {
                 outcomes: &[OutcomeType::Over(over.0), OutcomeType::Under(over.0 + 1)],
             }
             .check(&offer.outcomes, &offer.offer_type)?;
@@ -26,12 +27,13 @@ mod tests {
 
     use super::*;
 
+    const OFFER_TYPE: OfferType = OfferType::TotalGoals(Period::FullTime, Over(2));
     const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
 
     #[test]
     fn valid() {
         let offer = Offer {
-            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
+            offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3)]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
         };
@@ -41,7 +43,7 @@ mod tests {
     #[test]
     fn wrong_booksum() {
         let offer = Offer {
-            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
+            offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3)]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.5], &PRICE_BOUNDS),
         };
@@ -51,7 +53,7 @@ mod tests {
     #[test]
     fn missing_outcome() {
         let offer = Offer {
-            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
+            offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![OutcomeType::Over(2)]),
             market: Market::frame(&Overround::fair(), vec![1.0], &PRICE_BOUNDS),
         };
@@ -61,7 +63,7 @@ mod tests {
     #[test]
     fn extraneous_outcome() {
         let offer = Offer {
-            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
+            offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3), OutcomeType::None]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.5, 0.1], &PRICE_BOUNDS),
         };

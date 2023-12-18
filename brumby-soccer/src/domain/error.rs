@@ -1,9 +1,42 @@
-use crate::domain::{InvalidOffer, OfferType, OutcomeType};
+use crate::domain::{Offer, OfferType, OutcomeType};
+use brumby::hash_lookup::HashLookup;
 use brumby::probs::SliceExt;
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
 use thiserror::Error;
-use brumby::hash_lookup::HashLookup;
+
+mod head_to_head;
+mod total_goals;
+
+#[derive(Debug, Error)]
+pub enum InvalidOffer {
+    #[error("misaligned offer: {0}")]
+    MisalignedOffer(#[from] MisalignedOffer),
+
+    #[error("{0}")]
+    MissingOutcome(#[from] MissingOutcome),
+
+    #[error("{0}")]
+    ExtraneousOutcome(#[from] ExtraneousOutcome),
+
+    #[error("wrong booksum: {0}")]
+    WrongBooksum(#[from] WrongBooksum),
+}
+
+impl Offer {
+    pub fn validate(&self) -> Result<(), InvalidOffer> {
+        OfferAlignmentAssertion::check(
+            &self.outcomes.items(),
+            &self.market.probs,
+            &self.offer_type,
+        )?;
+        match self.offer_type {
+            OfferType::TotalGoals(_, _) => total_goals::validate(self),
+            OfferType::HeadToHead(_) => head_to_head::validate(self),
+            _ => Ok(()),
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 #[error("expected {assertion}, got {actual} for {offer_type:?}")]
@@ -89,7 +122,11 @@ pub struct OutcomesIntactAssertion<'a> {
     pub outcomes: &'a [OutcomeType],
 }
 impl<'a> OutcomesIntactAssertion<'a> {
-    pub fn check(&self, outcomes: &HashLookup<OutcomeType>, offer_type: &OfferType) -> Result<(), MissingOutcome> {
+    pub fn check(
+        &self,
+        outcomes: &HashLookup<OutcomeType>,
+        offer_type: &OfferType,
+    ) -> Result<(), MissingOutcome> {
         for outcome in self.outcomes.iter() {
             if outcomes.index_of(outcome).is_none() {
                 return Err(MissingOutcome {
@@ -110,17 +147,21 @@ pub struct ExtraneousOutcome {
 }
 
 pub struct OutcomesMatchAssertion<F: FnMut(&OutcomeType) -> bool> {
-    pub matcher: F
+    pub matcher: F,
 }
 impl<F: FnMut(&OutcomeType) -> bool> OutcomesMatchAssertion<F> {
-    pub fn check(&mut self, outcomes: &[OutcomeType], offer_type: &OfferType) -> Result<(), ExtraneousOutcome> {
+    pub fn check(
+        &mut self,
+        outcomes: &[OutcomeType],
+        offer_type: &OfferType,
+    ) -> Result<(), ExtraneousOutcome> {
         let mismatched = outcomes.iter().find(|&outcome| !(self.matcher)(outcome));
         match mismatched {
             None => Ok(()),
             Some(mismatched_outcome) => Err(ExtraneousOutcome {
                 outcome_type: mismatched_outcome.clone(),
                 offer_type: offer_type.clone(),
-            })
+            }),
         }
     }
 }
@@ -138,7 +179,7 @@ impl From<IncompleteOutcomes> for InvalidOffer {
     fn from(value: IncompleteOutcomes) -> Self {
         match value {
             IncompleteOutcomes::MissingOutcome(nested) => nested.into(),
-            IncompleteOutcomes::ExtraneousOutcome(nested) => nested.into()
+            IncompleteOutcomes::ExtraneousOutcome(nested) => nested.into(),
         }
     }
 }
@@ -148,15 +189,23 @@ pub struct OutcomesCompleteAssertion<'a> {
     pub outcomes: &'a [OutcomeType],
 }
 impl<'a> OutcomesCompleteAssertion<'a> {
-    pub fn check(&self, outcomes: &HashLookup<OutcomeType>, offer_type: &OfferType) -> Result<(), IncompleteOutcomes> {
+    pub fn check(
+        &self,
+        outcomes: &HashLookup<OutcomeType>,
+        offer_type: &OfferType,
+    ) -> Result<(), IncompleteOutcomes> {
         OutcomesIntactAssertion {
             outcomes: self.outcomes,
-        }.check(outcomes, offer_type)?;
+        }
+        .check(outcomes, offer_type)?;
 
         if outcomes.len() != self.outcomes.len() {
             Err(OutcomesMatchAssertion {
                 matcher: |outcome| self.outcomes.contains(outcome),
-            }.check(outcomes.items(), offer_type).unwrap_err().into())
+            }
+            .check(outcomes.items(), offer_type)
+            .unwrap_err()
+            .into())
         } else {
             Ok(())
         }
@@ -166,7 +215,23 @@ impl<'a> OutcomesCompleteAssertion<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Period, Side};
+    use crate::domain::{Over, Period, Side};
+    use brumby::market::{Market, Overround};
+
+    const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
+
+    #[test]
+    fn misaligned_offer() {
+        let offer = Offer {
+            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
+            outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+            market: Market::frame(&Overround::fair(), vec![0.4], &PRICE_BOUNDS),
+        };
+        assert_eq!(
+            "misaligned offer: 2:1 outcomes:probabilities mapped for TotalGoals(FullTime, Over(2))",
+            offer.validate().unwrap_err().to_string()
+        );
+    }
 
     #[test]
     fn booksum_within_expected() {
@@ -237,7 +302,15 @@ mod tests {
         let assertion = OutcomesIntactAssertion {
             outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
         };
-        assertion.check(&HashLookup::from(vec![OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)]), &OfferType::DrawNoBet).unwrap();
+        assertion
+            .check(
+                &HashLookup::from(vec![
+                    OutcomeType::Win(Side::Home),
+                    OutcomeType::Win(Side::Away),
+                ]),
+                &OfferType::DrawNoBet,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -245,7 +318,12 @@ mod tests {
         let assertion = OutcomesIntactAssertion {
             outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
         };
-        let err = assertion.check(&HashLookup::from(vec![OutcomeType::Win(Side::Home)]), &OfferType::DrawNoBet).unwrap_err();
+        let err = assertion
+            .check(
+                &HashLookup::from([OutcomeType::Win(Side::Home)]),
+                &OfferType::DrawNoBet,
+            )
+            .unwrap_err();
         assert_eq!("Win(Away) missing from DrawNoBet", err.to_string());
     }
 
@@ -254,7 +332,16 @@ mod tests {
         let mut assertion = OutcomesMatchAssertion {
             matcher: |outcome| matches!(outcome, OutcomeType::Win(_) | OutcomeType::Draw),
         };
-        assertion.check(&[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away), OutcomeType::Draw], &OfferType::HeadToHead(Period::FullTime)).unwrap();
+        assertion
+            .check(
+                &[
+                    OutcomeType::Win(Side::Home),
+                    OutcomeType::Win(Side::Away),
+                    OutcomeType::Draw,
+                ],
+                &OfferType::HeadToHead(Period::FullTime),
+            )
+            .unwrap();
     }
 
     #[test]
@@ -262,8 +349,16 @@ mod tests {
         let mut assertion = OutcomesMatchAssertion {
             matcher: |outcome| matches!(outcome, OutcomeType::Win(_) | OutcomeType::Draw),
         };
-        let err = assertion.check(&[OutcomeType::Win(Side::Home), OutcomeType::None], &OfferType::HeadToHead(Period::FullTime)).unwrap_err();
-        assert_eq!("None does not belong in HeadToHead(FullTime)", err.to_string());
+        let err = assertion
+            .check(
+                &[OutcomeType::Win(Side::Home), OutcomeType::None],
+                &OfferType::HeadToHead(Period::FullTime),
+            )
+            .unwrap_err();
+        assert_eq!(
+            "None does not belong in HeadToHead(FullTime)",
+            err.to_string()
+        );
     }
 
     #[test]
@@ -271,7 +366,15 @@ mod tests {
         let assertion = OutcomesCompleteAssertion {
             outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
         };
-        assertion.check(&HashLookup::from(vec![OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)]), &OfferType::DrawNoBet).unwrap();
+        assertion
+            .check(
+                &HashLookup::from([
+                    OutcomeType::Win(Side::Home),
+                    OutcomeType::Win(Side::Away),
+                ]),
+                &OfferType::DrawNoBet,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -280,11 +383,25 @@ mod tests {
             outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
         };
         {
-            let err = assertion.check(&HashLookup::from(vec![OutcomeType::Win(Side::Home)]), &OfferType::DrawNoBet).unwrap_err();
+            let err = assertion
+                .check(
+                    &HashLookup::from([OutcomeType::Win(Side::Home)]),
+                    &OfferType::DrawNoBet,
+                )
+                .unwrap_err();
             assert_eq!("Win(Away) missing from DrawNoBet", err.to_string());
         }
         {
-            let err = assertion.check(&HashLookup::from(vec![OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away), OutcomeType::Draw]), &OfferType::DrawNoBet).unwrap_err();
+            let err = assertion
+                .check(
+                    &HashLookup::from([
+                        OutcomeType::Win(Side::Home),
+                        OutcomeType::Win(Side::Away),
+                        OutcomeType::Draw,
+                    ]),
+                    &OfferType::DrawNoBet,
+                )
+                .unwrap_err();
             assert_eq!("Draw does not belong in DrawNoBet", err.to_string());
         }
     }

@@ -1,30 +1,10 @@
 use std::iter::{Filter, Zip};
 use std::slice::Iter;
 
-use thiserror::Error;
-
 use brumby::hash_lookup::HashLookup;
 use brumby::market::Market;
 
-use crate::domain::assert::{ExtraneousOutcome, MisalignedOffer, MissingOutcome, WrongBooksum};
-
-pub mod assert;
-mod total_goals;
-
-#[derive(Debug, Error)]
-pub enum InvalidOffer {
-    #[error("misaligned offer: {0}")]
-    MisalignedOffer(#[from] MisalignedOffer),
-
-    #[error("{0}")]
-    MissingOutcome(#[from] MissingOutcome),
-
-    #[error("{0}")]
-    ExtraneousOutcome(#[from] ExtraneousOutcome),
-
-    #[error("wrong booksum: {0}")]
-    WrongBooksum(#[from] WrongBooksum)
-}
+pub mod error;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Score {
@@ -105,34 +85,5 @@ pub struct Offer {
 impl Offer {
     pub fn filter_outcomes_with_probs<F>(&self, filter: F) -> Filter<Zip<Iter<OutcomeType>, Iter<f64>>, F> where F: FnMut(&(&OutcomeType, &f64)) -> bool{
         self.outcomes.items().iter().zip(self.market.probs.iter()).filter(filter)
-    }
-
-    pub fn validate(&self) -> Result<(), InvalidOffer> {
-        assert::OfferAlignmentAssertion::check(&self.outcomes.items(), &self.market.probs, &self.offer_type)?;
-        match self.offer_type {
-            OfferType::TotalGoals(_, _) => {
-                total_goals::validate(self)
-            }
-            _ => Ok(())
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::ops::RangeInclusive;
-    use brumby::market::Overround;
-    use super::*;
-
-    const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
-
-    #[test]
-    fn misaligned_offer() {
-        let offer = Offer {
-            offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-            outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3)]),
-            market: Market::frame(&Overround::fair(), vec![0.4], &PRICE_BOUNDS),
-        };
-        assert_eq!("misaligned offer: 2:1 outcomes:probabilities mapped for TotalGoals(FullTime, Over(2))", offer.validate().unwrap_err().to_string());
     }
 }
