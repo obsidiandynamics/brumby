@@ -6,15 +6,14 @@ use tracing::debug;
 use brumby::probs::Fraction;
 
 use crate::domain::{Offer, OfferCategory, OfferType, Over, Period};
+use crate::domain::error::OfferCapture;
 use crate::fit;
 use crate::interval::BivariateProbs;
-use crate::model::{FitError, GoalProbs, MissingOffer, Model, ValidationError};
+use crate::model::{FitError, get_offer, GoalProbs, MissingOffer, Model, most_balanced_goals, ValidationError};
 
 pub struct Config {
     h1_goal_ratio: f64,
     half_total_goals_ratio: Fraction
-    // poisson_search: HypergridSearchConfig<'a>,
-    // binomial_search: HypergridSearchConfig<'a>,
 }
 impl Config {
     fn validate(&self) -> Result<(), ValidationError> {
@@ -28,8 +27,6 @@ impl Config {
         if self.half_total_goals_ratio.numerator == 0 {
             return Err(anyhow!("half total goals ratio cannot be zero").into());
         }
-        // self.poisson_search.validate()?;
-        // self.binomial_search.validate()?;
         Ok(())
     }
 }
@@ -52,21 +49,24 @@ impl ScoreFitter {
             most_balanced_goals(offers.values(), &Period::FullTime).ok_or_else(|| {
                 FitError::MissingOffer(MissingOffer::Category(OfferCategory::TotalGoals))
             })?;
+        let ft_goals = OfferCapture::try_from(ft_goals)?;
 
-        let ft_h2h = get_offer(offers, &OfferType::HeadToHead(Period::FullTime))?;
+        let ft_h2h = OfferCapture::try_from(get_offer(offers, &OfferType::HeadToHead(Period::FullTime))?)?;
         let (ft_search_outcome, lambdas) = fit::fit_scoregrid_full(&ft_h2h, &ft_goals, model.config.intervals, model.config.max_total_goals);
 
         let (h1_goals, h1_goals_over) =
             most_balanced_goals(offers.values(), &Period::FirstHalf).ok_or_else(|| {
                 FitError::MissingOffer(MissingOffer::Category(OfferCategory::TotalGoals))
             })?;
-        let h1_h2h = get_offer(offers, &OfferType::HeadToHead(Period::FirstHalf))?;
+        let h1_goals = OfferCapture::try_from(h1_goals)?;
+        let h1_h2h = OfferCapture::try_from(get_offer(offers, &OfferType::HeadToHead(Period::FirstHalf))?)?;
 
         let (h2_goals, h2_goals_over) =
             most_balanced_goals(offers.values(), &Period::SecondHalf).ok_or_else(|| {
                 FitError::MissingOffer(MissingOffer::Category(OfferCategory::TotalGoals))
             })?;
-        let h2_h2h = get_offer(offers, &OfferType::HeadToHead(Period::SecondHalf))?;
+        let h2_goals = OfferCapture::try_from(h2_goals)?;
+        let h2_h2h = OfferCapture::try_from(get_offer(offers, &OfferType::HeadToHead(Period::SecondHalf))?)?;
 
         debug!("fitting 1st half ({:.1} goals line)", h1_goals_over.0 as f64 + 0.5);
         let h1_home_goals_estimate = (lambdas[0] + lambdas[2]) * self.config.h1_goal_ratio;
@@ -105,10 +105,6 @@ impl ScoreFitter {
     }
 }
 
-fn get_offer<'a>(offers: &'a FxHashMap<OfferType, Offer>, offer_type: &OfferType) -> Result<&'a Offer, MissingOffer> {
-    offers.get(offer_type).ok_or_else(|| MissingOffer::Type(offer_type.clone()))
-}
-
 impl TryFrom<Config> for ScoreFitter {
     type Error = ValidationError;
 
@@ -118,26 +114,3 @@ impl TryFrom<Config> for ScoreFitter {
     }
 }
 
-fn most_balanced_goals<'a>(
-    offers: impl Iterator<Item = &'a Offer>,
-    period: &Period,
-) -> Option<(&'a Offer, &'a Over)> {
-    let mut most_balanced = None;
-    let mut most_balanced_diff = f64::MAX;
-    for offer in offers {
-        match &offer.offer_type {
-            OfferType::TotalGoals(p, over) => {
-                if p == period {
-                    let diff = f64::abs(offer.market.prices[0] - offer.market.prices[1]);
-                    if diff < most_balanced_diff {
-                        most_balanced_diff = diff;
-                        most_balanced = Some((offer, over));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    most_balanced
-}

@@ -1,17 +1,19 @@
 use std::collections::hash_map::Entry;
 use std::error::Error;
+use std::time::Instant;
 
 use anyhow::anyhow;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::debug;
+use brumby::capture::Capture;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
 
-use crate::domain::error::InvalidOutcome;
-use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Player};
+use crate::domain::error::{InvalidOffer, InvalidOutcome, UnvalidatedOffer};
+use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
 use crate::interval;
 use crate::interval::query::{isolate, requirements};
 use crate::interval::{
@@ -19,14 +21,19 @@ use crate::interval::{
     UnivariateProbs,
 };
 
+pub mod player_goal_fitter;
 pub mod score_fitter;
 
 #[derive(Debug, Error)]
 pub enum FitError {
     #[error("{0}")]
     MissingOffer(#[from] MissingOffer),
-    // #[error("other: {0}")]
-    // Other(#[from] Box<dyn Error>)
+
+    #[error("{0}")]
+    UnmetRequirement(#[from] UnmetRequirement),
+
+    #[error("{0}")]
+    InvalidOffer(#[from] InvalidOffer),
 }
 
 #[derive(Debug, Error)]
@@ -36,6 +43,33 @@ pub enum MissingOffer {
 
     #[error("missing category {0:?}")]
     Category(OfferCategory),
+}
+
+fn get_offer<'a>(offers: &'a FxHashMap<OfferType, Offer>, offer_type: &OfferType) -> Result<UnvalidatedOffer<'a>, MissingOffer> {
+    offers.get(offer_type).ok_or_else(|| MissingOffer::Type(offer_type.clone())).map(|offer| UnvalidatedOffer::from(Capture::Borrowed(offer)))
+}
+
+fn most_balanced_goals<'a>(
+    offers: impl Iterator<Item = &'a Offer>,
+    period: &Period,
+) -> Option<(UnvalidatedOffer<'a>, &'a Over)> {
+    let mut most_balanced = None;
+    let mut most_balanced_diff = f64::MAX;
+    for offer in offers {
+        match &offer.offer_type {
+            OfferType::TotalGoals(p, over) => {
+                if p == period {
+                    let diff = f64::abs(offer.market.prices[0] - offer.market.prices[1]);
+                    if diff < most_balanced_diff {
+                        most_balanced_diff = diff;
+                        most_balanced = Some((offer, over));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    most_balanced.map(|(offer, over)| (UnvalidatedOffer::from(Capture::Borrowed(offer)), over))
 }
 
 #[derive(Debug, Error)]
@@ -135,12 +169,15 @@ impl Model {
         stubs: &[Stub],
         price_bounds: &PriceBounds,
     ) -> Result<(), DerivationError> {
+        let start = Instant::now();
         for stub in stubs {
             debug!("deriving {:?}", stub.offer_type);
             stub.offer_type.validate(&stub.outcomes)?;
             let offer = self.derive_offer(&stub, price_bounds)?;
             self.offers.insert(offer.offer_type.clone(), offer);
         }
+        let elapsed = start.elapsed();
+        debug!("derivation took {elapsed:?}");
         Ok(())
     }
 
@@ -195,13 +232,29 @@ impl Model {
     }
 
     fn ensure_team_requirements(&self, reqs: &Expansions) -> Result<(), UnmetRequirement> {
-        if reqs.requires_team_goal_probs() && self.goal_probs.is_none() {
-            return Err(UnmetRequirement::TeamGoalProbabilities);
+        if reqs.requires_team_goal_probs() {
+            self.require_team_goal_probs()?;
         }
-        if reqs.requires_team_assist_probs() && self.assist_probs.is_none() {
-            return Err(UnmetRequirement::TeamAssistProbabilities);
+        if reqs.requires_team_assist_probs() {
+            self.require_team_assist_probs()?
         }
         Ok(())
+    }
+
+    fn require_team_goal_probs(&self) -> Result<(), UnmetRequirement> {
+        if self.goal_probs.is_none() {
+            Err(UnmetRequirement::TeamGoalProbabilities)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn require_team_assist_probs(&self) -> Result<(), UnmetRequirement> {
+        if self.assist_probs.is_none() {
+            Err(UnmetRequirement::TeamAssistProbabilities)
+        } else {
+            Ok(())
+        }
     }
 
     fn get_or_create_player(&mut self, player: Player) -> &mut PlayerProbs {
