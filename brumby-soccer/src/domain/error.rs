@@ -3,9 +3,7 @@ use brumby::hash_lookup::HashLookup;
 use brumby::probs::SliceExt;
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
-use rustc_hash::FxHashMap;
 use thiserror::Error;
-use crate::interval::PlayerProbs;
 
 mod head_to_head;
 mod total_goals;
@@ -55,10 +53,6 @@ impl OfferType {
             OfferType::HeadToHead(_) => head_to_head::validate_outcomes(self, outcomes),
             _ => Ok(()),
         }
-    }
-
-    pub fn create_outcomes(&self, player_probs: &FxHashMap<Player, PlayerProbs>) {
-        todo!()
     }
 }
 

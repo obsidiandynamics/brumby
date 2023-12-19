@@ -20,6 +20,7 @@ pub mod multinomial;
 pub mod opt;
 pub mod poisson;
 pub mod probs;
+pub mod tables;
 pub mod selection;
 pub mod timed;
 

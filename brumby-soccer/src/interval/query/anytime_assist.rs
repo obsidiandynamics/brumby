@@ -43,7 +43,7 @@ mod tests {
     use assert_float_eq::*;
     use super::*;
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, PlayerProbs, BivariateProbs, TeamProbs, UnivariateProbs};
+    use crate::interval::{explore, Config, PlayerProbs, BivariateProbs, TeamProbs, UnivariateProbs};
 
     fn print_prospects(prospects: &Prospects) {
         for (prospect, prob) in prospects {
@@ -56,7 +56,7 @@ mod tests {
         let alice = Player::Named(Side::Home, "Alice".into());
         let bob = Player::Named(Side::Home, "Bob".into());
         let exploration = explore(
-            &IntervalConfig {
+            &Config {
                 intervals: 1,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs {
@@ -147,7 +147,7 @@ mod tests {
         let alice = Player::Named(Side::Home, "Alice".into());
         let bob = Player::Named(Side::Away, "Bob".into());
         let exploration = explore(
-            &IntervalConfig {
+            &Config {
                 intervals: 1,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs {

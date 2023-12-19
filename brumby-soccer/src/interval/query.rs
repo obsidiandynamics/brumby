@@ -107,14 +107,14 @@ pub fn isolate_set(
 #[cfg(test)]
 mod tests {
     use crate::domain::{Period, Score, Side};
-    use crate::interval::{explore, IntervalConfig, BivariateProbs, TeamProbs, UnivariateProbs};
+    use crate::interval::{explore, Config, BivariateProbs, TeamProbs, UnivariateProbs};
 
     use super::*;
 
     #[test]
     fn isolate_degenerate_case_of_isolate_set() {
         let exploration = explore(
-            &IntervalConfig {
+            &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn logical_implication_is_a_subset() {
         let exploration = explore(
-            &IntervalConfig {
+            &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn impossibility_of_conflicting_outcomes() {
         let exploration = explore(
-            &IntervalConfig {
+            &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },

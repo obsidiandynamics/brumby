@@ -17,7 +17,7 @@ use brumby_soccer::domain::{Offer, OfferType, OutcomeType, Over, Period, Score};
 use brumby_soccer::fit::{away_booksum, home_booksum, ErrorType, FittingErrors};
 use brumby_soccer::interval::query::isolate;
 use brumby_soccer::interval::{
-    explore, BivariateProbs, Expansions, Exploration, IntervalConfig, PlayerProbs, PruneThresholds,
+    explore, BivariateProbs, Expansions, Exploration, Config, PlayerProbs, PruneThresholds,
     TeamProbs, UnivariateProbs,
 };
 use brumby_soccer::{fit, print};
@@ -25,8 +25,8 @@ use brumby_soccer::{fit, print};
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
 const FIRST_GOALSCORER_BOOKSUM: f64 = 1.5;
-const INTERVALS: usize = 18;
-// const MAX_TOTAL_GOALS_HALF: u16 = 4;
+const INTERVALS: u8 = 18;
+const MAX_TOTAL_GOALS_HALF: u16 = 6;
 const MAX_TOTAL_GOALS_FULL: u16 = 8;
 const GOALSCORER_MIN_PROB: f64 = 0.0;
 // const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
@@ -129,16 +129,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         1.0,
     );
 
-    let (ft_search_outcome, lambdas) = fit::fit_scoregrid_full(&ft_h2h, &ft_goals);
+    let (ft_search_outcome, lambdas) = fit::fit_scoregrid_full(&ft_h2h, &ft_goals, INTERVALS, MAX_TOTAL_GOALS_FULL);
     const H1_RATIO: f64 = 0.425;
     println!("*** fitting H1 ***");
     let h1_home_goals_estimate = (lambdas[0] + lambdas[2]) * H1_RATIO;
     let h1_away_goals_estimate = (lambdas[1] + lambdas[2]) * H1_RATIO;
-    let h1_search_outcome = fit::fit_scoregrid_half(h1_home_goals_estimate, h1_away_goals_estimate, &[&h1_h2h, &h1_goals]);
+    let h1_search_outcome = fit::fit_scoregrid_half(h1_home_goals_estimate, h1_away_goals_estimate, &[&h1_h2h, &h1_goals], INTERVALS, MAX_TOTAL_GOALS_HALF);
     println!("*** fitting H2 ***");
     let h2_home_goals_estimate = (lambdas[0] + lambdas[2]) * (1.0 - H1_RATIO);
     let h2_away_goals_estimate = (lambdas[1] + lambdas[2]) * (1.0 - H1_RATIO);
-    let h2_search_outcome = fit::fit_scoregrid_half(h2_home_goals_estimate, h2_away_goals_estimate, &[&h2_h2h, &h2_goals]);
+    let h2_search_outcome = fit::fit_scoregrid_half(h2_home_goals_estimate, h2_away_goals_estimate, &[&h2_h2h, &h2_goals], INTERVALS, MAX_TOTAL_GOALS_HALF);
 
     let mut adj_optimal_h1 = [0.0; 3];
     let mut adj_optimal_h2 = [0.0; 3];
@@ -432,13 +432,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &BivariateProbs::from(adj_optimal_h2.as_slice()),
         &first_gs,
         draw_prob,
+        INTERVALS,
+        MAX_TOTAL_GOALS_FULL
     );
 
     let mut fitted_first_goalscorer_probs = Vec::with_capacity(first_gs.outcomes.len());
     for (player, prob) in &fitted_goalscorer_probs {
         let exploration = explore(
-            &IntervalConfig {
-                intervals: INTERVALS as u8,
+            &Config {
+                intervals: INTERVALS,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
@@ -467,7 +469,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     first_goalscorer: true,
                 },
             },
-            0..INTERVALS as u8,
+            0..INTERVALS,
         );
         let isolated_prob = isolate(
             &OfferType::FirstGoalscorer,
@@ -516,8 +518,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for (player, prob) in &fitted_goalscorer_probs {
         fitted_anytime_goalscorer_outcomes.push(OutcomeType::Player(player.clone()));
         let exploration = explore(
-            &IntervalConfig {
-                intervals: INTERVALS as u8,
+            &Config {
+                intervals: INTERVALS,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
@@ -546,7 +548,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     first_goalscorer: false,
                 },
             },
-            0..INTERVALS as u8,
+            0..INTERVALS,
         );
         let isolated_prob = isolate(
             &OfferType::AnytimeGoalscorer,
@@ -623,6 +625,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &anytime_assist,
         draw_prob,
         anytime_assist.market.fair_booksum(),
+        INTERVALS,
+        MAX_TOTAL_GOALS_FULL
     );
 
     let mut fitted_anytime_assist_outcomes = HashLookup::with_capacity(fitted_assist_probs.len());
@@ -630,8 +634,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for (player, prob) in &fitted_assist_probs {
         fitted_anytime_assist_outcomes.push(OutcomeType::Player(player.clone()));
         let exploration = explore(
-            &IntervalConfig {
-                intervals: INTERVALS as u8,
+            &Config {
+                intervals: INTERVALS,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
@@ -657,7 +661,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     first_goalscorer: false,
                 },
             },
-            0..INTERVALS as u8,
+            0..INTERVALS,
         );
         let isolated_prob = isolate(
             &OfferType::AnytimeAssist,
@@ -739,16 +743,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let fitted_markets = [
-        fitted_h1_h2h,
-        fitted_h1_goals,
-        fitted_h2_h2h,
-        fitted_h2_goals,
-        fitted_ft_h2h,
-        fitted_ft_goals_ou,
-        fitted_ft_correct_score,
-        fitted_first_goalscorer,
-        fitted_anytime_goalscorer,
-        fitted_anytime_assist,
+        &fitted_h1_h2h,
+        &fitted_h1_goals,
+        &fitted_h2_h2h,
+        &fitted_h2_goals,
+        &fitted_ft_h2h,
+        &fitted_ft_goals_ou,
+        &fitted_ft_correct_score,
+        &fitted_first_goalscorer,
+        &fitted_anytime_goalscorer,
+        &fitted_anytime_assist,
     ];
 
     let table_overrounds = print::tabulate_overrounds(&fitted_markets);
@@ -984,8 +988,8 @@ fn fit_offer(offer_type: OfferType, map: &HashMap<OutcomeType, f64>, normal: f64
 
 fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Exploration {
     explore(
-        &IntervalConfig {
-            intervals: INTERVALS as u8,
+        &Config {
+            intervals: INTERVALS,
             team_probs: TeamProbs {
                 h1_goals,
                 h2_goals,
@@ -1008,7 +1012,7 @@ fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Explora
                 first_goalscorer: false,
             },
         },
-        0..INTERVALS as u8,
+        0..INTERVALS,
     )
 }
 

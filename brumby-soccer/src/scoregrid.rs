@@ -6,7 +6,7 @@ use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
 use crate::domain::{OutcomeType, Score, Side};
-use crate::interval::{Expansions, explore, IntervalConfig, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
+use crate::interval::{Expansions, explore, Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
@@ -159,7 +159,7 @@ pub fn from_interval(
 ) {
     assert_eq!(scoregrid.rows(), scoregrid.cols());
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals,
             team_probs: TeamProbs {
                 h1_goals,

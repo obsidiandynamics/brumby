@@ -8,7 +8,7 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
         Period::FirstHalf => Expansions {
             ht_score: true,
             ft_score: false,
-            player_goal_stats: true,
+            player_goal_stats: false,
             player_split_goal_stats: false,
             max_player_assists: 0,
             first_goalscorer: false,
@@ -16,7 +16,7 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
         Period::SecondHalf => Expansions {
             ht_score: true,
             ft_score: true,
-            player_goal_stats: true,
+            player_goal_stats: false,
             player_split_goal_stats: false,
             max_player_assists: 0,
             first_goalscorer: false,

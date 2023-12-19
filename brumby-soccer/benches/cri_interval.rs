@@ -1,12 +1,12 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use brumby_soccer::interval;
-use brumby_soccer::interval::{IntervalConfig, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
+use brumby_soccer::interval::{Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 
 fn criterion_benchmark(c: &mut Criterion) {
     fn run(intervals: u8, max_total_goals: u16) -> usize {
         interval::explore(
-            &IntervalConfig {
+            &Config {
                 intervals,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },

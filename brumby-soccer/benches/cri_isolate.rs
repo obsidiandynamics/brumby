@@ -1,14 +1,14 @@
 use brumby_soccer::domain::{OfferType, OutcomeType, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use brumby_soccer::interval::{explore, Exploration, IntervalConfig, BivariateProbs, PruneThresholds, PlayerProbs, TeamProbs, UnivariateProbs};
+use brumby_soccer::interval::{explore, Exploration, Config, BivariateProbs, PruneThresholds, PlayerProbs, TeamProbs, UnivariateProbs};
 use brumby_soccer::interval::query::isolate;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let player = Player::Named(Side::Home, "Markos".into());
     fn prepare(intervals: u8, max_total_goals: u16, player: Player) -> Exploration {
         explore(
-            &IntervalConfig {
+            &Config {
                 intervals,
                 team_probs: TeamProbs {
                     h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },

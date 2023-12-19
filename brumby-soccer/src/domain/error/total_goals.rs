@@ -10,7 +10,7 @@ pub fn validate_outcomes(
     match offer_type {
         OfferType::TotalGoals(_, over) => {
             error::OutcomesCompleteAssertion {
-                outcomes: &_create_outcomes(over),
+                outcomes: &valid_outcomes(over),
             }
             .check(outcomes, offer_type)?;
             Ok(())
@@ -29,14 +29,14 @@ pub fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), Inval
     }
 }
 
-pub fn create_outcomes(offer_type: &OfferType) -> [OutcomeType; 2] {
-    match offer_type {
-        OfferType::TotalGoals(_, over) => _create_outcomes(over),
-        _ => unreachable!(),
-    }
-}
+// pub fn create_outcomes(offer_type: &OfferType) -> [OutcomeType; 2] {
+//     match offer_type {
+//         OfferType::TotalGoals(_, over) => _create_outcomes(over),
+//         _ => unreachable!(),
+//     }
+// }
 
-fn _create_outcomes(over: &Over) -> [OutcomeType; 2] {
+fn valid_outcomes(over: &Over) -> [OutcomeType; 2] {
     [
         OutcomeType::Over(over.0), OutcomeType::Under(over.0 + 1),
     ]

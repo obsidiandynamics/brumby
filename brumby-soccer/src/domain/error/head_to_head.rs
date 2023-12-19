@@ -10,7 +10,7 @@ pub fn validate_outcomes(
     match offer_type {
         OfferType::HeadToHead(_) => {
             error::OutcomesCompleteAssertion {
-                outcomes: &create_outcomes(),
+                outcomes: &valid_outcomes(),
             }
             .check(outcomes, offer_type)?;
             Ok(())
@@ -29,7 +29,7 @@ pub fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), Inval
     }
 }
 
-pub fn create_outcomes() -> [OutcomeType; 3] {
+fn valid_outcomes() -> [OutcomeType; 3] {
     [
         OutcomeType::Win(Side::Home),
         OutcomeType::Win(Side::Away),

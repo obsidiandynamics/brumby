@@ -25,7 +25,7 @@ fn assert_expected_prospects(expected: &[(Prospect, f64)], actual: &Prospects) {
 #[test]
 fn explore_2x2() {
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 2,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -241,7 +241,7 @@ fn explore_2x2() {
 #[test]
 fn explore_2x2_pruned_2_goals() {
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 2,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -383,7 +383,7 @@ fn explore_2x2_pruned_2_goals() {
 #[test]
 fn explore_3x3() {
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 3,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -405,7 +405,7 @@ fn explore_3x3() {
 #[test]
 fn explore_4x4() {
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 4,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -428,7 +428,7 @@ fn explore_4x4() {
 fn explore_1x1_player_goal() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 1,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -609,7 +609,7 @@ fn explore_1x1_player_goal() {
 fn explore_2x2_player_goal() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 2,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
@@ -655,7 +655,7 @@ fn explore_2x2_player_goal() {
 fn explore_2x2_player_goal_asymmetric() {
     let player = Player::Named(Side::Home, "Markos".into());
     let exploration = explore(
-        &IntervalConfig {
+        &Config {
             intervals: 2,
             team_probs: TeamProbs {
                 h1_goals: BivariateProbs { home: 0.3, away: 0.2, common: 0.1 },
