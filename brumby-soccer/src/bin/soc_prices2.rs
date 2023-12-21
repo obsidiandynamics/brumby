@@ -381,7 +381,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let anytime_gs = fit_offer(OfferType::AnytimeGoalscorer, &anytime_gs, 1.0);
 
     // println!("scoregrid:\n{}sum: {}", scoregrid.verbose(), scoregrid.flatten().sum());
-    let draw_prob = isolate(
+    let nil_all_draw_prob = isolate(
         &OfferType::CorrectScore(Period::FullTime),
         &OutcomeType::Score(Score { home: 0, away: 0 }),
         &exploration.prospects,
@@ -427,11 +427,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // }
     // let elapsed = start.elapsed();
     // println!("player fitting took {elapsed:?}");
+
+    debug!("nil-all draw prob: {nil_all_draw_prob}");
     let fitted_goalscorer_probs = fit::fit_first_goalscorer_all(
         &BivariateProbs::from(adj_optimal_h1.as_slice()),
         &BivariateProbs::from(adj_optimal_h2.as_slice()),
         &first_gs,
-        draw_prob,
+        nil_all_draw_prob,
         INTERVALS,
         MAX_TOTAL_GOALS_FULL
     );
@@ -559,7 +561,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fitted_anytime_goalscorer_probs.push(isolated_prob);
     }
     fitted_anytime_goalscorer_outcomes.push(OutcomeType::None);
-    fitted_anytime_goalscorer_probs.push(draw_prob);
+    fitted_anytime_goalscorer_probs.push(nil_all_draw_prob);
 
     let anytime_goalscorer_overround = Overround {
         method: OVERROUND_METHOD,
@@ -623,7 +625,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &BivariateProbs::from(adj_optimal_h2.as_slice()),
         &assist_probs,
         &anytime_assist,
-        draw_prob,
+        nil_all_draw_prob,
         anytime_assist.market.fair_booksum(),
         INTERVALS,
         MAX_TOTAL_GOALS_FULL
@@ -677,7 +679,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         value: anytime_assist.market.offered_booksum() / fitted_anytime_assist_probs.sum(),
     };
     fitted_anytime_assist_outcomes.push(OutcomeType::None);
-    fitted_anytime_assist_probs.push(draw_prob);
+    fitted_anytime_assist_probs.push(nil_all_draw_prob);
 
     let fitted_anytime_assist = Offer {
         offer_type: OfferType::AnytimeAssist,

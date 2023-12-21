@@ -75,7 +75,7 @@ impl<'a> From<&'a [f64]> for BivariateProbs {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expansions {
     pub ht_score: bool,
     pub ft_score: bool,
@@ -132,7 +132,7 @@ impl Default for Expansions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PruneThresholds {
     pub max_total_goals: u16,
     pub min_prob: f64,
@@ -146,7 +146,7 @@ impl Default for PruneThresholds {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TeamProbs {
     pub h1_goals: BivariateProbs,
     pub h2_goals: BivariateProbs,

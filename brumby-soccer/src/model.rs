@@ -3,16 +3,16 @@ use std::error::Error;
 use std::time::Instant;
 
 use anyhow::anyhow;
+use brumby::capture::Capture;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::debug;
-use brumby::capture::Capture;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
 
-use crate::domain::error::{InvalidOffer, InvalidOutcome, UnvalidatedOffer};
+use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
 use crate::interval;
 use crate::interval::query::{isolate, requirements};
@@ -21,6 +21,7 @@ use crate::interval::{
     UnivariateProbs,
 };
 
+pub mod player_assist_fitter;
 pub mod player_goal_fitter;
 pub mod score_fitter;
 
@@ -28,6 +29,9 @@ pub mod score_fitter;
 pub enum FitError {
     #[error("{0}")]
     MissingOffer(#[from] MissingOffer),
+
+    #[error("{0}")]
+    MissingOutcome(#[from] MissingOutcome),
 
     #[error("{0}")]
     UnmetRequirement(#[from] UnmetRequirement),
@@ -45,8 +49,14 @@ pub enum MissingOffer {
     Category(OfferCategory),
 }
 
-fn get_offer<'a>(offers: &'a FxHashMap<OfferType, Offer>, offer_type: &OfferType) -> Result<UnvalidatedOffer<'a>, MissingOffer> {
-    offers.get(offer_type).ok_or_else(|| MissingOffer::Type(offer_type.clone())).map(|offer| UnvalidatedOffer::from(Capture::Borrowed(offer)))
+fn get_offer<'a>(
+    offers: &'a FxHashMap<OfferType, Offer>,
+    offer_type: &OfferType,
+) -> Result<UnvalidatedOffer<'a>, MissingOffer> {
+    offers
+        .get(offer_type)
+        .ok_or_else(|| MissingOffer::Type(offer_type.clone()))
+        .map(|offer| UnvalidatedOffer::from(Capture::Borrowed(offer)))
 }
 
 fn most_balanced_goals<'a>(
@@ -56,17 +66,14 @@ fn most_balanced_goals<'a>(
     let mut most_balanced = None;
     let mut most_balanced_diff = f64::MAX;
     for offer in offers {
-        match &offer.offer_type {
-            OfferType::TotalGoals(p, over) => {
-                if p == period {
-                    let diff = f64::abs(offer.market.prices[0] - offer.market.prices[1]);
-                    if diff < most_balanced_diff {
-                        most_balanced_diff = diff;
-                        most_balanced = Some((offer, over));
-                    }
+        if let OfferType::TotalGoals(p, over) = &offer.offer_type {
+            if p == period {
+                let diff = f64::abs(offer.market.prices[0] - offer.market.prices[1]);
+                if diff < most_balanced_diff {
+                    most_balanced_diff = diff;
+                    most_balanced = Some((offer, over));
                 }
             }
-            _ => {}
         }
     }
     most_balanced.map(|(offer, over)| (UnvalidatedOffer::from(Capture::Borrowed(offer)), over))
@@ -142,7 +149,6 @@ impl Config {
         const MIN_INTERVALS: u8 = 4;
         if self.intervals < MIN_INTERVALS {
             return Err(anyhow!("number of intervals cannot be less than {MIN_INTERVALS}").into());
-            //  ValidationError::err(&*format!("number of intervals cannot be less than {MIN_INTERVALS}"))?;
         }
 
         const MIN_MAX_TOTAL_GOALS: u16 = 6;
@@ -173,11 +179,18 @@ impl Model {
         for stub in stubs {
             debug!("deriving {:?}", stub.offer_type);
             stub.offer_type.validate(&stub.outcomes)?;
-            let offer = self.derive_offer(&stub, price_bounds)?;
+            let offer = self.derive_offer(stub, price_bounds)?;
             self.offers.insert(offer.offer_type.clone(), offer);
         }
         let elapsed = start.elapsed();
-        debug!("derivation took {elapsed:?}");
+        debug!(
+            "derivation took {elapsed:?} for {} offers ({} outcomes)",
+            self.offers.len(),
+            self.offers
+                .values()
+                .map(|offer| offer.outcomes.len())
+                .sum::<usize>()
+        );
         Ok(())
     }
 
@@ -205,9 +218,50 @@ impl Model {
             min_prob: 0.0,
         };
 
-        if requires_player_goal_probs || requires_player_assist_probs {
+        let offer = if requires_player_goal_probs || requires_player_assist_probs {
             // requires player probabilities — must be explored individually for each outcome
-            todo!()
+            let mut probs = Vec::with_capacity(stub.outcomes.len());
+            for outcome in stub.outcomes.items() {
+                let player_probs = match outcome.get_player() {
+                    None => vec![],
+                    Some(player) => {
+                        let mut player_probs = PlayerProbs::default();
+                        if requires_player_goal_probs {
+                            player_probs.goal = Some(self.require_player_goal_prob(player)?);
+                        }
+                        if requires_player_assist_probs {
+                            player_probs.assist = Some(self.require_player_assist_prob(player)?);
+                        }
+                        vec![(player.clone(), player_probs)]
+                    }
+                };
+
+                let exploration = explore(
+                    &interval::Config {
+                        intervals: self.config.intervals,
+                        team_probs: team_probs.clone(),
+                        player_probs,
+                        prune_thresholds: prune_thresholds.clone(),
+                        expansions: reqs.clone(),
+                    },
+                    0..self.config.intervals,
+                );
+
+                let prob = isolate(
+                    &stub.offer_type,
+                    outcome,
+                    &exploration.prospects,
+                    &exploration.player_lookup,
+                );
+                probs.push(prob);
+            }
+            probs.normalise(stub.normal);
+            let market = Market::frame(&stub.overround, probs, price_bounds);
+            Offer {
+                offer_type: stub.offer_type.clone(),
+                outcomes: stub.outcomes.clone(),
+                market,
+            }
         } else {
             // doesn't require player probabilities — can be explored as a whole
             let exploration = explore(
@@ -220,15 +274,16 @@ impl Model {
                 },
                 0..self.config.intervals,
             );
-            Ok(frame_prices_from_exploration(
+            frame_prices_from_exploration(
                 &exploration,
                 &stub.offer_type,
-                &stub.outcomes.items(),
+                stub.outcomes.items(),
                 stub.normal,
                 &stub.overround,
                 price_bounds,
-            ))
-        }
+            )
+        };
+        Ok(offer)
     }
 
     fn ensure_team_requirements(&self, reqs: &Expansions) -> Result<(), UnmetRequirement> {
@@ -236,25 +291,21 @@ impl Model {
             self.require_team_goal_probs()?;
         }
         if reqs.requires_team_assist_probs() {
-            self.require_team_assist_probs()?
+            self.require_team_assist_probs()?;
         }
         Ok(())
     }
 
-    fn require_team_goal_probs(&self) -> Result<(), UnmetRequirement> {
-        if self.goal_probs.is_none() {
-            Err(UnmetRequirement::TeamGoalProbabilities)
-        } else {
-            Ok(())
-        }
+    fn require_team_goal_probs(&self) -> Result<&GoalProbs, UnmetRequirement> {
+        self.goal_probs
+            .as_ref()
+            .ok_or(UnmetRequirement::TeamGoalProbabilities)
     }
 
-    fn require_team_assist_probs(&self) -> Result<(), UnmetRequirement> {
-        if self.assist_probs.is_none() {
-            Err(UnmetRequirement::TeamAssistProbabilities)
-        } else {
-            Ok(())
-        }
+    fn require_team_assist_probs(&self) -> Result<&UnivariateProbs, UnmetRequirement> {
+        self.assist_probs
+            .as_ref()
+            .ok_or(UnmetRequirement::TeamAssistProbabilities)
     }
 
     fn get_or_create_player(&mut self, player: Player) -> &mut PlayerProbs {
@@ -262,10 +313,20 @@ impl Model {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(PlayerProbs::default()),
         }
-        // if !self.player_probs.contains_key(player) {
-        //     self.player_probs.insert(player.clone(), PlayerProbs::default());
-        // }
-        // self.player_probs.get_mut(player).unwrap()
+    }
+
+    fn require_player_goal_prob(&self, player: &Player) -> Result<f64, UnmetRequirement> {
+        self.player_probs
+            .get(player)
+            .and_then(|player_probs| player_probs.goal)
+            .ok_or_else(|| UnmetRequirement::PlayerGoalProbability(player.clone()))
+    }
+
+    fn require_player_assist_prob(&self, player: &Player) -> Result<f64, UnmetRequirement> {
+        self.player_probs
+            .get(player)
+            .and_then(|player_probs| player_probs.assist)
+            .ok_or_else(|| UnmetRequirement::PlayerAssistProbability(player.clone()))
     }
 }
 

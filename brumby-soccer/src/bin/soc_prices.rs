@@ -8,6 +8,8 @@ use clap::Parser;
 use rustc_hash::FxHashMap;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
+use stanza::style::Styles;
+use stanza::table::{Cell, Content, Row, Table};
 use tracing::{debug, info};
 
 use brumby::hash_lookup::HashLookup;
@@ -16,6 +18,8 @@ use brumby::tables;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, OutcomeType};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
+use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
+use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
 use brumby_soccer::model::{score_fitter, Model, Stub};
 use brumby_soccer::{fit, model, print};
@@ -95,7 +99,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 | OfferType::PlayerShotsOnTarget(_)
                 | OfferType::AnytimeAssist => {
                     let implied_booksum = implied_booksum(prices.values());
-                    let expected_overround = prices.len() as f64 * INCREMENTAL_OVERROUND;
+                    let expected_overround = 1.0 + prices.len() as f64 * INCREMENTAL_OVERROUND;
                     implied_booksum / expected_overround
                 }
             };
@@ -112,12 +116,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let score_fitter = ScoreFitter::try_from(score_fitter::Config::default())?;
     score_fitter.fit(&mut model, &sample_offers)?;
 
+    let player_goal_fitter = PlayerGoalFitter;
+    player_goal_fitter.fit(&mut model, &sample_offers)?;
+
+    let player_assist_fitter = PlayerAssistFitter;
+    player_assist_fitter.fit(&mut model, &sample_offers)?;
+
     let stubs = sample_offers
         .iter()
         .filter(|(offer_type, _)| {
             matches!(
                 offer_type,
-                OfferType::HeadToHead(_) | OfferType::TotalGoals(_, _) | OfferType::CorrectScore(_)
+                OfferType::HeadToHead(_)
+                    | OfferType::TotalGoals(_, _)
+                    | OfferType::CorrectScore(_)
+                    | OfferType::FirstGoalscorer
+                    | OfferType::AnytimeGoalscorer
+                    | OfferType::AnytimeAssist
             )
         })
         .map(|(_, offer)| Stub {
@@ -128,6 +143,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .collect::<Vec<_>>();
     model.derive(&stubs, &SINGLE_PRICE_BOUNDS)?;
+
+    {
+        let table = Table::default().with_rows({
+            const PER_ROW: usize = 4;
+            let sorted = sort_tuples(model.offers());
+            let mut rows = vec![];
+            loop {
+                let row = sorted
+                    .iter()
+                    .skip(rows.len() * PER_ROW)
+                    .take(PER_ROW)
+                    .map(|(_, offer)| {
+                        let header = format!(
+                            "{:?}\nΣ={:.3}, σ={:.3}, n={}\n",
+                            offer.offer_type,
+                            offer.market.fair_booksum(),
+                            offer.market.offered_booksum(),
+                            offer.market.probs.len(),
+                        );
+                        let nested = print::tabulate_offer(offer);
+                        Cell::from(Content::Composite(vec![header.into(), nested.into()]))
+                    })
+                    .collect::<Vec<_>>();
+                if row.is_empty() {
+                    break;
+                }
+                rows.push(Row::new(Styles::default(), row))
+            }
+            rows
+        });
+        info!("Derived prices:\n{}", Console::default().render(&table));
+    }
 
     {
         let fitting_errors = model

@@ -1,23 +1,23 @@
-use std::collections::BTreeMap;
 use std::time::Instant;
+
 use tracing::debug;
 
+use brumby::{factorial, poisson};
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::opt::{
-    hypergrid_search, univariate_descent, HypergridSearchConfig, HypergridSearchOutcome,
+    hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent,
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
-use brumby::{factorial, poisson};
 
-use crate::domain::Player::Named;
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
-use crate::interval::query::isolate;
+use crate::domain::Player::Named;
 use crate::interval::{
-    explore, BivariateProbs, Expansions, Config, PlayerProbs, PruneThresholds, TeamProbs,
+    BivariateProbs, Config, Expansions, explore, PlayerProbs, PruneThresholds, TeamProbs,
     UnivariateProbs,
 };
+use crate::interval::query::isolate;
 use crate::scoregrid;
 
 // const INTERVALS: usize = 18;
@@ -269,24 +269,25 @@ pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_t
     (search_outcome, lambdas)
 }
 
-pub fn fit_first_goalscorer_all(
-    h1_probs: &BivariateProbs,
-    h2_probs: &BivariateProbs,
-    first_gs: &Offer,
-    draw_prob: f64,
+pub fn fit_first_goalscorer_all<'a>(
+    h1_probs: &'a BivariateProbs,
+    h2_probs: &'a BivariateProbs,
+    first_goalscorer: &'a Offer,
+    nil_all_draw_prob: f64,
     intervals: u8,
     max_total_goals: u16
-) -> BTreeMap<Player, f64> {
+) -> Vec<(Player, f64)> {
     let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
     let common_rate = (h1_probs.common + h2_probs.common) / 2.0;
     let rate_sum = home_rate + away_rate + common_rate;
-    let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
-    let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob);
+    let home_ratio = (home_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob);
+    let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob);
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
-    let mut fitted_goalscorer_probs = BTreeMap::new();
     let start = Instant::now();
-    for (index, outcome) in first_gs.outcomes.items().iter().enumerate() {
+    let probs = first_goalscorer.outcomes.items().iter().enumerate()
+        .filter(|(_, outcome)| matches!(outcome, OutcomeType::Player(_)))
+        .map(|(index, outcome)| {
         match outcome {
             OutcomeType::Player(player) => {
                 let side_ratio = match player {
@@ -296,26 +297,26 @@ pub fn fit_first_goalscorer_all(
                     },
                     Player::Other => unreachable!(),
                 };
-                let init_estimate = first_gs.market.probs[index] / side_ratio;
+                let init_estimate = first_goalscorer.market.probs[index] / side_ratio;
                 let player_search_outcome = fit_first_goalscorer_one(
                     h1_probs,
                     h2_probs,
                     player,
                     init_estimate,
-                    first_gs.market.probs[index],
+                    first_goalscorer.market.probs[index],
                     intervals,
                     max_total_goals
                 );
-                // println!("goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", first_gs.market.probs[index]);
-                fitted_goalscorer_probs.insert(player.clone(), player_search_outcome.optimal_value);
+                println!("goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", first_goalscorer.market.probs[index]);
+                (player.clone(), player_search_outcome.optimal_value)
             }
-            OutcomeType::None => {}
             _ => unreachable!(),
         }
-    }
+    })
+    .collect::<Vec<_>>();
     let elapsed = start.elapsed();
-    println!("first goalscorer fitting took {elapsed:?}");
-    fitted_goalscorer_probs
+    debug!("first goalscorer fitting took {elapsed:?}");
+    probs
 }
 
 fn fit_first_goalscorer_one(
@@ -385,23 +386,22 @@ pub fn fit_anytime_assist_all(
     h2_probs: &BivariateProbs,
     assist_probs: &UnivariateProbs,
     anytime_assist: &Offer,
-    draw_prob: f64,
+    nil_all_draw_prob: f64,
     booksum: f64,
     intervals: u8,
     max_total_goals: u16
-) -> BTreeMap<Player, f64> {
+) -> Vec<(Player, f64)> {
     let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
     let common_rate = (h1_probs.common + h2_probs.common) / 2.0;
     let rate_sum = home_rate + away_rate + common_rate;
     let home_ratio =
-        (home_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.home;
+        (home_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob) * assist_probs.home;
     let away_ratio =
-        (away_rate + common_rate / 2.0) / rate_sum * (1.0 - draw_prob) * assist_probs.away;
+        (away_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob) * assist_probs.away;
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
-    let mut fitted_assist_probs = BTreeMap::new();
     let start = Instant::now();
-    for (index, outcome) in anytime_assist.outcomes.items().iter().enumerate() {
+    let probs = anytime_assist.outcomes.items().iter().enumerate().map(|(index, outcome)| {
         match outcome {
             OutcomeType::Player(player) => {
                 let side_ratio = match player {
@@ -423,15 +423,14 @@ pub fn fit_anytime_assist_all(
                     max_total_goals
                 );
                 // println!("assist for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", anytime_assist.market.probs[index]);
-                fitted_assist_probs.insert(player.clone(), player_search_outcome.optimal_value);
+                (player.clone(), player_search_outcome.optimal_value)
             }
-            OutcomeType::None => {}
             _ => unreachable!(),
         }
-    }
+    }).collect::<Vec<_>>();
     let elapsed = start.elapsed();
-    println!("anytime assist fitting took {elapsed:?}");
-    fitted_assist_probs
+    debug!("anytime assist fitting took {elapsed:?}");
+    probs
 }
 
 fn fit_anytime_assist_one(

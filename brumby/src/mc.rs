@@ -9,7 +9,7 @@ use crate::selection::{Selection, Selections};
 
 pub struct MonteCarloEngine<'a, R: Rand> {
     trials: u64,
-    probs: Option<Capture<'a, Matrix<f64>, Matrix<f64>>>,
+    probs: Option<Capture<'a, Matrix<f64>>>,
     podium: Option<CaptureMut<'a, Vec<usize>, [usize]>>,
     bitmap: Option<CaptureMut<'a, Vec<bool>, [bool]>>,
     totals: Option<CaptureMut<'a, Vec<f64>, [f64]>>,
@@ -53,16 +53,16 @@ impl<'a, R: Rand> MonteCarloEngine<'a, R> {
     }
 
     #[must_use]
-    pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) -> Self {
+    pub fn with_probs(mut self, probs: Capture<'a, Matrix<f64>>) -> Self {
         self.probs = Some(probs);
         self
     }
 
-    pub fn set_probs(&mut self, probs: Capture<'a, Matrix<f64>, Matrix<f64>>) {
+    pub fn set_probs(&mut self, probs: Capture<'a, Matrix<f64>>) {
         self.probs = Some(probs);
     }
 
-    pub fn probs(&self) -> Option<&Capture<'a, Matrix<f64>, Matrix<f64>>> {
+    pub fn probs(&self) -> Option<&Capture<'a, Matrix<f64>>> {
         self.probs.as_ref()
     }
 

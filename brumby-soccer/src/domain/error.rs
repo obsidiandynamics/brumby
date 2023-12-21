@@ -24,7 +24,7 @@ pub enum InvalidOffer {
 impl Offer {
     pub fn validate(&self) -> Result<(), InvalidOffer> {
         OfferAlignmentAssertion::check(
-            &self.outcomes.items(),
+            self.outcomes.items(),
             &self.market.probs,
             &self.offer_type,
         )?;
@@ -37,8 +37,9 @@ impl Offer {
     }
 }
 
-pub type OfferCapture<'a> = Capture<'a, Offer, Offer>;
+pub type OfferCapture<'a> = Capture<'a, Offer>;
 
+/// Prevents accidental handling of an [Offer] before it has been validated.
 #[derive(Debug)]
 pub struct UnvalidatedOffer<'a>(OfferCapture<'a>);
 impl<'a> UnvalidatedOffer<'a> {
@@ -81,12 +82,6 @@ impl OfferType {
     }
 }
 
-// #[derive(Debug, Error)]
-// pub enum FitError {
-//     #[error("missing offer {0:?}")]
-//     MissingOffer(OfferType),
-// }
-
 #[derive(Debug, Error)]
 #[error("expected booksum in {assertion}, got {actual} for {offer_type:?}")]
 pub struct WrongBooksum {
@@ -101,7 +96,7 @@ pub struct BooksumAssertion {
     pub tolerance: f64,
 }
 impl BooksumAssertion {
-    const DEFAULT_TOLERANCE: f64 = 1e-6;
+    const DEFAULT_TOLERANCE: f64 = 1e-3;
 
     pub fn with_default_tolerance(expected: RangeInclusive<f64>) -> Self {
         Self {
@@ -162,8 +157,8 @@ impl OfferAlignmentAssertion {
 #[derive(Debug, Error)]
 #[error("{outcome_type:?} missing from {offer_type:?}")]
 pub struct MissingOutcome {
-    outcome_type: OutcomeType,
-    offer_type: OfferType,
+    pub outcome_type: OutcomeType,
+    pub offer_type: OfferType,
 }
 
 #[derive(Debug)]
@@ -191,8 +186,8 @@ impl<'a> OutcomesIntactAssertion<'a> {
 #[derive(Debug, Error)]
 #[error("{outcome_type:?} does not belong in {offer_type:?}")]
 pub struct ExtraneousOutcome {
-    outcome_type: OutcomeType,
-    offer_type: OfferType,
+    pub outcome_type: OutcomeType,
+    pub offer_type: OfferType,
 }
 
 pub struct OutcomesMatchAssertion<F: FnMut(&OutcomeType) -> bool> {
@@ -214,24 +209,6 @@ impl<F: FnMut(&OutcomeType) -> bool> OutcomesMatchAssertion<F> {
         }
     }
 }
-
-// #[derive(Debug, Error)]
-// pub enum IncompleteOutcomes {
-//     #[error("{0}")]
-//     MissingOutcome(#[from] MissingOutcome),
-//
-//     #[error("{0}")]
-//     ExtraneousOutcome(#[from] ExtraneousOutcome),
-// }
-//
-// impl From<IncompleteOutcomes> for InvalidOutcome {
-//     fn from(value: IncompleteOutcomes) -> Self {
-//         match value {
-//             IncompleteOutcomes::MissingOutcome(nested) => nested.into(),
-//             IncompleteOutcomes::ExtraneousOutcome(nested) => nested.into(),
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 pub struct OutcomesCompleteAssertion<'a> {

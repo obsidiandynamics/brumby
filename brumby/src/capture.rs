@@ -5,7 +5,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, PartialEq)]
-pub enum Capture<'a, W: Borrow<B>, B: ?Sized> {
+pub enum Capture<'a, W: Borrow<B>, B: ?Sized = W> {
     Owned(W),
     Borrowed(&'a B),
 }
@@ -43,7 +43,7 @@ impl<'a, B: ?Sized + ToOwned> Clone for Capture<'a, B::Owned, B> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum CaptureMut<'a, W: BorrowMut<B>, B: ?Sized> {
+pub enum CaptureMut<'a, W: BorrowMut<B>, B: ?Sized = W> {
     Owned(W),
     Borrowed(&'a mut B),
 }

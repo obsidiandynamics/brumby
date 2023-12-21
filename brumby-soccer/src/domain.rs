@@ -101,6 +101,14 @@ pub enum OutcomeType {
     Player(Player),
     None,
 }
+impl OutcomeType {
+    pub fn get_player(&self) -> Option<&Player> {
+        match self {
+            OutcomeType::Player(player) => Some(player),
+            _ => None
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Offer {
@@ -111,5 +119,9 @@ pub struct Offer {
 impl Offer {
     pub fn filter_outcomes_with_probs<F>(&self, filter: F) -> Filter<Zip<Iter<OutcomeType>, Iter<f64>>, F> where F: FnMut(&(&OutcomeType, &f64)) -> bool{
         self.outcomes.items().iter().zip(self.market.probs.iter()).filter(filter)
+    }
+    
+    pub fn get_probability(&self, outcome: &OutcomeType) -> Option<f64> {
+        self.outcomes.index_of(outcome).map(|index| self.market.probs[index])
     }
 }

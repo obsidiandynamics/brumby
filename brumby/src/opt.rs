@@ -94,7 +94,7 @@ pub struct HypergridSearchConfig<'a> {
 }
 impl HypergridSearchConfig<'_> {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
-        if self.max_steps <= 0 {
+        if self.max_steps == 0 {
             bail!("at least one step must be specified")
         }
         if self.acceptable_residual < 0.0 {

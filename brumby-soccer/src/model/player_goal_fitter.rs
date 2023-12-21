@@ -1,24 +1,42 @@
 use rustc_hash::FxHashMap;
-use crate::domain::{Offer, OfferType};
-use crate::domain::error::OfferCapture;
-use crate::fit;
-use crate::interval::BivariateProbs;
-use crate::model::{FitError, get_offer, Model};
+use tracing::debug;
 
-pub struct PlayerAssistFitter;
-impl PlayerAssistFitter {
-    pub fn fit(&self, model: &mut Model, offers: &FxHashMap<OfferType, Offer>) -> Result<(), FitError> {
-        model.require_team_goal_probs()?;
-        let first_gs = OfferCapture::try_from(get_offer(offers, &OfferType::FirstGoalscorer)?)?;
-        first_gs.validate()?;
-        // let fitted_goalscorer_probs = fit::fit_first_goalscorer_all(
-        //     &BivariateProbs::from(adj_optimal_h1.as_slice()),
-        //     &BivariateProbs::from(adj_optimal_h2.as_slice()),
-        //     &first_gs,
-        //     draw_prob,
-        //     INTERVALS,
-        //     MAX_TOTAL_GOALS_FULL
-        // );
+use crate::domain::error::{MissingOutcome, OfferCapture};
+use crate::domain::{Offer, OfferType, OutcomeType};
+use crate::fit;
+use crate::model::{get_offer, FitError, Model};
+
+pub struct PlayerGoalFitter;
+impl PlayerGoalFitter {
+    pub fn fit(
+        &self,
+        model: &mut Model,
+        offers: &FxHashMap<OfferType, Offer>,
+    ) -> Result<(), FitError> {
+        let goal_probs = model.require_team_goal_probs()?;
+        let first_goalscorer =
+            OfferCapture::try_from(get_offer(offers, &OfferType::FirstGoalscorer)?)?;
+        let nil_all_draw_prob =
+            first_goalscorer
+                .get_probability(&OutcomeType::None)
+                .ok_or(MissingOutcome {
+                    offer_type: OfferType::FirstGoalscorer,
+                    outcome_type: OutcomeType::None,
+                })?;
+        debug!("nil-all draw prob: {nil_all_draw_prob}");
+
+        let fitted_goalscorer_probs = fit::fit_first_goalscorer_all(
+            &goal_probs.h1,
+            &goal_probs.h2,
+            &first_goalscorer,
+            nil_all_draw_prob,
+            model.config.intervals,
+            model.config.max_total_goals,
+        );
+
+        for (player, player_goal_prob) in fitted_goalscorer_probs {
+            model.get_or_create_player(player).goal = Some(player_goal_prob);
+        }
 
         Ok(())
     }

@@ -74,7 +74,7 @@ mod tests {
             market: Market::frame(&Overround::fair(), vec![0.4, 0.5], &PRICE_BOUNDS),
         };
         assert_eq!(
-            "expected booksum in 1.0..=1.0 ± 0.000001, got 0.9 for TotalGoals(FullTime, Over(2))",
+            "expected booksum in 1.0..=1.0 ± 0.001, got 0.9 for TotalGoals(FullTime, Over(2))",
             offer.validate().unwrap_err().to_string()
         );
     }
