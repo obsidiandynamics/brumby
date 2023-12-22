@@ -465,7 +465,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: false,
-                    player_goal_stats: false,
+                    max_player_goals: 0,
                     player_split_goal_stats: false,
                     max_player_assists: 0,
                     first_goalscorer: true,
@@ -544,7 +544,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: false,
-                    player_goal_stats: true,
+                    max_player_goals: u8::MAX,
                     player_split_goal_stats: false,
                     max_player_assists: 0,
                     first_goalscorer: false,
@@ -657,7 +657,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: false,
-                    player_goal_stats: false,
+                    max_player_goals: 0,
                     player_split_goal_stats: false,
                     max_player_assists: 1,
                     first_goalscorer: false,
@@ -1008,7 +1008,7 @@ fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Explora
             expansions: Expansions {
                 ht_score: true,
                 ft_score: true,
-                player_goal_stats: false,
+                max_player_goals: 0,
                 player_split_goal_stats: false,
                 max_player_assists: 0,
                 first_goalscorer: false,

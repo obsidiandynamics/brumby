@@ -126,7 +126,7 @@ mod tests {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: true,
-                    player_goal_stats: true,
+                    max_player_goals: u8::MAX,
                     player_split_goal_stats: false,
                     max_player_assists: 0,
                     first_goalscorer: false,
@@ -168,7 +168,7 @@ mod tests {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: true,
-                    player_goal_stats: true,
+                    max_player_goals: u8::MAX,
                     player_split_goal_stats: false,
                     max_player_assists: 0,
                     first_goalscorer: false,
@@ -230,7 +230,7 @@ mod tests {
                 expansions: Expansions {
                     ht_score: false,
                     ft_score: true,
-                    player_goal_stats: true,
+                    max_player_goals: u8::MAX,
                     player_split_goal_stats: false,
                     max_player_assists: 0,
                     first_goalscorer: false,

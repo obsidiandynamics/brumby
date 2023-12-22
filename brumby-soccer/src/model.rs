@@ -4,6 +4,7 @@ use std::ops::Range;
 use std::time::Instant;
 
 use anyhow::anyhow;
+use bincode::Encode;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::debug;
@@ -13,20 +14,20 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
 
-use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
 use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
+use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
 use crate::interval;
+use crate::interval::query::{isolate, requirements};
 use crate::interval::{
-    BivariateProbs, Expansions, Exploration, explore, PlayerProbs, PruneThresholds, TeamProbs,
+    explore, BivariateProbs, Expansions, Exploration, PlayerProbs, PruneThresholds, TeamProbs,
     UnivariateProbs,
 };
-use crate::interval::query::{isolate, requirements};
 use crate::model::cache_stats::CacheStats;
 
+mod cache_stats;
 pub mod player_assist_fitter;
 pub mod player_goal_fitter;
 pub mod score_fitter;
-mod cache_stats;
 
 #[derive(Debug, Error)]
 pub enum FitError {
@@ -182,9 +183,15 @@ impl Model {
         let mut cache = FxHashMap::default();
         let mut cache_stats = CacheStats::default();
         for stub in stubs {
-            debug!("deriving {:?}", stub.offer_type);
+            debug!(
+                "deriving {:?} ({} outcomes)",
+                stub.offer_type,
+                stub.outcomes.len()
+            );
             stub.offer_type.validate(&stub.outcomes)?;
+            let start = Instant::now();
             let (offer, derive_cache_stats) = self.derive_offer(stub, price_bounds, &mut cache)?;
+            debug!("... took {:?}, {derive_cache_stats:?}", start.elapsed());
             cache_stats += derive_cache_stats;
             self.offers.insert(offer.offer_type.clone(), offer);
         }
@@ -245,14 +252,16 @@ impl Model {
                 };
 
                 let (exploration, cache_hit) = explore_cached(
-                    interval::Config {
-                        intervals: self.config.intervals,
-                        team_probs: team_probs.clone(),
-                        player_probs,
-                        prune_thresholds: prune_thresholds.clone(),
-                        expansions: reqs.clone(),
+                    CacheableIntervalArgs {
+                        config: interval::Config {
+                            intervals: self.config.intervals,
+                            team_probs: team_probs.clone(),
+                            player_probs,
+                            prune_thresholds: prune_thresholds.clone(),
+                            expansions: reqs.clone(),
+                        },
+                        include_intervals: 0..self.config.intervals,
                     },
-                    0..self.config.intervals,
                     cache,
                 );
                 cache_stats += cache_hit;
@@ -267,22 +276,27 @@ impl Model {
             }
             probs.normalise(stub.normal);
             let market = Market::frame(&stub.overround, probs, price_bounds);
-            (Offer {
-                offer_type: stub.offer_type.clone(),
-                outcomes: stub.outcomes.clone(),
-                market,
-            }, cache_stats)
+            (
+                Offer {
+                    offer_type: stub.offer_type.clone(),
+                    outcomes: stub.outcomes.clone(),
+                    market,
+                },
+                cache_stats,
+            )
         } else {
             // doesn't require player probabilities — can be explored as a whole
             let (exploration, cache_hit) = explore_cached(
-                interval::Config {
-                    intervals: self.config.intervals,
-                    team_probs,
-                    player_probs: vec![],
-                    prune_thresholds,
-                    expansions: reqs,
+                CacheableIntervalArgs {
+                    config: interval::Config {
+                        intervals: self.config.intervals,
+                        team_probs,
+                        player_probs: vec![],
+                        prune_thresholds,
+                        expansions: reqs,
+                    },
+                    include_intervals: 0..self.config.intervals,
                 },
-                0..self.config.intervals,
                 cache,
             );
 
@@ -358,16 +372,21 @@ impl TryFrom<Config> for Model {
     }
 }
 
-fn explore_cached(
+#[derive(Debug, Encode)]
+struct CacheableIntervalArgs {
     config: interval::Config,
     include_intervals: Range<u8>,
+}
+
+fn explore_cached(
+    args: CacheableIntervalArgs,
     cache: &mut FxHashMap<Vec<u8>, Exploration>,
 ) -> (&Exploration, bool) {
-    let encoded = bincode::encode_to_vec(&config, bincode::config::standard()).unwrap();
+    let encoded = bincode::encode_to_vec(&args, bincode::config::standard()).unwrap();
     match cache.entry(encoded) {
         Entry::Occupied(entry) => (entry.into_mut(), true),
         Entry::Vacant(entry) => {
-            let exploration = explore(&config, include_intervals);
+            let exploration = explore(&args.config, args.include_intervals);
             (entry.insert(exploration), false)
         }
     }

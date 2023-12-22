@@ -5,12 +5,14 @@ use strum_macros::{EnumCount, EnumIter};
 use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
-use crate::domain::{OutcomeType, Score, Side};
-use crate::interval::{Expansions, explore, Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
+use crate::domain::{OutcomeType, Period, Score, Side};
+use crate::interval::{explore, Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
 use brumby::{factorial, poisson};
+use crate::domain::OfferType::CorrectScore;
+use crate::interval::query::requirements;
 
 #[derive(Debug, Ordinal, EnumCount, EnumIter)]
 pub enum GoalEvent {
@@ -171,14 +173,7 @@ pub fn from_interval(
                 max_total_goals,
                 min_prob: 0.0,
             },
-            expansions: Expansions {
-                ft_score: true,
-                ht_score: false,
-                player_goal_stats: false,
-                player_split_goal_stats: false,
-                max_player_assists: 0,
-                first_goalscorer: false,
-            },
+            expansions: requirements(&CorrectScore(Period::FullTime)),
         },
         explore_intervals,
     );

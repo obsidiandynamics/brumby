@@ -80,7 +80,7 @@ impl<'a> From<&'a [f64]> for BivariateProbs {
 pub struct Expansions {
     pub ht_score: bool,
     pub ft_score: bool,
-    pub player_goal_stats: bool,
+    pub max_player_goals: u8,
     pub player_split_goal_stats: bool,
     pub max_player_assists: u8,
     pub first_goalscorer: bool,
@@ -89,14 +89,14 @@ impl Expansions {
     fn validate(&self) {
         if self.player_split_goal_stats {
             assert!(
-                self.player_goal_stats,
-                "cannot expand player split goal stats without player goal stats"
+                self.max_player_goals > 0,
+                "cannot expand player split goal stats without player goals"
             );
         }
         assert!(
             self.ft_score
                 || self.ht_score
-                || self.player_goal_stats
+                || self.max_player_goals > 0
                 || self.first_goalscorer
                 || self.max_player_assists > 0,
             "at least one expansion must be enabled"
@@ -104,7 +104,7 @@ impl Expansions {
     }
 
     pub fn requires_team_goal_probs(&self) -> bool {
-        self.ht_score || self.ft_score || self.player_goal_stats || self.first_goalscorer || self.max_player_assists > 0
+        self.ht_score || self.ft_score || self.max_player_goals > 0 || self.first_goalscorer || self.max_player_assists > 0
     }
 
     pub fn requires_team_assist_probs(&self) -> bool {
@@ -112,7 +112,7 @@ impl Expansions {
     }
 
     pub fn requires_player_goal_probs(&self) -> bool {
-        self.player_goal_stats || self.first_goalscorer
+        self.max_player_goals > 0 || self.first_goalscorer
     }
 
     pub fn requires_player_assist_probs(&self) -> bool {
@@ -125,7 +125,7 @@ impl Default for Expansions {
         Self {
             ft_score: true,
             ht_score: true,
-            player_goal_stats: true,
+            max_player_goals: u8::MAX,
             player_split_goal_stats: true,
             max_player_assists: u8::MAX,
             first_goalscorer: true,
@@ -423,8 +423,10 @@ fn merge(
                 Half::First => &mut merged.stats[player].h1,
                 Half::Second => &mut merged.stats[player].h2,
             };
-            split_stats.goals += 1;
-        } else if expansions.player_goal_stats {
+            if split_stats.goals < expansions.max_player_goals {
+                split_stats.goals += 1;
+            }
+        } else if merged.stats[player].h2.goals < expansions.max_player_goals {
             merged.stats[player].h2.goals += 1;
         }
 
@@ -448,8 +450,10 @@ fn merge(
                 Half::First => &mut merged.stats[player].h1,
                 Half::Second => &mut merged.stats[player].h2,
             };
-            split_stats.goals += 1;
-        } else if expansions.player_goal_stats {
+            if split_stats.goals < expansions.max_player_goals {
+                split_stats.goals += 1;
+            }
+        } else if merged.stats[player].h2.goals < expansions.max_player_goals {
             merged.stats[player].h2.goals += 1;
         }
 

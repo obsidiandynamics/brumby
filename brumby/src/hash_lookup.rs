@@ -97,7 +97,7 @@ impl<'a, T: Eq + PartialEq + Hash> IntoIterator for &'a HashLookup<T> {
     type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.index_to_item.as_slice().into_iter()
+        self.index_to_item.as_slice().iter()
     }
 }
 
