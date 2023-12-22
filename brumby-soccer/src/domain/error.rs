@@ -1,10 +1,13 @@
-use crate::domain::{Offer, OfferType, OutcomeType};
-use brumby::hash_lookup::HashLookup;
-use brumby::probs::SliceExt;
 use std::fmt::{Display, Formatter};
 use std::ops::RangeInclusive;
+
 use thiserror::Error;
+
 use brumby::capture::Capture;
+use brumby::hash_lookup::HashLookup;
+use brumby::probs::SliceExt;
+
+use crate::domain::{Offer, OfferType, OutcomeType};
 
 mod head_to_head;
 mod total_goals;
@@ -19,10 +22,14 @@ pub enum InvalidOffer {
 
     #[error("{0}")]
     WrongBooksum(#[from] WrongBooksum),
+
+    #[error("{0}")]
+    InvalidMarket(#[from] anyhow::Error),
 }
 
 impl Offer {
     pub fn validate(&self) -> Result<(), InvalidOffer> {
+        self.market.validate()?;
         OfferAlignmentAssertion::check(
             self.outcomes.items(),
             &self.market.probs,

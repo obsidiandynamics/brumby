@@ -1,6 +1,9 @@
-use rustc_hash::FxHashMap;
 use std::hash::Hash;
 use std::ops::Index;
+use std::slice::Iter;
+use std::vec::IntoIter;
+
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub struct HashLookup<T: Eq + PartialEq + Hash> {
@@ -80,6 +83,24 @@ impl<T: Eq + PartialEq + Hash + Clone> From<Vec<T>> for HashLookup<T> {
     }
 }
 
+impl<T: Eq + PartialEq + Hash> IntoIterator for HashLookup<T> {
+    type Item = T;
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.index_to_item.into_iter()
+    }
+}
+
+impl<'a, T: Eq + PartialEq + Hash> IntoIterator for &'a HashLookup<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.index_to_item.as_slice().into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,5 +153,23 @@ mod tests {
     #[should_panic(expected = "duplicate item at index 2, previously at 1")]
     fn from_vec_duplicate() {
         let _ = HashLookup::from(["zero", "one", "one"]);
+    }
+
+    #[test]
+    fn into_iter() {
+        let lookup = HashLookup::from(["zero", "one"]);
+        let mut iter = lookup.into_iter();
+        assert_eq!(Some("zero"), iter.next());
+        assert_eq!(Some("one"), iter.next());
+        assert_eq!(None, iter.next());
+    }
+
+    #[test]
+    fn into_iter_ref() {
+        let lookup = HashLookup::from(["zero", "one"]);
+        let mut iter = (&lookup).into_iter();
+        assert_eq!(Some(&"zero"), iter.next());
+        assert_eq!(Some(&"one"), iter.next());
+        assert_eq!(None, iter.next());
     }
 }

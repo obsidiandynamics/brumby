@@ -69,7 +69,7 @@ impl Market {
         if self.prices.iter().any(|&price| price.is_nan()) {
             bail!("prices cannot be NaN");
         }
-        const MIN_PROBS: usize = 2;
+        const MIN_PROBS: usize = 1;
         if self.probs.len() < MIN_PROBS {
             bail!("the number of provided probabilities cannot be fewer than {MIN_PROBS}");
         }

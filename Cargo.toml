@@ -21,8 +21,6 @@ anyhow = "1.0.75"
 chrono = "0.4.31"
 clap = { version =  "4.4.6", features = ["derive"] }
 racing_scraper = "0.0.18"
-serde_json = "1.0.107"
-stanza = "0.5.1"
 tinyrand = "0.5.0"
 tokio={version="1.32.0",features=["full"]}
 tracing = "0.1.37"
@@ -33,6 +31,9 @@ ordinalizer = "0.1.0"
 strum = "0.25.0"
 strum_macros = "0.25.3"
 serde = { version = "1.0.189", features = ["derive"] }
+serde_json = "1.0.107"
+bincode = "2.0.0-rc.3"
+stanza = "0.5.1"
 thiserror = "1.0.50"
 rustc-hash = "1.1.0"
 

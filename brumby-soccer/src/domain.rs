@@ -1,6 +1,8 @@
 use std::iter::{Filter, Zip};
 use std::slice::Iter;
 
+use bincode::Encode;
+
 use brumby::hash_lookup::HashLookup;
 use brumby::market::Market;
 
@@ -79,13 +81,13 @@ pub enum OfferCategory {
     AnytimeAssist
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode)]
 pub enum Side {
     Home,
     Away,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode)]
 pub enum Player {
     Named(Side, String),
     Other
@@ -110,6 +112,12 @@ impl OutcomeType {
     }
 }
 
+// #[derive(Debug, Error)]
+// pub enum OfferSubsetError {
+//     #[error("no outcomes remaining")]
+//     NoOutcomesRemaining
+// }
+
 #[derive(Debug)]
 pub struct Offer {
     pub offer_type: OfferType,
@@ -117,11 +125,40 @@ pub struct Offer {
     pub market: Market,
 }
 impl Offer {
-    pub fn filter_outcomes_with_probs<F>(&self, filter: F) -> Filter<Zip<Iter<OutcomeType>, Iter<f64>>, F> where F: FnMut(&(&OutcomeType, &f64)) -> bool{
+    pub fn filter_outcomes_with_probs<F>(&self, filter: F) -> Filter<Zip<Iter<OutcomeType>, Iter<f64>>, F> where F: FnMut(&(&OutcomeType, &f64)) -> bool {
         self.outcomes.items().iter().zip(self.market.probs.iter()).filter(filter)
     }
     
     pub fn get_probability(&self, outcome: &OutcomeType) -> Option<f64> {
         self.outcomes.index_of(outcome).map(|index| self.market.probs[index])
+    }
+
+    pub fn subset(&self, mut filter: impl FnMut(&(&OutcomeType, &f64)) -> bool) -> Option<Offer> {
+        let mut outcomes = Vec::with_capacity(self.outcomes.len());
+        let mut probs = Vec::with_capacity(self.outcomes.len());
+        let mut prices = Vec::with_capacity(self.outcomes.len());
+
+        for (index, outcome) in self.outcomes.items().iter().enumerate() {
+            let prob = self.market.probs[index];
+            if filter(&(outcome, &prob)) {
+                outcomes.push(outcome.clone());
+                probs.push(prob);
+                prices.push(self.market.prices[index]);
+            }
+        }
+
+        if outcomes.is_empty() {
+            None
+        }  else {
+            Some(Self {
+                offer_type: self.offer_type.clone(),
+                outcomes: HashLookup::from(outcomes),
+                market: Market {
+                    probs,
+                    prices,
+                    overround: self.market.overround.clone(),
+                },
+            })
+        }
     }
 }

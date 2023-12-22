@@ -1,29 +1,32 @@
 use std::collections::hash_map::Entry;
 use std::error::Error;
+use std::ops::Range;
 use std::time::Instant;
 
 use anyhow::anyhow;
-use brumby::capture::Capture;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::debug;
 
+use brumby::capture::Capture;
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
 
-use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
+use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::interval;
-use crate::interval::query::{isolate, requirements};
 use crate::interval::{
-    explore, BivariateProbs, Expansions, Exploration, PlayerProbs, PruneThresholds, TeamProbs,
+    BivariateProbs, Expansions, Exploration, explore, PlayerProbs, PruneThresholds, TeamProbs,
     UnivariateProbs,
 };
+use crate::interval::query::{isolate, requirements};
+use crate::model::cache_stats::CacheStats;
 
 pub mod player_assist_fitter;
 pub mod player_goal_fitter;
 pub mod score_fitter;
+mod cache_stats;
 
 #[derive(Debug, Error)]
 pub enum FitError {
@@ -176,15 +179,18 @@ impl Model {
         price_bounds: &PriceBounds,
     ) -> Result<(), DerivationError> {
         let start = Instant::now();
+        let mut cache = FxHashMap::default();
+        let mut cache_stats = CacheStats::default();
         for stub in stubs {
             debug!("deriving {:?}", stub.offer_type);
             stub.offer_type.validate(&stub.outcomes)?;
-            let offer = self.derive_offer(stub, price_bounds)?;
+            let (offer, derive_cache_stats) = self.derive_offer(stub, price_bounds, &mut cache)?;
+            cache_stats += derive_cache_stats;
             self.offers.insert(offer.offer_type.clone(), offer);
         }
         let elapsed = start.elapsed();
         debug!(
-            "derivation took {elapsed:?} for {} offers ({} outcomes)",
+            "derivation took {elapsed:?} for {} offers ({} outcomes), {cache_stats:?}",
             self.offers.len(),
             self.offers
                 .values()
@@ -202,7 +208,8 @@ impl Model {
         &mut self,
         stub: &Stub,
         price_bounds: &PriceBounds,
-    ) -> Result<Offer, DerivationError> {
+        cache: &mut FxHashMap<Vec<u8>, Exploration>,
+    ) -> Result<(Offer, CacheStats), DerivationError> {
         let reqs = requirements(&stub.offer_type);
         self.ensure_team_requirements(&reqs)?;
         let requires_player_goal_probs = reqs.requires_player_goal_probs();
@@ -218,10 +225,11 @@ impl Model {
             min_prob: 0.0,
         };
 
-        let offer = if requires_player_goal_probs || requires_player_assist_probs {
+        let (offer, cache_stats) = if requires_player_goal_probs || requires_player_assist_probs {
             // requires player probabilities — must be explored individually for each outcome
             let mut probs = Vec::with_capacity(stub.outcomes.len());
-            for outcome in stub.outcomes.items() {
+            let mut cache_stats = CacheStats::default();
+            for outcome in &stub.outcomes {
                 let player_probs = match outcome.get_player() {
                     None => vec![],
                     Some(player) => {
@@ -236,8 +244,8 @@ impl Model {
                     }
                 };
 
-                let exploration = explore(
-                    &interval::Config {
+                let (exploration, cache_hit) = explore_cached(
+                    interval::Config {
                         intervals: self.config.intervals,
                         team_probs: team_probs.clone(),
                         player_probs,
@@ -245,7 +253,9 @@ impl Model {
                         expansions: reqs.clone(),
                     },
                     0..self.config.intervals,
+                    cache,
                 );
+                cache_stats += cache_hit;
 
                 let prob = isolate(
                     &stub.offer_type,
@@ -257,15 +267,15 @@ impl Model {
             }
             probs.normalise(stub.normal);
             let market = Market::frame(&stub.overround, probs, price_bounds);
-            Offer {
+            (Offer {
                 offer_type: stub.offer_type.clone(),
                 outcomes: stub.outcomes.clone(),
                 market,
-            }
+            }, cache_stats)
         } else {
             // doesn't require player probabilities — can be explored as a whole
-            let exploration = explore(
-                &interval::Config {
+            let (exploration, cache_hit) = explore_cached(
+                interval::Config {
                     intervals: self.config.intervals,
                     team_probs,
                     player_probs: vec![],
@@ -273,17 +283,20 @@ impl Model {
                     expansions: reqs,
                 },
                 0..self.config.intervals,
+                cache,
             );
-            frame_prices_from_exploration(
-                &exploration,
+
+            let offer = frame_prices_from_exploration(
+                exploration,
                 &stub.offer_type,
                 stub.outcomes.items(),
                 stub.normal,
                 &stub.overround,
                 price_bounds,
-            )
+            );
+            (offer, CacheStats::default() + cache_hit)
         };
-        Ok(offer)
+        Ok((offer, cache_stats))
     }
 
     fn ensure_team_requirements(&self, reqs: &Expansions) -> Result<(), UnmetRequirement> {
@@ -342,6 +355,21 @@ impl TryFrom<Config> for Model {
             player_probs: Default::default(),
             offers: Default::default(),
         })
+    }
+}
+
+fn explore_cached(
+    config: interval::Config,
+    include_intervals: Range<u8>,
+    cache: &mut FxHashMap<Vec<u8>, Exploration>,
+) -> (&Exploration, bool) {
+    let encoded = bincode::encode_to_vec(&config, bincode::config::standard()).unwrap();
+    match cache.entry(encoded) {
+        Entry::Occupied(entry) => (entry.into_mut(), true),
+        Entry::Vacant(entry) => {
+            let exploration = explore(&config, include_intervals);
+            (entry.insert(exploration), false)
+        }
     }
 }
 

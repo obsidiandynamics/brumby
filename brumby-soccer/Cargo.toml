@@ -12,6 +12,7 @@ exclude.workspace = true
 
 [dependencies]
 brumby = { version = "0.7.3", path = "../brumby" }
+bincode = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 ordinalizer = { workspace = true }

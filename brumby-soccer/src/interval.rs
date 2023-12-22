@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use bincode::Encode;
 use rustc_hash::FxHashMap;
 
 use brumby::hash_lookup::HashLookup;
@@ -41,7 +42,7 @@ pub fn init_prospects(capacity: usize) -> Prospects {
     Prospects::with_capacity_and_hasher(capacity, Default::default())
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Encode)]
 pub struct UnivariateProbs {
     pub home: f64,
     pub away: f64,
@@ -57,7 +58,7 @@ impl<'a> From<&'a [f64]> for UnivariateProbs {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Encode)]
 pub struct BivariateProbs {
     pub home: f64,
     pub away: f64,
@@ -75,7 +76,7 @@ impl<'a> From<&'a [f64]> for BivariateProbs {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Encode)]
 pub struct Expansions {
     pub ht_score: bool,
     pub ft_score: bool,
@@ -132,7 +133,7 @@ impl Default for Expansions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Encode)]
 pub struct PruneThresholds {
     pub max_total_goals: u16,
     pub min_prob: f64,
@@ -146,14 +147,14 @@ impl Default for PruneThresholds {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Encode)]
 pub struct TeamProbs {
     pub h1_goals: BivariateProbs,
     pub h2_goals: BivariateProbs,
     pub assists: UnivariateProbs,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Encode)]
 pub struct Config {
     pub intervals: u8,
     pub team_probs: TeamProbs,
@@ -162,7 +163,7 @@ pub struct Config {
     pub expansions: Expansions,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Encode)]
 pub struct PlayerProbs {
     pub goal: Option<f64>,
     pub assist: Option<f64>,
