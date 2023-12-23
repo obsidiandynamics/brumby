@@ -9,10 +9,12 @@ pub struct StackVec<T, const C: usize> {
     array: [Option<T>; C],
 }
 impl<T, const C: usize> StackVec<T, C> {
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -27,11 +29,13 @@ impl<T, const C: usize> StackVec<T, C> {
         Iter { sv: self, pos: 0 }
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.array.fill_with(|| None);
         self.len = 0;
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         C
     }
@@ -39,6 +43,7 @@ impl<T, const C: usize> StackVec<T, C> {
 
 
 impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         if self.len != other.len {
             return false;
@@ -58,6 +63,7 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
 
 
 impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         for index in 0..self.len {
             let item = &self.array[index];
@@ -176,6 +182,7 @@ pub struct Iter<'a, T, const C: usize> {
 impl<'a, T, const C: usize> Iterator for Iter<'a, T, C> {
     type Item = &'a T;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.sv.len {
             let next = self.sv.array[self.pos].as_ref();
@@ -204,6 +211,7 @@ pub struct IntoIter<T, const C: usize> {
 impl<T, const C: usize> Iterator for IntoIter<T, C> {
     type Item = T;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.sv.len {
             let next = self.sv.array[self.pos].take();
