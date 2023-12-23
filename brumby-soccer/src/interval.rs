@@ -4,22 +4,29 @@ use bincode::Encode;
 use rustc_hash::FxHashMap;
 
 use brumby::hash_lookup::HashLookup;
+use brumby::stack_vec::StackVec;
 
 use crate::domain::{Player, Score, Side};
 
 mod assist;
 pub mod query;
 
+const PLAYERS: usize = 4;
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Prospect {
     pub ht_score: Score,
     pub ft_score: Score,
-    pub stats: Vec<PlayerStats>,
+    pub stats: StackVec<PlayerStats, PLAYERS>,
     pub first_scorer: Option<usize>,
 }
 impl Prospect {
     fn init(players: usize) -> Prospect {
-        let stats = vec![PlayerStats::default(); players];
+        // let stats = vec![PlayerStats::default(); players];
+        let mut stats = StackVec::default();
+        for _ in 0..players {
+            stats.push(PlayerStats::default());
+        }
         Prospect {
             ht_score: Score::nil_all(),
             ft_score: Score::nil_all(),

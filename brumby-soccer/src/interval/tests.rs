@@ -1,4 +1,5 @@
 use assert_float_eq::*;
+use brumby::sv;
 use super::*;
 use crate::domain::{OfferType, OutcomeType, Player};
 use crate::interval::query::isolate;
@@ -45,7 +46,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
                 first_scorer: None,
             },
             0.0625f64,
@@ -54,7 +55,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -63,7 +64,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -72,7 +73,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -81,7 +82,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -90,7 +91,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -99,7 +100,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 2 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -108,7 +109,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 1, away: 2 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -117,7 +118,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 2 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -126,7 +127,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 2, away: 2 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 2 }, assists: 4 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 2 }, assists: 4 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -135,7 +136,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -144,7 +145,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -153,7 +154,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -162,7 +163,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -171,7 +172,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 2, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 1 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -180,7 +181,7 @@ fn explore_2x2() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 2 }, assists: 3 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -263,7 +264,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }],
                 first_scorer: None,
             },
             0.0625f64,
@@ -272,7 +273,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 2, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -281,7 +282,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -290,7 +291,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -299,7 +300,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 1 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -308,7 +309,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0}, h2: PeriodStats { goals: 2 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -317,7 +318,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 2 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 1 }, assists: 2 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -326,7 +327,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 1, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -335,7 +336,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -344,7 +345,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 1 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -353,7 +354,7 @@ fn explore_2x2_pruned_2_goals() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
+                stats:sv![PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }],
                 first_scorer: Some(0),
             },
             0.0625,
@@ -448,7 +449,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 0 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 }
                 ],
@@ -460,7 +461,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 2 }, assists: 2 }
                 ],
@@ -472,7 +473,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 2 }
                 ],
@@ -484,7 +485,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 1 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 2 }
                 ],
@@ -496,7 +497,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }
                 ],
@@ -508,7 +509,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 1, away: 0 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 1 }
                 ],
@@ -520,7 +521,7 @@ fn explore_1x1_player_goal() {
             Prospect {
                 ht_score: Score { home: 0, away: 0 },
                 ft_score: Score { home: 0, away: 1 },
-                stats: vec![
+                stats:sv![
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 0 }, assists: 0 },
                     PlayerStats { h1: PeriodStats { goals: 0 }, h2: PeriodStats { goals: 1 }, assists: 1 }
                 ],
