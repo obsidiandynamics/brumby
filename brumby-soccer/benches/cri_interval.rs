@@ -40,6 +40,10 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cri_interval_90_min_1e-6_max_8_goals", |b| {
         b.iter(|| run(90, 8));
     });
+
+    c.bench_function("cri_interval_90_min_1e-6_max_16_goals", |b| {
+        b.iter(|| run(90, 16));
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

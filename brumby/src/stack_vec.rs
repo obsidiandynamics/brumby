@@ -1,8 +1,9 @@
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::ops::{Index, IndexMut};
 use thiserror::Error;
 
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Eq)]
 pub struct StackVec<T, const C: usize> {
     len: usize,
     array: [Option<T>; C],
@@ -33,6 +34,35 @@ impl<T, const C: usize> StackVec<T, C> {
 
     pub fn capacity(&self) -> usize {
         C
+    }
+}
+
+
+impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len != other.len {
+            return false;
+        }
+
+        for index in 0..self.len {
+            let self_item = &self.array[index];
+            let other_item = &other.array[index];
+            if self_item.ne(other_item) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+
+impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for index in 0..self.len {
+            let item = &self.array[index];
+            item.hash(state);
+        }
     }
 }
 

@@ -1,8 +1,26 @@
 use assert_float_eq::*;
 use brumby::sv;
-use super::*;
+
 use crate::domain::{OfferType, OutcomeType, Player};
 use crate::interval::query::isolate;
+
+use super::*;
+
+// #[macro_export]
+// macro_rules! sv {
+//     () => (
+//         StackVec4::default()
+//     );
+//     ( $( $x:expr ),* ) => {
+//         {
+//             let mut sv = StackVec4::default();
+//             $(
+//                 sv.push($x);
+//             )*
+//             sv
+//         }
+//     };
+// }
 
 fn print_prospects(prospects: &Prospects) {
     for (prospect, prob) in prospects {

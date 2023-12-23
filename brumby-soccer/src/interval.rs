@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Range};
+use std::ops::{AddAssign, Range};
 
 use bincode::Encode;
 use rustc_hash::FxHashMap;
@@ -13,7 +13,7 @@ pub mod query;
 
 const PLAYERS: usize = 4;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Prospect {
     pub ht_score: Score,
     pub ft_score: Score,
@@ -219,12 +219,12 @@ struct PartialProspect<'a> {
     prob: f64,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
 pub struct PeriodStats {
     pub goals: u8,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
 pub struct PlayerStats {
     pub h1: PeriodStats,
     pub h2: PeriodStats,
