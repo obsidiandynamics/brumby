@@ -33,8 +33,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| run(18, u16::MAX));
     });
 
-    c.bench_function("cri_interval_90_min_1e-6", |b| {
-        b.iter(|| run(90, u16::MAX));
+    c.bench_function("cri_interval_36_min_1e-6", |b| {
+        b.iter(|| run(36, u16::MAX));
     });
 
     c.bench_function("cri_interval_90_min_1e-6_max_8_goals", |b| {

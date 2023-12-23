@@ -21,8 +21,9 @@ pub mod opt;
 pub mod poisson;
 pub mod probs;
 pub mod tables;
-pub mod selection;
 pub mod timed;
+pub mod selection;
+pub mod stack_vec;
 
 #[cfg(test)]
 pub(crate) mod testing;

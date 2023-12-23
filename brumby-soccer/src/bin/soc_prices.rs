@@ -15,6 +15,7 @@ use tracing::{debug, info};
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
+use brumby::timed::Timed;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, OutcomeType};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
@@ -26,12 +27,10 @@ use brumby_soccer::{fit, model, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
-const FIRST_GOALSCORER_BOOKSUM: f64 = 1.5;
 const INTERVALS: u8 = 18;
 const INCREMENTAL_OVERROUND: f64 = 0.01;
 // const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS: u16 = 8;
-const GOALSCORER_MIN_PROB: f64 = 0.0;
 // const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
@@ -142,7 +141,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             overround: offer.market.overround.clone(),
         })
         .collect::<Vec<_>>();
-    model.derive(&stubs, &SINGLE_PRICE_BOUNDS)?;
+
+    let Timed {
+        value: cache_stats,
+        elapsed,
+    } = model.derive(&stubs, &SINGLE_PRICE_BOUNDS)?;
+    debug!(
+        "derivation took {elapsed:?} for {} offers ({} outcomes), {cache_stats:?}",
+        stubs.len(),
+        stubs.iter().map(|stub| stub.outcomes.len()).sum::<usize>()
+    );
 
     {
         let table = Table::default().with_rows({

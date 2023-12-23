@@ -13,6 +13,7 @@ use brumby::capture::Capture;
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
+use brumby::timed::Timed;
 
 use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
@@ -178,33 +179,26 @@ impl Model {
         &mut self,
         stubs: &[Stub],
         price_bounds: &PriceBounds,
-    ) -> Result<(), DerivationError> {
-        let start = Instant::now();
-        let mut cache = FxHashMap::default();
-        let mut cache_stats = CacheStats::default();
-        for stub in stubs {
-            debug!(
-                "deriving {:?} ({} outcomes)",
-                stub.offer_type,
-                stub.outcomes.len()
-            );
-            stub.offer_type.validate(&stub.outcomes)?;
-            let start = Instant::now();
-            let (offer, derive_cache_stats) = self.derive_offer(stub, price_bounds, &mut cache)?;
-            debug!("... took {:?}, {derive_cache_stats:?}", start.elapsed());
-            cache_stats += derive_cache_stats;
-            self.offers.insert(offer.offer_type.clone(), offer);
-        }
-        let elapsed = start.elapsed();
-        debug!(
-            "derivation took {elapsed:?} for {} offers ({} outcomes), {cache_stats:?}",
-            self.offers.len(),
-            self.offers
-                .values()
-                .map(|offer| offer.outcomes.len())
-                .sum::<usize>()
-        );
-        Ok(())
+    ) -> Result<Timed<CacheStats>, DerivationError> {
+        Timed::result(|| {
+            let mut cache = FxHashMap::default();
+            let mut cache_stats = CacheStats::default();
+            for stub in stubs {
+                debug!(
+                    "deriving {:?} ({} outcomes)",
+                    stub.offer_type,
+                    stub.outcomes.len()
+                );
+                stub.offer_type.validate_outcomes(&stub.outcomes)?;
+                let start = Instant::now();
+                let (offer, derive_cache_stats) =
+                    self.derive_offer(stub, price_bounds, &mut cache)?;
+                debug!("... took {:?}, {derive_cache_stats:?}", start.elapsed());
+                cache_stats += derive_cache_stats;
+                self.offers.insert(offer.offer_type.clone(), offer);
+            }
+            Ok(cache_stats)
+        })
     }
 
     pub fn offers(&self) -> &FxHashMap<OfferType, Offer> {
@@ -311,6 +305,23 @@ impl Model {
             (offer, CacheStats::default() + cache_hit)
         };
         Ok((offer, cache_stats))
+    }
+
+    pub fn derive_price(selections: &[(OfferType, OutcomeType)]) -> Result<(), ()> {
+        todo!()
+    }
+
+    fn collect_requirements(
+        offer_type: &OfferType,
+        outcome: &OutcomeType,
+        agg_reqs: &mut Expansions,
+        agg_player_probs: &mut FxHashMap<Player, PlayerProbs>,
+    ) -> Result<(), DerivationError> {
+        offer_type.validate_outcome(outcome)?;
+        let reqs = requirements(offer_type);
+
+        // *agg_reqs = *agg_reqs + reqs;
+        todo!()
     }
 
     fn ensure_team_requirements(&self, reqs: &Expansions) -> Result<(), UnmetRequirement> {

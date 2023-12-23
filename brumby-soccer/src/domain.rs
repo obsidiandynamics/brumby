@@ -112,12 +112,6 @@ impl OutcomeType {
     }
 }
 
-// #[derive(Debug, Error)]
-// pub enum OfferSubsetError {
-//     #[error("no outcomes remaining")]
-//     NoOutcomesRemaining
-// }
-
 #[derive(Debug)]
 pub struct Offer {
     pub offer_type: OfferType,

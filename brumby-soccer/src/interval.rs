@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Add, AddAssign, Range};
 
 use bincode::Encode;
 use rustc_hash::FxHashMap;
@@ -130,6 +130,32 @@ impl Default for Expansions {
             max_player_assists: u8::MAX,
             first_goalscorer: true,
         }
+    }
+}
+
+// impl Add for Expansions {
+//     type Output = Expansions;
+//
+//     fn add(self, rhs: Self) -> Self::Output {
+//         Self {
+//             ht_score: self.ht_score || rhs.ht_score,
+//             ft_score: self.ft_score || rhs.ft_score,
+//             max_player_goals: u8::max(self.max_player_goals, rhs.max_player_goals),
+//             player_split_goal_stats: self.player_split_goal_stats || rhs.player_split_goal_stats,
+//             max_player_assists: u8::max(self.max_player_assists, rhs.max_player_assists),
+//             first_goalscorer: self.first_goalscorer || rhs.first_goalscorer,
+//         }
+//     }
+// }
+
+impl AddAssign for Expansions {
+    fn add_assign(&mut self, rhs: Self) {
+        self.ht_score |= rhs.ht_score;
+        self.ft_score |= rhs.ft_score;
+        self.max_player_goals = u8::max(self.max_player_goals, rhs.max_player_goals);
+        self.player_split_goal_stats |= rhs.player_split_goal_stats;
+        self.max_player_assists = u8::max(self.max_player_assists, rhs.max_player_assists);
+        self.first_goalscorer |= rhs.first_goalscorer;
     }
 }
 

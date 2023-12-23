@@ -35,7 +35,7 @@ impl Offer {
             &self.market.probs,
             &self.offer_type,
         )?;
-        self.offer_type.validate(&self.outcomes)?;
+        self.offer_type.validate_outcomes(&self.outcomes)?;
         match self.offer_type {
             OfferType::TotalGoals(_, _) => total_goals::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::HeadToHead(_) => head_to_head::validate_probs(&self.offer_type, &self.market.probs),
@@ -80,10 +80,18 @@ pub enum InvalidOutcome {
 }
 
 impl OfferType {
-    pub fn validate(&self, outcomes: &HashLookup<OutcomeType>) -> Result<(), InvalidOutcome> {
+    pub fn validate_outcomes(&self, outcomes: &HashLookup<OutcomeType>) -> Result<(), InvalidOutcome> {
         match self {
             OfferType::TotalGoals(_, _) => total_goals::validate_outcomes(self, outcomes),
             OfferType::HeadToHead(_) => head_to_head::validate_outcomes(self, outcomes),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn validate_outcome(&self, outcome: &OutcomeType) -> Result<(), InvalidOutcome> {
+        match self {
+            OfferType::TotalGoals(_, _) => total_goals::validate_outcome(self, outcome),
+            OfferType::HeadToHead(_) => head_to_head::validate_outcome(self, outcome),
             _ => Ok(()),
         }
     }
