@@ -2,10 +2,10 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};
 use thiserror::Error;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StackVec<T, const C: usize> {
     len: usize,
-    array: [Option<T>; C]
+    array: [Option<T>; C],
 }
 impl<T, const C: usize> StackVec<T, C> {
     pub fn len(&self) -> usize {
@@ -16,16 +16,14 @@ impl<T, const C: usize> StackVec<T, C> {
         self.len == 0
     }
 
+    #[inline]
     pub fn push(&mut self, value: T) {
         self.array[self.len] = Some(value);
         self.len += 1;
     }
 
     pub fn iter(&self) -> Iter<T, C> {
-        Iter {
-            sv: self,
-            pos: 0,
-        }
+        Iter { sv: self, pos: 0 }
     }
 
     pub fn clear(&mut self) {
@@ -64,33 +62,50 @@ impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
 
     fn try_from(source: [T; B]) -> Result<Self, Self::Error> {
         if B > C {
-            return Err(ArrayOverflow { source_len: B, target_len: C });
+            return Err(ArrayOverflow {
+                source_len: B,
+                target_len: C,
+            });
         }
 
         let mut array: [Option<T>; C] = std::array::from_fn(|_| None);
         for (index, item) in source.into_iter().enumerate() {
             array[index] = Some(item);
         }
-        Ok(Self {
-            len: B,
-            array,
-        })
+        Ok(Self { len: B, array })
     }
 }
 
-pub fn sv<J, T, const C: usize>(source: J) -> StackVec<T, C> where J: IntoIterator<Item = T> {
-    let mut sv = StackVec::default();
-    for item in source {
-        sv.push(item);
-    }
-    sv
+// pub fn si<J, T, const C: usize>(source: J) -> StackVec<T, C> where J: IntoIterator<Item = T> {
+//     let mut sv = StackVec::default();
+//     for item in source {
+//         sv.push(item);
+//     }
+//     sv
+// }
+
+#[macro_export]
+macro_rules! sv {
+    () => (
+        StackVec::default()
+    );
+    ( $( $x:expr ),* ) => {
+        {
+            let mut sv = StackVec::default();
+            $(
+                sv.push($x);
+            )*
+            sv
+        }
+    };
 }
 
 impl<T, const C: usize> Default for StackVec<T, C> {
+    #[inline]
     fn default() -> Self {
         Self {
             len: 0,
-            array: std::array::from_fn(|_| None)
+            array: std::array::from_fn(|_| None),
         }
     }
 }
@@ -98,18 +113,26 @@ impl<T, const C: usize> Default for StackVec<T, C> {
 impl<T, const C: usize> Index<usize> for StackVec<T, C> {
     type Output = T;
 
+    #[inline]
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
-            panic!("index out of bounds: the len is {} but the index is {index}", self.len);
+            panic!(
+                "index out of bounds: the len is {} but the index is {index}",
+                self.len
+            );
         }
         self.array[index].as_ref().unwrap()
     }
 }
 
 impl<T, const C: usize> IndexMut<usize> for StackVec<T, C> {
+    #[inline]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= self.len {
-            panic!("index out of bounds: the len is {} but the index is {index}", self.len);
+            panic!(
+                "index out of bounds: the len is {} but the index is {index}",
+                self.len
+            );
         }
         self.array[index].as_mut().unwrap()
     }
@@ -117,7 +140,7 @@ impl<T, const C: usize> IndexMut<usize> for StackVec<T, C> {
 
 pub struct Iter<'a, T, const C: usize> {
     sv: &'a StackVec<T, C>,
-    pos: usize
+    pos: usize,
 }
 
 impl<'a, T, const C: usize> Iterator for Iter<'a, T, C> {
@@ -145,7 +168,7 @@ impl<'a, T, const C: usize> IntoIterator for &'a StackVec<T, C> {
 
 pub struct IntoIter<T, const C: usize> {
     sv: StackVec<T, C>,
-    pos: usize
+    pos: usize,
 }
 
 impl<T, const C: usize> Iterator for IntoIter<T, C> {
@@ -167,10 +190,7 @@ impl<T, const C: usize> IntoIterator for StackVec<T, C> {
     type IntoIter = IntoIter<T, C>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            sv: self,
-            pos: 0,
-        }
+        IntoIter { sv: self, pos: 0 }
     }
 }
 
@@ -191,19 +211,19 @@ mod tests {
     #[test]
     fn debug() {
         {
-            let sv = StackVec::<(), 0>::default();
+            let sv: StackVec<(), 0> = sv![];
             assert_eq!("[]", format!("{sv:?}"));
         }
         {
-            let sv: StackVec<_, 2> = sv(["zero"]);
+            let sv: StackVec<_, 2> = sv!["zero"];
             assert_eq!(r#"["zero"]"#, format!("{sv:?}"));
         }
         {
-            let sv: StackVec<_, 2> = sv(["zero", "one"]);
+            let sv: StackVec<_, 2> = sv!["zero", "one"];
             assert_eq!(r#"["zero", "one"]"#, format!("{sv:?}"));
         }
         {
-            let sv: StackVec<_, 3> = sv(["zero", "one", "two"]);
+            let sv: StackVec<_, 3> = sv!["zero", "one", "two"];
             assert_eq!(r#"["zero", "one", "two"]"#, format!("{sv:?}"));
         }
     }
@@ -271,12 +291,18 @@ mod tests {
     #[test]
     fn from_array_overflow() {
         let result = StackVec::<_, 2>::try_from(["zero", "one", "two"]);
-        assert_eq!(ArrayOverflow { source_len: 3, target_len: 2 }, result.unwrap_err());
+        assert_eq!(
+            ArrayOverflow {
+                source_len: 3,
+                target_len: 2
+            },
+            result.unwrap_err()
+        );
     }
 
     #[test]
     fn index() {
-        let sv: StackVec<_, 2> = sv(["zero", "one"]);
+        let sv: StackVec<_, 2> = sv!["zero", "one"];
         assert_eq!("zero", sv[0]);
         assert_eq!("one", sv[1]);
     }
@@ -284,13 +310,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "index out of bounds: the len is 2 but the index is 2")]
     fn index_overflow() {
-        let sv: StackVec<_, 2> = sv(["0", "1"]);
+        let sv: StackVec<_, 2> = sv!["0", "1"];
         let _ = sv[2];
     }
 
     #[test]
     fn index_mut() {
-        let mut sv: StackVec<_, 2> = sv(["0", "1"]);
+        let mut sv: StackVec<_, 2> = sv!["0", "1"];
         sv[0] = "zero";
         sv[1] = "one";
         assert_eq!(vec!["zero", "one"], sv.into_iter().collect::<Vec<_>>());
@@ -299,13 +325,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "index out of bounds: the len is 2 but the index is 2")]
     fn index_mut_overflow() {
-        let mut sv: StackVec<_, 2> = sv(["0", "1"]);
+        let mut sv: StackVec<_, 2> = sv!["0", "1"];
         sv[2] = "two";
     }
 
     #[test]
     fn clear() {
-        let mut sv: StackVec<_, 2> = sv(["0", "1"]);
+        let mut sv: StackVec<_, 2> = sv!["0", "1"];
         sv.clear();
         assert!(sv.is_empty());
         assert_eq!(Vec::<&str>::new(), sv.into_iter().collect::<Vec<_>>());
@@ -314,6 +340,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "the len is 2 but the index is 2")]
     fn sv_overflow() {
-        let _: StackVec<_, 2> = sv(["0", "1", "2"]);
+        let _: StackVec<_, 2> = sv!["0", "1", "2"];
     }
 }
