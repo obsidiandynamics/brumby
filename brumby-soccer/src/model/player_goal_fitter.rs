@@ -43,7 +43,7 @@ impl PlayerGoalFitter {
 
         // truncated anytime goalscorer offer that only contains player outcomes lacking a goal probability
         let anytime_goalscorer =
-            anytime_goalscorer.subset(|(outcome, _)| match outcome.get_player() {
+            anytime_goalscorer.subset(|outcome, _| match outcome.get_player() {
                 None => false,
                 Some(player) => !fitted_goalscorer_probs.contains_key(player)
             });

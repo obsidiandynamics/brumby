@@ -119,22 +119,22 @@ pub struct Offer {
     pub market: Market,
 }
 impl Offer {
-    pub fn filter_outcomes_with_probs<F>(&self, filter: F) -> Filter<Zip<Iter<OutcomeType>, Iter<f64>>, F> where F: FnMut(&(&OutcomeType, &f64)) -> bool {
-        self.outcomes.items().iter().zip(self.market.probs.iter()).filter(filter)
+    pub fn filter_outcomes_with_probs(&self, mut filter: impl FnMut(&OutcomeType, &f64) -> bool) -> impl Iterator<Item = (&OutcomeType, &f64)> {
+        self.outcomes.items().iter().zip(self.market.probs.iter()).filter(move |(outcome, prob)| filter(outcome, prob))
     }
     
     pub fn get_probability(&self, outcome: &OutcomeType) -> Option<f64> {
         self.outcomes.index_of(outcome).map(|index| self.market.probs[index])
     }
 
-    pub fn subset(&self, mut filter: impl FnMut(&(&OutcomeType, &f64)) -> bool) -> Option<Offer> {
+    pub fn subset(&self, mut filter: impl FnMut(&OutcomeType, &f64) -> bool) -> Option<Offer> {
         let mut outcomes = Vec::with_capacity(self.outcomes.len());
         let mut probs = Vec::with_capacity(self.outcomes.len());
         let mut prices = Vec::with_capacity(self.outcomes.len());
 
         for (index, outcome) in self.outcomes.items().iter().enumerate() {
             let prob = self.market.probs[index];
-            if filter(&(outcome, &prob)) {
+            if filter(&outcome, &prob) {
                 outcomes.push(outcome.clone());
                 probs.push(prob);
                 prices.push(self.market.prices[index]);

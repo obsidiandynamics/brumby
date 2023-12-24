@@ -42,7 +42,7 @@ impl ErrorType {
 
 pub fn home_booksum(offer: &Offer) -> f64 {
     offer
-        .filter_outcomes_with_probs(|(outcome_type, _)| {
+        .filter_outcomes_with_probs(|outcome_type, _| {
             matches!(
                 outcome_type,
                 OutcomeType::Player(Player::Named(Side::Home, _))
@@ -54,7 +54,7 @@ pub fn home_booksum(offer: &Offer) -> f64 {
 
 pub fn away_booksum(offer: &Offer) -> f64 {
     offer
-        .filter_outcomes_with_probs(|(outcome_type, _)| {
+        .filter_outcomes_with_probs(|outcome_type, _| {
             matches!(
                 outcome_type,
                 OutcomeType::Player(Player::Named(Side::Away, _))
