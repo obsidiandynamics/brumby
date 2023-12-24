@@ -268,6 +268,7 @@ impl Model {
                 );
                 probs.push(prob);
             }
+            debug!("... normalizing: {} -> {}", probs.sum(), stub.normal);
             probs.normalise(stub.normal);
             let market = Market::frame(&stub.overround, probs, price_bounds);
             (

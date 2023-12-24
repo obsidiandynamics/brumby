@@ -21,8 +21,41 @@ impl<T, const C: usize> StackVec<T, C> {
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        self.array[self.len] = Some(value);
-        self.len += 1;
+        self.try_push(value).unwrap_or_else(|err| panic!("{}", err))
+    }
+
+    #[inline]
+    pub fn try_push(&mut self, value: T) -> Result<(), CapacityExceeded> {
+        if self.len < C {
+            self.array[self.len] = Some(value);
+            self.len += 1;
+            Ok(())
+        } else {
+            Err(CapacityExceeded { target_capacity: C })
+        }
+    }
+
+    #[inline]
+    pub fn push_repeat(&mut self, value: T, times: usize)
+    where
+        T: Clone,
+    {
+        self.try_push_repeat(value, times)
+            .unwrap_or_else(|err| panic!("{}", err))
+    }
+
+    #[inline]
+    pub fn try_push_repeat(&mut self, value: T, times: usize) -> Result<(), CapacityExceeded>
+    where
+        T: Clone,
+    {
+        for _ in 1..times {
+            self.try_push(value.clone())?;
+        }
+        if times > 0 {
+            self.try_push(value)?;
+        }
+        Ok(())
     }
 
     pub fn iter(&self) -> Iter<T, C> {
@@ -34,13 +67,7 @@ impl<T, const C: usize> StackVec<T, C> {
         self.array.fill_with(|| None);
         self.len = 0;
     }
-
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        C
-    }
 }
-
 
 impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
     #[inline]
@@ -52,7 +79,7 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
         for index in 0..self.len {
             let self_item = &self.array[index];
             let other_item = &other.array[index];
-            if self_item.ne(other_item) {
+            if self_item != other_item {
                 return false;
             }
         }
@@ -60,7 +87,6 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
         true
     }
 }
-
 
 impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
     #[inline]
@@ -87,21 +113,17 @@ impl<T: Debug, const C: usize> Debug for StackVec<T, C> {
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("source array len {source_len} exceeds target len {target_len}")]
-pub struct ArrayOverflow {
-    source_len: usize,
-    target_len: usize,
+#[error("exceeds capacity ({target_capacity})")]
+pub struct CapacityExceeded {
+    target_capacity: usize,
 }
 
 impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
-    type Error = ArrayOverflow;
+    type Error = CapacityExceeded;
 
     fn try_from(source: [T; B]) -> Result<Self, Self::Error> {
         if B > C {
-            return Err(ArrayOverflow {
-                source_len: B,
-                target_len: C,
-            });
+            return Err(CapacityExceeded { target_capacity: C });
         }
 
         let mut array: [Option<T>; C] = std::array::from_fn(|_| None);
@@ -120,19 +142,39 @@ impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
 //     sv
 // }
 
+pub mod __macro_support {
+    use crate::stack_vec::StackVec;
+
+    pub fn sv_repeat<T: Clone, const C: usize>(value: T, times: usize) -> StackVec<T, C> {
+        let mut sv = StackVec::default();
+        sv.push_repeat(value, times);
+        sv
+    }
+}
+
 #[macro_export]
 macro_rules! sv {
     () => (
-        StackVec::default()
+        $crate::__rust_force_expr!($crate::stack_vec::StackVec::default())
     );
-    ( $( $x:expr ),* ) => {
+    ($elem:expr; $n:expr) => (
+        $crate::__rust_force_expr!($crate::stack_vec::__macro_support::sv_repeat($elem, $n))
+    );
+    ($($elem:expr), *) => {
         {
-            let mut sv = StackVec::default();
+            let mut sv = $crate::stack_vec::StackVec::default();
             $(
-                sv.push($x);
+                $crate::__rust_force_expr!(sv.push($elem));
             )*
             sv
         }
+    };
+}
+
+#[macro_export]
+macro_rules! __rust_force_expr {
+    ($e:expr) => {
+        $e
     };
 }
 
@@ -239,7 +281,6 @@ mod tests {
     #[test]
     fn init() {
         let sv = StackVec::<(), 4>::default();
-        assert_eq!(4, sv.capacity());
         assert!(sv.is_empty());
         assert_eq!(0, sv.len());
         assert_eq!(None, sv.iter().next());
@@ -247,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn debug() {
+    fn macro_and_debug() {
         {
             let sv: StackVec<(), 0> = sv![];
             assert_eq!("[]", format!("{sv:?}"));
@@ -264,6 +305,18 @@ mod tests {
             let sv: StackVec<_, 3> = sv!["zero", "one", "two"];
             assert_eq!(r#"["zero", "one", "two"]"#, format!("{sv:?}"));
         }
+        {
+            let sv: StackVec<_, 2> = sv!["zero"; 0];
+            assert_eq!(r#"[]"#, format!("{sv:?}"));
+        }
+        {
+            let sv: StackVec<_, 2> = sv!["zero"; 1];
+            assert_eq!(r#"["zero"]"#, format!("{sv:?}"));
+        }
+        {
+            let sv: StackVec<_, 2> = sv!["zero"; 2];
+            assert_eq!(r#"["zero", "zero"]"#, format!("{sv:?}"));
+        }
     }
 
     #[test]
@@ -279,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "index out of bounds: the len is 2 but the index is 2")]
+    #[should_panic(expected = "exceeds capacity (2)")]
     fn push_with_overflow() {
         let mut sv = StackVec::<_, 2>::default();
         sv.push("zero");
@@ -329,13 +382,7 @@ mod tests {
     #[test]
     fn from_array_overflow() {
         let result = StackVec::<_, 2>::try_from(["zero", "one", "two"]);
-        assert_eq!(
-            ArrayOverflow {
-                source_len: 3,
-                target_len: 2
-            },
-            result.unwrap_err()
-        );
+        assert_eq!(CapacityExceeded { target_capacity: 2 }, result.unwrap_err());
     }
 
     #[test]
@@ -376,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "the len is 2 but the index is 2")]
+    #[should_panic(expected = "exceeds capacity (2)")]
     fn sv_overflow() {
         let _: StackVec<_, 2> = sv!["0", "1", "2"];
     }

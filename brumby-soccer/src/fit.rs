@@ -12,7 +12,6 @@ use brumby::opt::{
 use brumby::probs::SliceExt;
 
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
-use crate::domain::OfferType::{AnytimeAssist, FirstGoalscorer};
 use crate::domain::Player::Named;
 use crate::interval::{
     BivariateProbs, Config, explore, PlayerProbs, PruneThresholds, TeamProbs,
@@ -296,7 +295,7 @@ pub fn fit_first_goalscorer_all<'a>(
                     Player::Other => unreachable!(),
                 };
                 let init_estimate = first_goalscorer.market.probs[index] / side_ratio;
-                // let start = Instant::now();
+                // let per_start = Instant::now();
                 let player_search_outcome = fit_first_goalscorer_one(
                     h1_probs,
                     h2_probs,
@@ -306,7 +305,7 @@ pub fn fit_first_goalscorer_all<'a>(
                     intervals,
                     max_total_goals
                 );
-                // println!("first goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}, took {:?}", first_goalscorer.market.probs[index], start.elapsed());
+                // println!("first goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}, took {:?}", first_goalscorer.market.probs[index], per_start.elapsed());
                 (player.clone(), player_search_outcome.optimal_value)
             }
             _ => unreachable!(),
@@ -332,10 +331,7 @@ fn fit_first_goalscorer_one(
         team_probs: TeamProbs {
             h1_goals: h1_goals.clone(),
             h2_goals: h2_goals.clone(),
-            assists: UnivariateProbs {
-                home: 1.0,
-                away: 1.0,
-            },
+            assists: UnivariateProbs::default(),
         },
         player_probs: vec![(
             player.clone(),
@@ -348,14 +344,14 @@ fn fit_first_goalscorer_one(
             max_total_goals,
             min_prob: GOALSCORER_MIN_PROB,
         },
-        expansions: requirements(&FirstGoalscorer),
+        expansions: requirements(&OfferType::FirstGoalscorer),
     };
     let outcome_type = OutcomeType::Player(player.clone());
     univariate_descent(
         &UnivariateDescentConfig {
             init_value: init_estimate,
             init_step: init_estimate * 0.1,
-            min_step: init_estimate * 0.001,
+            min_step: init_estimate * 0.0001,
             max_steps: 100,
             acceptable_residual: 1e-9,
         },
@@ -438,10 +434,7 @@ fn fit_anytime_goalscorer_one(
         team_probs: TeamProbs {
             h1_goals: h1_goals.clone(),
             h2_goals: h2_goals.clone(),
-            assists: UnivariateProbs {
-                home: 1.0,
-                away: 1.0,
-            },
+            assists: UnivariateProbs::default(),
         },
         player_probs: vec![(
             player.clone(),
@@ -461,7 +454,7 @@ fn fit_anytime_goalscorer_one(
         &UnivariateDescentConfig {
             init_value: init_estimate,
             init_step: init_estimate * 0.1,
-            min_step: init_estimate * 0.001,
+            min_step: init_estimate * 0.0001,
             max_steps: 100,
             acceptable_residual: 1e-9,
         },
@@ -559,14 +552,14 @@ fn fit_anytime_assist_one(
             max_total_goals,
             min_prob: GOALSCORER_MIN_PROB,
         },
-        expansions: requirements(&AnytimeAssist),
+        expansions: requirements(&OfferType::AnytimeAssist),
     };
     let outcome_type = OutcomeType::Player(player.clone());
     univariate_descent(
         &UnivariateDescentConfig {
             init_value: init_estimate,
             init_step: init_estimate * 0.1,
-            min_step: init_estimate * 0.001,
+            min_step: init_estimate * 0.0001,
             max_steps: 100,
             acceptable_residual: 1e-9,
         },

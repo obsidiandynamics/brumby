@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::stack_vec::StackVec;
+use brumby::sv;
 
 use crate::domain::{Player, Score, Side};
 
@@ -22,11 +23,7 @@ pub struct Prospect {
 }
 impl Prospect {
     fn init(players: usize) -> Prospect {
-        // let stats = vec![PlayerStats::default(); players];
-        let mut stats = StackVec::default();
-        for _ in 0..players {
-            stats.push(PlayerStats::default());
-        }
+        let stats = sv![PlayerStats::default(); players];
         Prospect {
             ht_score: Score::nil_all(),
             ft_score: Score::nil_all(),
