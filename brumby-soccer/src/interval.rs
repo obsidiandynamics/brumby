@@ -12,13 +12,14 @@ use crate::domain::{Player, Score, Side};
 mod assist;
 pub mod query;
 
-const PLAYERS: usize = 4;
+const NUM_PLAYERS: usize = 3;
+const NUM_PLAYER_STATS: usize = NUM_PLAYERS + 1;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Prospect {
     pub ht_score: Score,
     pub ft_score: Score,
-    pub stats: StackVec<PlayerStats, PLAYERS>,
+    pub stats: StackVec<PlayerStats, NUM_PLAYER_STATS>,
     pub first_scorer: Option<usize>,
 }
 impl Prospect {
@@ -188,7 +189,7 @@ pub struct TeamProbs {
 pub struct Config {
     pub intervals: u8,
     pub team_probs: TeamProbs,
-    pub player_probs: Vec<(Player, PlayerProbs)>,
+    pub player_probs: StackVec<(Player, PlayerProbs), NUM_PLAYERS>,
     pub prune_thresholds: PruneThresholds,
     pub expansions: Expansions,
 }

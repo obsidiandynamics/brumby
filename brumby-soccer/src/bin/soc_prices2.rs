@@ -12,6 +12,7 @@ use tracing::{debug, info};
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, OverroundMethod, PriceBounds};
 use brumby::probs::SliceExt;
+use brumby::sv;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, OutcomeType, Over, Period, Score};
 use brumby_soccer::fit::{away_booksum, home_booksum, ErrorType, FittingErrors};
@@ -451,7 +452,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         away: 1.0,
                     },
                 },
-                player_probs: vec![(
+                player_probs: sv![(
                     player.clone(),
                     PlayerProbs {
                         goal: Some(*prob),
@@ -530,7 +531,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         away: 1.0,
                     },
                 },
-                player_probs: vec![(
+                player_probs: sv![(
                     player.clone(),
                     PlayerProbs {
                         goal: Some(*prob),
@@ -643,7 +644,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
                     assists: assist_probs.clone(),
                 },
-                player_probs: vec![(
+                player_probs: sv![(
                     player.clone(),
                     PlayerProbs {
                         goal: None,
@@ -1000,7 +1001,7 @@ fn explore_scores(h1_goals: BivariateProbs, h2_goals: BivariateProbs) -> Explora
                     away: 1.0,
                 },
             },
-            player_probs: vec![],
+            player_probs: sv![],
             prune_thresholds: PruneThresholds {
                 max_total_goals: MAX_TOTAL_GOALS_FULL,
                 min_prob: 0.0,

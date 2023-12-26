@@ -1,9 +1,10 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Index, IndexMut};
+use bincode::Encode;
 use thiserror::Error;
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Encode)]
 pub struct StackVec<T, const C: usize> {
     len: usize,
     array: [Option<T>; C],
@@ -36,16 +37,16 @@ impl<T, const C: usize> StackVec<T, C> {
     }
 
     #[inline]
-    pub fn push_repeat(&mut self, value: T, times: usize)
+    pub fn repeat(&mut self, value: T, times: usize)
     where
         T: Clone,
     {
-        self.try_push_repeat(value, times)
+        self.try_repeat(value, times)
             .unwrap_or_else(|err| panic!("{}", err))
     }
 
     #[inline]
-    pub fn try_push_repeat(&mut self, value: T, times: usize) -> Result<(), CapacityExceeded>
+    pub fn try_repeat(&mut self, value: T, times: usize) -> Result<(), CapacityExceeded>
     where
         T: Clone,
     {
@@ -134,20 +135,12 @@ impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
     }
 }
 
-// pub fn si<J, T, const C: usize>(source: J) -> StackVec<T, C> where J: IntoIterator<Item = T> {
-//     let mut sv = StackVec::default();
-//     for item in source {
-//         sv.push(item);
-//     }
-//     sv
-// }
-
 pub mod __macro_support {
     use crate::stack_vec::StackVec;
 
     pub fn sv_repeat<T: Clone, const C: usize>(value: T, times: usize) -> StackVec<T, C> {
         let mut sv = StackVec::default();
-        sv.push_repeat(value, times);
+        sv.repeat(value, times);
         sv
     }
 }
@@ -160,7 +153,7 @@ macro_rules! sv {
     ($elem:expr; $n:expr) => (
         $crate::__rust_force_expr!($crate::stack_vec::__macro_support::sv_repeat($elem, $n))
     );
-    ($($elem:expr), *) => {
+    ($($elem:expr),+ $(,)?) => {
         {
             let mut sv = $crate::stack_vec::StackVec::default();
             $(
@@ -298,7 +291,15 @@ mod tests {
             assert_eq!(r#"["zero"]"#, format!("{sv:?}"));
         }
         {
+            let sv: StackVec<_, 2> = sv!["zero",];
+            assert_eq!(r#"["zero"]"#, format!("{sv:?}"));
+        }
+        {
             let sv: StackVec<_, 2> = sv!["zero", "one"];
+            assert_eq!(r#"["zero", "one"]"#, format!("{sv:?}"));
+        }
+        {
+            let sv: StackVec<_, 2> = sv!["zero", "one",];
             assert_eq!(r#"["zero", "one"]"#, format!("{sv:?}"));
         }
         {
@@ -316,6 +317,22 @@ mod tests {
         {
             let sv: StackVec<_, 2> = sv!["zero"; 2];
             assert_eq!(r#"["zero", "zero"]"#, format!("{sv:?}"));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "exceeds capacity (2)")]
+    fn macro_exceeds_capacity_elements() {
+        {
+            let _: StackVec<_, 2> = sv!["zero", "one", "two"];
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "exceeds capacity (2)")]
+    fn macro_exceeds_capacity_repeat() {
+        {
+            let _: StackVec<_, 2> = sv!["zero"; 3];
         }
     }
 

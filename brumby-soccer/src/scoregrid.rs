@@ -10,7 +10,7 @@ use crate::interval::{explore, Config, PruneThresholds, BivariateProbs, TeamProb
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
 use brumby::probs::SliceExt;
-use brumby::{factorial, poisson};
+use brumby::{factorial, poisson, sv};
 use crate::domain::OfferType::CorrectScore;
 use crate::interval::query::requirements;
 
@@ -168,7 +168,7 @@ pub fn from_interval(
                 h2_goals,
                 assists: UnivariateProbs { home: 1.0, away: 1.0 },
             },
-            player_probs: vec![],
+            player_probs: sv![],
             prune_thresholds: PruneThresholds {
                 max_total_goals,
                 min_prob: 0.0,

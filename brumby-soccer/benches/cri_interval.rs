@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use brumby::sv;
 
 use brumby_soccer::interval;
 use brumby_soccer::interval::{Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
@@ -13,7 +14,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
                     assists: UnivariateProbs { home: 1.0, away: 1.0 },
                 },
-                player_probs: vec![],
+                player_probs: sv![],
                 prune_thresholds: PruneThresholds {
                     max_total_goals,
                     min_prob: 1e-6,

@@ -13,6 +13,7 @@ use brumby::capture::Capture;
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, Overround, PriceBounds};
 use brumby::probs::SliceExt;
+use brumby::sv;
 use brumby::timed::Timed;
 
 use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
@@ -232,7 +233,7 @@ impl Model {
             let mut cache_stats = CacheStats::default();
             for outcome in &stub.outcomes {
                 let player_probs = match outcome.get_player() {
-                    None => vec![],
+                    None => sv![],
                     Some(player) => {
                         let mut player_probs = PlayerProbs::default();
                         if requires_player_goal_probs {
@@ -241,7 +242,7 @@ impl Model {
                         if requires_player_assist_probs {
                             player_probs.assist = Some(self.require_player_assist_prob(player)?);
                         }
-                        vec![(player.clone(), player_probs)]
+                        sv![(player.clone(), player_probs)]
                     }
                 };
 
@@ -286,7 +287,7 @@ impl Model {
                     config: interval::Config {
                         intervals: self.config.intervals,
                         team_probs,
-                        player_probs: vec![],
+                        player_probs: sv![],
                         prune_thresholds,
                         expansions: reqs,
                     },

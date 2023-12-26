@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use tracing::debug;
 
-use brumby::{factorial, poisson};
+use brumby::{factorial, poisson, sv};
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::opt::{
@@ -333,7 +333,7 @@ fn fit_first_goalscorer_one(
             h2_goals: h2_goals.clone(),
             assists: UnivariateProbs::default(),
         },
-        player_probs: vec![(
+        player_probs: sv![(
             player.clone(),
             PlayerProbs {
                 goal: Some(0.0),
@@ -436,7 +436,7 @@ fn fit_anytime_goalscorer_one(
             h2_goals: h2_goals.clone(),
             assists: UnivariateProbs::default(),
         },
-        player_probs: vec![(
+        player_probs: sv![(
             player.clone(),
             PlayerProbs {
                 goal: Some(0.0),
@@ -541,7 +541,7 @@ fn fit_anytime_assist_one(
             h2_goals: h2_goals.clone(),
             assists: assist_probs.clone(),
         },
-        player_probs: vec![(
+        player_probs: sv![(
             player.clone(),
             PlayerProbs {
                 goal: None,

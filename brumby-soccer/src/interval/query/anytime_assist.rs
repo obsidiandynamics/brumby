@@ -41,6 +41,7 @@ pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
 #[cfg(test)]
 mod tests {
     use assert_float_eq::*;
+    use brumby::sv;
     use super::*;
     use crate::domain::{Period, Score, Side};
     use crate::interval::{explore, Config, PlayerProbs, BivariateProbs, TeamProbs, UnivariateProbs};
@@ -71,7 +72,7 @@ mod tests {
                     },
                     assists: UnivariateProbs { home: 0.5, away: 1.0 },
                 },
-                player_probs: vec![
+                player_probs: sv![
                     (
                         alice.clone(),
                         PlayerProbs {
@@ -85,7 +86,7 @@ mod tests {
                             goal: Some(0.4),
                             assist: Some(0.4),
                         },
-                    ),
+                    )
                 ],
                 prune_thresholds: Default::default(),
                 expansions: Expansions {
@@ -162,7 +163,7 @@ mod tests {
                     },
                     assists: UnivariateProbs { home: 0.3, away: 0.4 },
                 },
-                player_probs: vec![
+                player_probs: sv![
                     (
                         alice.clone(),
                         PlayerProbs {
@@ -176,7 +177,7 @@ mod tests {
                             goal: Some(0.4),
                             assist: Some(0.4),
                         },
-                    ),
+                    )
                 ],
                 prune_thresholds: Default::default(),
                 expansions: Expansions {
