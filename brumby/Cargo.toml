@@ -50,3 +50,7 @@ harness = false
 [[bench]]
 name = "cri_selection"
 harness = false
+
+[[bench]]
+name = "cri_seq"
+harness = false

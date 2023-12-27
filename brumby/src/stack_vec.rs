@@ -1,13 +1,55 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Index, IndexMut};
+use bincode::enc::Encoder;
+
 use bincode::Encode;
+use bincode::error::EncodeError;
 use thiserror::Error;
 
-#[derive(Clone, Eq, Encode)]
+pub mod raw_array;
+
+#[macro_export]
+macro_rules! sv {
+    () => (
+        $crate::__rust_force_expr!($crate::stack_vec::StackVec::default())
+    );
+    ($elem:expr; $n:expr) => (
+        $crate::__rust_force_expr!($crate::stack_vec::__macro_support::sv_repeat($elem, $n))
+    );
+    ($($elem:expr),+ $(,)?) => {
+        {
+            let mut sv = $crate::stack_vec::StackVec::default();
+            $(
+                $crate::__rust_force_expr!(sv.push($elem));
+            )*
+            sv
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! __rust_force_expr {
+    ($e:expr) => {
+        $e
+    };
+}
+
+pub mod __macro_support {
+    use crate::stack_vec::StackVec;
+
+    pub fn sv_repeat<T: Clone, const C: usize>(value: T, times: usize) -> StackVec<T, C> {
+        let mut sv = StackVec::default();
+        sv.repeat(value, times);
+        sv
+    }
+}
+
+#[derive(Eq)]
 pub struct StackVec<T, const C: usize> {
     len: usize,
-    array: [Option<T>; C],
+    // array: RawArray<Option<T>, C>,
+    array: [Option<T>; C]
 }
 impl<T, const C: usize> StackVec<T, C> {
     #[inline]
@@ -89,6 +131,19 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
     }
 }
 
+impl<T: Clone, const C: usize> Clone for StackVec<T, C> {
+    fn clone(&self) -> Self {
+        let mut clone = Self {
+            array: std::array::from_fn(|_| None),
+            ..*self
+        };
+        for i in 0..self.len {
+            clone.array[i] = self.array[i].clone();
+        }
+        clone
+    }
+}
+
 impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -133,42 +188,6 @@ impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
         }
         Ok(Self { len: B, array })
     }
-}
-
-pub mod __macro_support {
-    use crate::stack_vec::StackVec;
-
-    pub fn sv_repeat<T: Clone, const C: usize>(value: T, times: usize) -> StackVec<T, C> {
-        let mut sv = StackVec::default();
-        sv.repeat(value, times);
-        sv
-    }
-}
-
-#[macro_export]
-macro_rules! sv {
-    () => (
-        $crate::__rust_force_expr!($crate::stack_vec::StackVec::default())
-    );
-    ($elem:expr; $n:expr) => (
-        $crate::__rust_force_expr!($crate::stack_vec::__macro_support::sv_repeat($elem, $n))
-    );
-    ($($elem:expr),+ $(,)?) => {
-        {
-            let mut sv = $crate::stack_vec::StackVec::default();
-            $(
-                $crate::__rust_force_expr!(sv.push($elem));
-            )*
-            sv
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! __rust_force_expr {
-    ($e:expr) => {
-        $e
-    };
 }
 
 impl<T, const C: usize> Default for StackVec<T, C> {
@@ -267,6 +286,16 @@ impl<T, const C: usize> IntoIterator for StackVec<T, C> {
     }
 }
 
+impl<T: Encode, const C: usize> Encode for StackVec<T, C> {
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.len.encode(encoder)?;
+        for item in self {
+            item.encode(encoder)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,6 +307,39 @@ mod tests {
         assert_eq!(0, sv.len());
         assert_eq!(None, sv.iter().next());
         assert_eq!(None, sv.into_iter().next());
+    }
+
+    #[test]
+    fn clone() {
+        {
+            let sv = StackVec::<(), 4>::default();
+            let clone = sv.clone();
+            assert!(clone.is_empty());
+        }
+        {
+            let sv: StackVec<_, 2> = sv!["zero"];
+            let clone = sv.clone();
+            assert_eq!(vec!["zero"], clone.into_iter().collect::<Vec<_>>());
+        }
+        {
+            let sv: StackVec<_, 2> = sv!["zero", "one"];
+            let clone = sv.clone();
+            assert_eq!(vec!["zero", "one"], clone.into_iter().collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn eq() {
+        let a: StackVec<&str, 2> = sv![];
+        let b: StackVec<_, 2> = sv!["zero"];
+        let c1: StackVec<_, 2> = sv!["zero", "one"];
+        let c2: StackVec<_, 2> = sv!["zero", "one"];
+        assert_ne!(a, b);
+        assert_ne!(b, c1);
+        assert_eq!(a, a);
+        assert_eq!(b, b);
+        assert_eq!(c1, c1);
+        assert_eq!(c1, c2);
     }
 
     #[test]

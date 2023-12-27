@@ -9,7 +9,7 @@ pub fn combinations(n: u8, r: u8, factorial: &impl Factorial) -> u128 {
     factorial.get(n) / factorial.get(r) / factorial.get(n - r)
 }
 
-/// Probability of `r` successes in `n` independent Bernoulli trials, given `p` probability of success.
+/// Probability of `r` successes i n `n` independent Bernoulli trials, given `p` probability of success.
 pub fn binomial(n: u8, r: u8, p: f64, factorial: &impl Factorial) -> f64 {
     assert!(n >= r, "n ({n}) < r ({r})");
     assert!(p <= 1.0, "p ({p}) > 1.0");
