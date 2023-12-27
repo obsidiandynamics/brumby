@@ -33,7 +33,14 @@ impl<T, const C: usize> RawArray<T, C> {
     }
 
     #[inline]
-    pub unsafe fn set(&mut self, index: usize, value: T) {
+    pub unsafe fn get_mut(&mut self, index: usize) -> &mut T {
+        let ptr = self.array.as_mut_ptr();
+        let pos = ptr.add(index);
+        &mut *pos
+    }
+
+    #[inline]
+    pub unsafe fn set_and_forget(&mut self, index: usize, value: T) {
         let ptr = self.array.as_mut_ptr();
         let pos = ptr.add(index);
         pos.write(value);
@@ -47,13 +54,19 @@ impl<T, const C: usize> RawArray<T, C> {
     }
 
     #[inline]
-    pub unsafe fn drop_range(mut self, offset: usize, len: usize) {
-        let ptr = self.array.as_mut_ptr();
-        for index in offset..offset + len {
-            let pos = ptr.add(index);
-            let value = pos.read();
-            drop(value);
+    pub unsafe fn drop_range(&mut self, offset: usize, len: usize) {
+        if mem::needs_drop::<T>() {
+            let ptr = self.array.as_mut_ptr();
+            for index in offset..offset + len {
+                let pos = ptr.add(index);
+                pos.drop_in_place();
+            }
         }
+    }
+
+    #[inline]
+    unsafe fn destruct(mut self, offset: usize, len: usize) {
+        self.drop_range(offset, len);
         mem::forget(self);
     }
 
@@ -68,13 +81,28 @@ impl<T, const C: usize> RawArray<T, C> {
         let ptr = self.array.as_mut_ptr();
         slice::from_raw_parts_mut(ptr, len)
     }
+
+    #[inline]
+    pub fn destructor(self, offset: usize, len: usize) -> Destructor<T, C> {
+        Destructor {
+            array: Explicit::Some(self),
+            offset,
+            len,
+        }
+    }
+}
+
+impl<T, const C: usize> Drop for RawArray<T, C> {
+    fn drop(&mut self) {
+        panic!("drop() called instead of destruct()");
+    }
 }
 
 impl<T, const C: usize> Default for RawArray<T, C> {
     #[inline]
     fn default() -> Self {
         unsafe {
-            let uninit_ptr: MaybeUninit<[T; C]> = MaybeUninit::uninit();
+            let uninit_ptr = MaybeUninit::uninit();
             let array = uninit_ptr.assume_init();
             Self {
                 array
@@ -84,9 +112,9 @@ impl<T, const C: usize> Default for RawArray<T, C> {
 }
 
 pub struct Destructor<T, const C: usize> {
-    array: Explicit<RawArray<T, C>>,
-    offset: usize,
-    len: usize
+    pub(crate) array: Explicit<RawArray<T, C>>,
+    pub(crate) offset: usize,
+    pub(crate) len: usize
 }
 
 impl<T, const C: usize> Deref for Destructor<T, C> {
@@ -108,9 +136,10 @@ impl<T, const C: usize> DerefMut for Destructor<T, C> {
 impl<T, const C: usize> Drop for Destructor<T, C> {
     #[inline]
     fn drop(&mut self) {
-        let array = self.array.take();
-        unsafe {
-            array.drop_range(self.offset, self.len);
+        if let Explicit::Some(array) = self.array.take() {
+            unsafe {
+                array.destruct(self.offset, self.len);
+            }
         }
     }
 }
@@ -122,40 +151,52 @@ impl<T, const C: usize> Drop for Destructor<T, C> {
 //     dst
 // }
 
-/// A variant of `Option` that omits the "null pointer optimisation" (NPO). By adding a third variant,
-/// the variant is determined explicitly from the stored tag, rather than implicitly. This enables
-/// the encapsulation of uninitialised data, which would otherwise appear as [None] under
-/// NPO.
-enum Explicit<T> {
+/// A variant of `Option` that omits the niche optimisation, enabling the encapsulation of
+/// uninitialised data, which would otherwise appear as [None] under the niche optimisation.
+/// `repr(C)` forces the tag to be included in the memory layout.
+#[repr(C)]
+pub(crate) enum Explicit<T> {
     None,
     Some(T),
-    __Other
 }
 impl<T> Explicit<T> {
-    // fn is_some(&self) -> bool {
-    //     matches!(self, Unoption::Some(_))
-    // }
-
-    fn as_ref(&self) -> &T {
+    #[inline]
+    pub(crate) fn as_ref(&self) -> &T {
         match self {
             Explicit::Some(value) => value,
             _ => panic!("invalid state")
         }
     }
 
-    fn as_mut(&mut self) -> &mut T {
+    #[inline]
+    pub(crate) fn as_mut(&mut self) -> &mut T {
         match self {
             Explicit::Some(value) => value,
             _ => panic!("invalid state")
         }
     }
 
-    fn take(&mut self) -> T {
-        let mut replacement = Explicit::__Other;
+    #[inline]
+    pub(crate) fn take(&mut self) -> Explicit<T> {
+        let mut replacement = Explicit::None;
         mem::swap(self, &mut replacement);
-        match replacement {
-            Explicit::Some(value) => value,
-            _ => panic!("invalid state")
+        replacement
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod dropper {
+    //! Testing of destructors.
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[derive(Debug, Clone)]
+    pub struct Dropper(pub Rc<RefCell<usize>>);
+
+    impl Drop for Dropper {
+        fn drop(&mut self) {
+            *self.0.borrow_mut() += 1;
         }
     }
 }
@@ -164,6 +205,7 @@ impl<T> Explicit<T> {
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
+    use crate::stack_vec::raw_array::dropper::Dropper;
 
     use super::*;
 
@@ -171,16 +213,46 @@ mod tests {
     fn empty() {
         let array = RawArray::<String, 4>::default();
         unsafe {
-            array.drop_range(0, 0);
+            array.destruct(0, 0);
         }
+    }
+
+    #[test]
+    fn empty_zero_length() {
+        let array = RawArray::<String, 0>::default();
+        unsafe {
+            array.destruct(0, 0);
+        }
+    }
+
+    #[test]
+    fn empty_zst() {
+        let array = RawArray::<(), 4>::default();
+        unsafe {
+            array.destruct(0, 0);
+        }
+    }
+
+    #[test]
+    fn empty_zero_length_zst() {
+        let array = RawArray::<(), 0>::default();
+        unsafe {
+            array.destruct(0, 0);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "drop() called instead of destruct()")]
+    fn drop_panics() {
+        let _ = RawArray::<(), 4>::default();
     }
 
     #[test]
     fn read_write_static_ref() {
         let mut array = RawArray::<&str, 4>::default();
         unsafe {
-            array.set(0, "zero");
-            array.set(1, "one");
+            array.set_and_forget(0, "zero");
+            array.set_and_forget(1, "one");
             assert_eq!(&["zero", "one"], array.as_slice(2));
             assert_eq!(&["zero", "one"], array.as_mut_slice(2));
 
@@ -191,7 +263,7 @@ mod tests {
             slice[0] = "0";
             slice[1] = "1";
             assert_eq!(&["0", "1"], array.as_slice(2));
-            array.drop_range(0, 2);
+            array.destruct(0, 2);
         }
     }
 
@@ -199,8 +271,8 @@ mod tests {
     fn read_write_owned() {
         let mut array = RawArray::<String, 4>::default();
         unsafe {
-            array.set(0, String::from("zero"));
-            array.set(1, String::from("one"));
+            array.set_and_forget(0, String::from("zero"));
+            array.set_and_forget(1, String::from("one"));
             assert_eq!(&["zero", "one"], array.as_slice(2));
             assert_eq!(&["zero", "one"], array.as_mut_slice(2));
 
@@ -212,27 +284,106 @@ mod tests {
             slice[1] = String::from("1");
             assert_eq!(&["0", "1"], array.as_slice(2));
 
-            array.drop_range(0, 2);
-        }
-    }
-
-    /// Testing of destructors.
-    struct Dropper(Rc<RefCell<usize>>);
-    impl Drop for Dropper {
-        fn drop(&mut self) {
-            *self.0.borrow_mut() += 1;
+            array.destruct(0, 2);
         }
     }
 
     #[test]
-    fn destroy_calls_drop() {
+    fn read_write_zst() {
+        let mut array = RawArray::<(), 4>::default();
+        unsafe {
+            array.set_and_forget(0, ());
+            array.set_and_forget(1, ());
+            assert_eq!(&[(), ()], array.as_slice(2));
+            assert_eq!(&[(), ()], array.as_mut_slice(2));
+
+            assert_eq!((), *array.get(0));
+            assert_eq!((), *array.get(1));
+
+            let slice = array.as_mut_slice(2);
+            slice[0] = ();
+            slice[1] = ();
+            assert_eq!(&[(), ()], array.as_slice(2));
+
+            array.destruct(0, 2);
+        }
+    }
+
+    #[test]
+    fn destruct_calls_drop() {
         let drop_count = Rc::new(RefCell::new(0_usize));
         let mut array = RawArray::<Dropper, 4>::default();
         unsafe {
-            array.set(0, Dropper(Rc::clone(&drop_count)));
-            array.set(1, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
             assert_eq!(0, *drop_count.borrow());
-            array.drop_range(0, 2);
+            array.destruct(0, 2);
+            assert_eq!(2, *drop_count.borrow());
+        }
+    }
+
+    #[test]
+    fn take_calls_drop() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let mut array = RawArray::<Dropper, 4>::default();
+        unsafe {
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+            array.take(1);
+            assert_eq!(1, *drop_count.borrow());
+            array.destruct(0, 1);
+            assert_eq!(2, *drop_count.borrow());
+        }
+    }
+
+    #[test]
+    fn replace_via_mut_ref_calls_drop() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let mut array = RawArray::<Dropper, 4>::default();
+        unsafe {
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+            let reference = array.get_mut(1);
+            assert_eq!(0, *drop_count.borrow());
+
+            *reference = Dropper(Rc::clone(&drop_count)); // replacing should call drop()
+            assert_eq!(1, *drop_count.borrow());
+            array.destruct(0, 2);
+            assert_eq!(3, *drop_count.borrow());
+        }
+    }
+
+    #[test]
+    fn replace_via_mut_slice_calls_drop() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let mut array = RawArray::<Dropper, 4>::default();
+        unsafe {
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+            let slice = array.as_mut_slice(2);
+            assert_eq!(0, *drop_count.borrow());
+
+            slice[1] = Dropper(Rc::clone(&drop_count)); // replacing should call drop()
+            assert_eq!(1, *drop_count.borrow());
+            array.destruct(0, 2);
+            assert_eq!(3, *drop_count.borrow());
+        }
+    }
+
+    #[test]
+    fn set_and_forget_does_not_call_drop() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let mut array = RawArray::<Dropper, 4>::default();
+        unsafe {
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+            array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+            array.destruct(0, 2);
             assert_eq!(2, *drop_count.borrow());
         }
     }
@@ -241,15 +392,11 @@ mod tests {
     fn destructor() {
         let drop_count = Rc::new(RefCell::new(0_usize));
         let array = RawArray::<Dropper, 4>::default();
-        let mut d = Destructor {
-            array: Explicit::Some(array),
-            offset: 0,
-            len: 0,
-        };
+        let mut d = array.destructor(0, 0);
         unsafe {
-            d.set(0, Dropper(Rc::clone(&drop_count)));
-            d.set(1, Dropper(Rc::clone(&drop_count)));
-            d.set(2, Dropper(Rc::clone(&drop_count)));
+            d.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            d.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            d.set_and_forget(2, Dropper(Rc::clone(&drop_count)));
         }
         assert_eq!(0, *drop_count.borrow());
         unsafe {
@@ -258,7 +405,6 @@ mod tests {
         assert_eq!(1, *drop_count.borrow());
         d.offset = 1;
         d.len = 2;
-        // mem::forget(d);
         drop(d);
         assert_eq!(3, *drop_count.borrow());
     }

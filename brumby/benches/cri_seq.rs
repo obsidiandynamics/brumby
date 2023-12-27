@@ -28,6 +28,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         bench::<16>(c);
         bench::<64>(c);
         bench::<256>(c);
+        bench::<1024>(c);
+        bench::<4096>(c);
     }
     {
         #[inline]
@@ -55,6 +57,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         bench::<64>(c);
         bench::<256>(c);
         bench::<1024>(c);
+        bench::<4096>(c);
     }
     {
         #[inline]
@@ -62,12 +65,13 @@ fn criterion_benchmark(c: &mut Criterion) {
             let mut array = RawArray::<usize, C>::default();
             unsafe {
                 for i in 0..C {
-                    array.set(i, i);
+                    array.set_and_forget(i, i);
                 }
                 let mut sum = 0;
                 for i in 0..C {
                     sum += array.get(i);
                 }
+                array.destructor(0, C);
                 sum
             }
         }
@@ -84,6 +88,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         bench::<64>(c);
         bench::<256>(c);
         bench::<1024>(c);
+        bench::<4096>(c);
     }
     {
         #[inline]
@@ -111,6 +116,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         bench::<64>(c);
         bench::<256>(c);
         bench::<1024>(c);
+        bench::<4096>(c);
     }
 }
 

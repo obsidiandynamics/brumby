@@ -326,6 +326,23 @@ fn fit_first_goalscorer_one(
     intervals: u8,
     max_total_goals: u16
 ) -> UnivariateDescentOutcome {
+    // println!("size of RawArray={}", mem::size_of::<RawArray<(Player, PlayerProbs), 3>>());
+    // println!("size of Explicit<RawArray>={}", mem::size_of::<Explicit<RawArray<(Player, PlayerProbs), 3>>>());
+    // let mut player_probs: StackVec<(Player, PlayerProbs), 3> = StackVec::default();
+    // player_probs.push((
+    //     player.clone(),
+    //     PlayerProbs {
+    //         goal: Some(0.0),
+    //         assist: None,
+    //     },
+    // ));
+    let player_probs = sv![(
+            player.clone(),
+            PlayerProbs {
+                goal: Some(0.0),
+                assist: None,
+            },
+        )];
     let mut config = Config {
         intervals,
         team_probs: TeamProbs {
@@ -333,13 +350,7 @@ fn fit_first_goalscorer_one(
             h2_goals: h2_goals.clone(),
             assists: UnivariateProbs::default(),
         },
-        player_probs: sv![(
-            player.clone(),
-            PlayerProbs {
-                goal: Some(0.0),
-                assist: None,
-            },
-        )],
+        player_probs,
         prune_thresholds: PruneThresholds {
             max_total_goals,
             min_prob: GOALSCORER_MIN_PROB,
