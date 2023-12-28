@@ -118,6 +118,12 @@ impl<T, const C: usize> StackVec<T, C> {
     }
 
     #[inline(always)]
+    pub fn fill(&mut self, value: &T) where T: Clone {
+        self.clear();
+        (0..C).for_each(|_| self.push(value.clone()));
+    }
+
+    #[inline(always)]
     pub fn as_slice(&self) -> &[T] {
         self
     }
@@ -202,23 +208,37 @@ pub struct CapacityExceeded {
 impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
     type Error = CapacityExceeded;
 
+    #[inline]
     fn try_from(source: [T; B]) -> Result<Self, Self::Error> {
         let mut sv = StackVec::default();
         for item in source {
             sv.try_push(item)?;
         }
         Ok(sv)
-        // if B > C {
-        //     return Err(CapacityExceeded { target_capacity: C });
-        // }
-        //
-        // let mut array: RawArray<T, C> = RawArray::default();
-        // for (index, item) in source.into_iter().enumerate() {
-        //     unsafe {
-        //         array.set_and_forget(index, item);
-        //     }
-        // }
-        // Ok(Self { len: B, array: Explicit::Some(array) })
+    }
+}
+
+impl<T: Clone, const C: usize> TryFrom<&[T]> for StackVec<T, C> {
+    type Error = CapacityExceeded;
+
+    #[inline]
+    fn try_from(source: &[T]) -> Result<Self, Self::Error> {
+        let mut sv = StackVec::default();
+        for item in source {
+            sv.try_push(item.clone())?;
+        }
+        Ok(sv)
+    }
+}
+
+impl<T, const C: usize> FromIterator<T> for StackVec<T, C> {
+    #[inline]
+    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+        let mut sv = StackVec::default();
+        for item in iter {
+            sv.push(item);
+        }
+        sv
     }
 }
 
@@ -697,9 +717,29 @@ mod tests {
     }
 
     #[test]
+    fn from_slice() {
+        let slice = ["zero", "one"].as_slice();
+        let sv = StackVec::<&str, 2>::try_from(slice).unwrap();
+        assert_eq!(2, sv.len());
+        assert_eq!(vec!["zero", "one"], sv.into_iter().collect::<Vec<_>>());
+    }
+
+    #[test]
     fn from_array_overflow() {
         let result = StackVec::<_, 2>::try_from(["zero", "one", "two"]);
         assert_eq!(CapacityExceeded { target_capacity: 2 }, result.unwrap_err());
+    }
+
+    #[test]
+    fn from_iterator() {
+        let sv = (0..3).collect::<StackVec<_, 3>>();
+        assert_eq!(3, sv.len);
+    }
+
+    #[test]
+    #[should_panic(expected = "exceeds capacity (3)")]
+    fn from_iterator_overflow() {
+        let _ = (0..4).collect::<StackVec<_, 3>>();
     }
 
     #[test]
@@ -792,6 +832,28 @@ mod tests {
         assert!(sv.is_empty());
         drop(sv);
         assert_eq!(2, *drop_count.borrow());
+    }
+
+    #[test]
+    fn fill_owned() {
+        let mut sv: StackVec<_, 3> = sv![String::from("0"), String::from("1")];
+        sv.fill(&String::from("9"));
+        assert_eq!(vec![String::from("9"), String::from("9"), String::from("9")], sv.to_vec());
+    }
+
+    #[test]
+    fn fill_will_drop() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let dropper = Dropper(Rc::clone(&drop_count));
+        let mut sv: StackVec<_, 3> = sv![dropper.clone(), dropper.clone()];
+        assert_eq!(0, *drop_count.borrow());
+
+        sv.fill(&dropper);
+        assert_eq!(3, sv.len());
+        assert_eq!(2, *drop_count.borrow());
+
+        drop(sv);
+        assert_eq!(5, *drop_count.borrow());
     }
 
     #[test]

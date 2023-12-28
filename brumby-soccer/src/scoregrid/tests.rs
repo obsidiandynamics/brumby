@@ -111,7 +111,7 @@ pub fn univariate_poisson_binomial_similarity() {
     let interval_away_prob_est =
         1.0 - poisson::univariate(0, AWAY_RATE / INTERVALS as f64, &factorial::Calculator);
     println!("estimated home_prob: {interval_home_prob_est}, away_prob: {interval_away_prob_est}");
-    let search_outcome = hypergrid_search(
+    let search_outcome = hypergrid_search::<2>(
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
@@ -169,7 +169,7 @@ pub fn bivariate_poisson_binomial_similarity() {
     let interval_common_prob_est =
         1.0 - poisson::univariate(0, COMMON_RATE / INTERVALS as f64, &factorial::Calculator);
     println!("estimated home_prob: {interval_home_prob_est}, away_prob: {interval_away_prob_est}, common_prob: {interval_common_prob_est}");
-    let search_outcome = hypergrid_search(
+    let search_outcome = hypergrid_search::<3>(
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,

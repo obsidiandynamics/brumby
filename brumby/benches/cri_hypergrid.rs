@@ -9,7 +9,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     const RANGE: RangeInclusive<f64> = -10.0..=10.0;
 
     #[inline(always)]
-    fn poly3() -> HypergridSearchOutcome {
+    fn poly3() -> HypergridSearchOutcome<3> {
         let config = HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-12,
@@ -27,7 +27,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     #[inline(always)]
-    fn poly4() -> HypergridSearchOutcome {
+    fn poly4() -> HypergridSearchOutcome<4> {
         let config = HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-15,
@@ -48,7 +48,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     #[inline(always)]
-    fn poly5() -> HypergridSearchOutcome {
+    fn poly5() -> HypergridSearchOutcome<5> {
         let config = HypergridSearchConfig {
             max_steps: 100,
             acceptable_residual: 1e-15,

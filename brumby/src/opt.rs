@@ -3,6 +3,7 @@ use anyhow::bail;
 
 use crate::capture::Capture;
 use crate::comb::{count_permutations, pick};
+use crate::stack_vec::StackVec;
 
 #[derive(Clone, Debug)]
 pub struct UnivariateDescentConfig {
@@ -112,33 +113,42 @@ impl HypergridSearchConfig<'_> {
 }
 
 #[derive(Debug)]
-pub struct HypergridSearchOutcome {
+pub struct HypergridSearchOutcome<const C: usize> {
     pub steps: u64,
-    pub optimal_values: Vec<f64>,
+    pub optimal_values: StackVec<f64, C>,
     pub optimal_residual: f64,
 }
 
-pub fn hypergrid_search(
+pub fn hypergrid_search<const C: usize>(
     config: &HypergridSearchConfig,
     mut constraint_f: impl FnMut(&[f64]) -> bool,
-    mut loss_f: impl FnMut(&[f64]) -> f64) -> HypergridSearchOutcome {
+    mut loss_f: impl FnMut(&[f64]) -> f64) -> HypergridSearchOutcome<C> {
     config.validate().unwrap();
 
     let mut steps = 0;
-    let mut values = Vec::with_capacity(config.bounds.len());
-    values.resize(values.capacity(), 0.0);
+    // let mut values = Vec::with_capacity(config.bounds.len());
+    // values.resize(values.capacity(), 0.0);
+    let mut values = StackVec::default();
+    values.fill(&0.0);
+    // (0..C).for_each(|_| values.push(0.0)); //TODO replace with fill()
 
     let mut optimal_values = values.clone();
     let mut optimal_residual = f64::MAX;
 
-    let cardinalities = {
-        let mut cardinalities = Vec::with_capacity(values.len());
-        cardinalities.resize(cardinalities.capacity(), config.resolution);
-        cardinalities
-    };
+    // let cardinalities = {
+    //     // let mut cardinalities = Vec::with_capacity(values.len());
+    //     // cardinalities.resize(cardinalities.capacity(), config.resolution);
+    //     // cardinalities
+    //     let mut cardinalities = StackVec::<_, C>::default();
+    //     (0..C).for_each(|_| cardinalities.push(config.resolution)); //TODO replace with fill()
+    //     cardinalities
+    // };
+    let mut cardinalities = StackVec::<_, C>::default();
+    cardinalities.fill(&config.resolution);
     let mut ordinals = cardinalities.clone();
     let permutations = count_permutations(&cardinalities);
-    let mut bounds = (*config.bounds).to_vec();
+    // let mut bounds = (*config.bounds).to_vec(); //TODO
+    let mut bounds = StackVec::<_, C>::try_from(&*config.bounds).unwrap();
     let inv_resolution = 1.0 / (config.resolution - 1) as f64;
 
     'outer: while steps < config.max_steps {

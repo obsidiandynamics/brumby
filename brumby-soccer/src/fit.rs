@@ -10,6 +10,7 @@ use brumby::opt::{
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
+use brumby::stack_vec::StackVec;
 
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::domain::Player::Named;
@@ -101,7 +102,7 @@ pub fn fit_scoregrid_half(
     away_goals_estimate: f64,
     offers: &[&Offer],
     intervals: u8,
-    max_total_goals_half: u16) -> HypergridSearchOutcome {
+    max_total_goals_half: u16) -> HypergridSearchOutcome<2> {
     let init_estimates = {
         let start = Instant::now();
         let search_outcome = fit_univariate_poisson_scoregrid(home_goals_estimate, away_goals_estimate, offers, intervals, max_total_goals_half);
@@ -120,9 +121,11 @@ pub fn fit_scoregrid_half(
             .collect::<Vec<_>>()
     };
     println!("initial estimates: {init_estimates:?}");
+
+    let init_estimates_sv = init_estimates.into_iter().collect();
     HypergridSearchOutcome {
         steps: 0,
-        optimal_values: init_estimates,
+        optimal_values: init_estimates_sv,
         optimal_residual: 0.0,
     }
 
@@ -182,7 +185,7 @@ pub fn fit_scoregrid_half(
 //     search_outcome
 // }
 
-pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_total_goals: u16) -> (HypergridSearchOutcome, Vec<f64>) {
+pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_total_goals: u16) -> (HypergridSearchOutcome<3>, StackVec<f64, 3>) {
     let expected_total_goals_per_side = {
         let start = Instant::now();
         let init_estimate = match &total_goals.offer_type {
@@ -684,7 +687,7 @@ fn fit_univariate_poisson_scoregrid(
     offers: &[&Offer],
     intervals: u8,
     max_total_goals: u16,
-) -> HypergridSearchOutcome {
+) -> HypergridSearchOutcome<2> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
     let bounds = [home_goals_estimate * 0.83..=home_goals_estimate * 1.2, away_goals_estimate * 0.83..=away_goals_estimate * 1.20];
     // let bounds = [0.2..=3.0, 0.2..=3.0];
@@ -710,7 +713,7 @@ fn fit_bivariate_poisson_scoregrid(
     common_estimate: f64,
     intervals: u8,
     max_total_goals: u16,
-) -> HypergridSearchOutcome {
+) -> HypergridSearchOutcome<3> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
     // println!("estimates: {home_estimate} and {away_estimate}");
     let bounds = [home_estimate - 0.5..=home_estimate, away_estimate - 0.5..=away_estimate, common_estimate..=common_estimate + 0.5];
@@ -730,38 +733,38 @@ fn fit_bivariate_poisson_scoregrid(
     )
 }
 
-fn fit_univariate_binomial_scoregrid(
-    offers: &[&Offer],
-    init_estimates: &[f64],
-    intervals: u8,
-    max_total_goals: u16,
-) -> HypergridSearchOutcome {
-    let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
-    let bounds = init_estimates
-        .iter()
-        .map(|&estimate| (estimate * 0.67)..=(estimate * 1.5))
-        .collect::<Vec<_>>();
-    hypergrid_search(
-        &HypergridSearchConfig {
-            max_steps: 10,
-            acceptable_residual: 1e-6,
-            bounds: Capture::Borrowed(&bounds),
-            resolution: 10,
-        },
-        |values| values.sum() <= 1.0,
-        |values| {
-            univariate_binomial_scoregrid(intervals, values[0], values[1], &mut scoregrid);
-            scoregrid_error(offers, &scoregrid)
-        },
-    )
-}
+// fn fit_univariate_binomial_scoregrid(
+//     offers: &[&Offer],
+//     init_estimates: &[f64],
+//     intervals: u8,
+//     max_total_goals: u16,
+// ) -> HypergridSearchOutcome<1> {
+//     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
+//     let bounds = init_estimates
+//         .iter()
+//         .map(|&estimate| (estimate * 0.67)..=(estimate * 1.5))
+//         .collect::<Vec<_>>();
+//     hypergrid_search(
+//         &HypergridSearchConfig {
+//             max_steps: 10,
+//             acceptable_residual: 1e-6,
+//             bounds: Capture::Borrowed(&bounds),
+//             resolution: 10,
+//         },
+//         |values| values.sum() <= 1.0,
+//         |values| {
+//             univariate_binomial_scoregrid(intervals, values[0], values[1], &mut scoregrid);
+//             scoregrid_error(offers, &scoregrid)
+//         },
+//     )
+// }
 
 fn fit_bivariate_binomial_scoregrid(
     offers: &[&Offer],
     init_estimates: &[f64],
     intervals: u8,
     max_total_goals: u16,
-) -> HypergridSearchOutcome {
+) -> HypergridSearchOutcome<3> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
     let bounds = init_estimates
         .iter()

@@ -23,7 +23,7 @@ fn hypergrid_search_poly3() {
         resolution: 4,
     };
     // search for root of (x - 5)(x + 6)(x - 10) = 0
-    let outcome = hypergrid_search(&config, |_| true, |values| {
+    let outcome = hypergrid_search::<3>(&config, |_| true, |values| {
         (values[0] - 5.0).powi(2) + (values[1] + 6.0).powi(2) + (values[2] - 10.0).powi(2)
     });
     println!("outcome: {outcome:?}");
