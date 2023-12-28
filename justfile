@@ -43,7 +43,7 @@ bench:
 
 # run the tests
 test:
-    cargo test
+    cargo test -- --include-ignored
     cargo test --examples
     cargo doc --no-deps
     cargo bench --no-run --profile dev

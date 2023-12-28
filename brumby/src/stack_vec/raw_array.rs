@@ -210,6 +210,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn explicit_as_ref() {
+        let explicit = Explicit::Some("text");
+        assert_eq!("text", *explicit.as_ref());
+    }
+
+    #[test]
+    fn explicit_as_mut() {
+        let mut explicit = Explicit::Some("one");
+        let r = explicit.as_mut();
+        assert_eq!("one", *r);
+        *r = "two";
+        assert_eq!("two", *explicit.as_ref());
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid state")]
+    fn explicit_as_mut_panics_when_none() {
+        let mut explicit: Explicit<()> = Explicit::None;
+        explicit.as_mut();
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid state")]
+    fn explicit_as_ref_panics_when_none() {
+        let explicit: Explicit<()> = Explicit::None;
+        explicit.as_ref();
+    }
+
+    #[test]
+    fn explicit_take_leaves_none() {
+        {
+            let mut explicit = Explicit::Some(());
+            let taken = explicit.take();
+            assert!(matches!(explicit, Explicit::None));
+            assert!(matches!(taken, Explicit::Some(_)));
+        }
+        {
+            let mut explicit: Explicit<()> = Explicit::None;
+            let taken = explicit.take();
+            assert!(matches!(explicit, Explicit::None));
+            assert!(matches!(taken, Explicit::None));
+        }
+    }
+
+    #[test]
     fn empty() {
         let array = RawArray::<String, 4>::default();
         unsafe {
