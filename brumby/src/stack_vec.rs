@@ -53,22 +53,22 @@ pub struct StackVec<T, const C: usize> {
     // array: [Option<T>; C]
 }
 impl<T, const C: usize> StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.len
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn push(&mut self, value: T) {
         self.try_push(value).unwrap_or_else(|err| panic!("{}", err))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn try_push(&mut self, value: T) -> Result<(), CapacityExceeded> {
         if self.len < C {
             unsafe {
@@ -81,7 +81,7 @@ impl<T, const C: usize> StackVec<T, C> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn repeat(&mut self, value: T, times: usize)
     where
         T: Clone,
@@ -90,7 +90,7 @@ impl<T, const C: usize> StackVec<T, C> {
             .unwrap_or_else(|err| panic!("{}", err))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn try_repeat(&mut self, value: T, times: usize) -> Result<(), CapacityExceeded>
     where
         T: Clone,
@@ -104,11 +104,12 @@ impl<T, const C: usize> StackVec<T, C> {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn iter(&self) -> Iter<T, C> {
         Iter { sv: self, pos: 0 }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn clear(&mut self) {
         unsafe {
             self.array.as_mut().drop_range(0, self.len);
@@ -116,19 +117,19 @@ impl<T, const C: usize> StackVec<T, C> {
         self.len = 0;
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn as_slice(&self) -> &[T] {
         self
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         self
     }
 }
 
 impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         let self_slice = &**self;
         let other_slice = &**other;
@@ -151,6 +152,7 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
 impl<T: Eq, const C: usize> Eq for StackVec<T, C> {}
 
 impl<T: Clone, const C: usize> Clone for StackVec<T, C> {
+    #[inline(always)]
     fn clone(&self) -> Self {
         let mut clone = RawArray::default();
         for i in 0..self.len {
@@ -166,7 +168,7 @@ impl<T: Clone, const C: usize> Clone for StackVec<T, C> {
 }
 
 impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         let slice = &**self;
         slice.hash(state);
@@ -221,7 +223,7 @@ impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
 }
 
 impl<T, const C: usize> Default for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self {
             len: 0,
@@ -233,7 +235,7 @@ impl<T, const C: usize> Default for StackVec<T, C> {
 impl<T, const C: usize> Index<usize> for StackVec<T, C> {
     type Output = T;
 
-    #[inline]
+    #[inline(always)]
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
             panic!(
@@ -246,7 +248,7 @@ impl<T, const C: usize> Index<usize> for StackVec<T, C> {
 }
 
 impl<T, const C: usize> IndexMut<usize> for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= self.len {
             panic!(
@@ -261,14 +263,14 @@ impl<T, const C: usize> IndexMut<usize> for StackVec<T, C> {
 impl<T, const C: usize> Deref for StackVec<T, C> {
     type Target = [T];
 
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         unsafe { self.array.as_ref().as_slice(self.len) }
     }
 }
 
 impl<T, const C: usize> DerefMut for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.array.as_mut().as_mut_slice(self.len) }
     }
@@ -282,7 +284,7 @@ pub struct Iter<'a, T, const C: usize> {
 impl<'a, T, const C: usize> Iterator for Iter<'a, T, C> {
     type Item = &'a T;
 
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.sv.len {
             let next = unsafe { self.sv.array.as_ref().get(self.pos) };
@@ -312,7 +314,7 @@ pub struct IntoIter<T, const C: usize> {
 impl<T, const C: usize> Iterator for IntoIter<T, C> {
     type Item = T;
 
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.lim {
             let next = unsafe { self.destructor.take(self.pos) };
@@ -330,6 +332,7 @@ impl<T, const C: usize> IntoIterator for StackVec<T, C> {
     type Item = T;
     type IntoIter = IntoIter<T, C>;
 
+    #[inline(always)]
     fn into_iter(mut self) -> Self::IntoIter {
         IntoIter {
             destructor: Destructor {
@@ -344,7 +347,7 @@ impl<T, const C: usize> IntoIterator for StackVec<T, C> {
 }
 
 impl<T, const C: usize> Drop for StackVec<T, C> {
-    #[inline]
+    #[inline(always)]
     fn drop(&mut self) {
         Destructor {
             array: self.array.take(),

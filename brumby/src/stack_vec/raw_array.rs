@@ -3,86 +3,77 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 
 pub struct RawArray<T, const C: usize> {
-    array: [T; C]
+    array: [MaybeUninit<T>; C]
 }
 impl<T, const C: usize> RawArray<T, C> {
-    // #[inline]
-    // pub fn new() -> Self {
-    //     // unsafe {
-    //     //     let ptr: *mut T = MaybeUninit::uninit().assume_init();
-    //     //     let array = transmute::<_, [T; C]>(ptr);
-    //     //     Self {
-    //     //         array
-    //     //     }
-    //     // }
-    //
-    //     unsafe {
-    //         let uninit_ptr: MaybeUninit<[T; C]> = MaybeUninit::uninit();
-    //         let array = uninit_ptr.assume_init();
-    //         Self {
-    //             array
-    //         }
-    //     }
-    // }
-
-    #[inline]
+    #[inline(always)]
     pub unsafe fn get(&self, index: usize) -> &T {
-        let ptr = self.array.as_ptr();
-        let pos = ptr.add(index);
-        &*pos
+        // let ptr = self.array.as_ptr();
+        // let pos = ptr.add(index) as *const T;
+        // &*pos
+        &*self.array[index].as_ptr()
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn get_mut(&mut self, index: usize) -> &mut T {
-        let ptr = self.array.as_mut_ptr();
-        let pos = ptr.add(index);
-        &mut *pos
+        // let ptr = self.array.as_mut_ptr();
+        // let pos = ptr.add(index) as *mut T;
+        // &mut *pos
+        &mut *self.array[index].as_mut_ptr()
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn set_and_forget(&mut self, index: usize, value: T) {
-        let ptr = self.array.as_mut_ptr();
-        let pos = ptr.add(index);
-        pos.write(value);
+        // let ptr = self.array.as_mut_ptr();
+        // let pos = ptr.add(index) as *mut T;
+
+        let ptr = self.array[index].as_mut_ptr();
+        ptr.write(value);
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn take(&mut self, index: usize) -> T {
-        let ptr = self.array.as_mut_ptr();
-        let pos = ptr.add(index);
-        pos.read()
+        // let ptr = self.array.as_mut_ptr();
+        // let pos = ptr.add(index) as *mut T;
+        let ptr = self.array[index].as_ptr();
+        ptr.read()
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn drop_range(&mut self, offset: usize, len: usize) {
         if mem::needs_drop::<T>() {
-            let ptr = self.array.as_mut_ptr();
+            // for index in offset..offset + len {
+            //     self.take(index);
+            // }
+            // let ptr = self.array.as_mut_ptr();
             for index in offset..offset + len {
-                let pos = ptr.add(index);
-                pos.drop_in_place();
+                let ptr = self.array[index].as_mut_ptr();
+                ptr.drop_in_place();
+                // let pos = ptr.add(index);
+                // pos.drop_in_place();
             }
         }
     }
 
-    #[inline]
+    #[inline(always)]
     unsafe fn destruct(mut self, offset: usize, len: usize) {
         self.drop_range(offset, len);
         mem::forget(self);
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {
-        let ptr = self.array.as_ptr();
+        let ptr = self.array.as_ptr() as *const T;
         slice::from_raw_parts(ptr, len)
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
-        let ptr = self.array.as_mut_ptr();
+        let ptr = self.array.as_mut_ptr() as *mut T;
         slice::from_raw_parts_mut(ptr, len)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn destructor(self, offset: usize, len: usize) -> Destructor<T, C> {
         Destructor {
             array: Explicit::Some(self),
@@ -99,14 +90,15 @@ impl<T, const C: usize> Drop for RawArray<T, C> {
 }
 
 impl<T, const C: usize> Default for RawArray<T, C> {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
-        unsafe {
-            let uninit_ptr = MaybeUninit::uninit();
-            let array = uninit_ptr.assume_init();
-            Self {
-                array
-            }
+        let array: [MaybeUninit<T>; C] = unsafe {
+            MaybeUninit::uninit().assume_init()
+        };
+        // let uninit_ptr = MaybeUninit::uninit();
+        // let array = uninit_ptr.assume_init();
+        Self {
+            array
         }
     }
 }
@@ -120,21 +112,21 @@ pub struct Destructor<T, const C: usize> {
 impl<T, const C: usize> Deref for Destructor<T, C> {
     type Target = RawArray<T, C>;
 
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.array.as_ref()
     }
 }
 
 impl<T, const C: usize> DerefMut for Destructor<T, C> {
-    #[inline]
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.array.as_mut()
     }
 }
 
 impl<T, const C: usize> Drop for Destructor<T, C> {
-    #[inline]
+    #[inline(always)]
     fn drop(&mut self) {
         if let Explicit::Some(array) = self.array.take() {
             unsafe {
@@ -143,13 +135,6 @@ impl<T, const C: usize> Drop for Destructor<T, C> {
         }
     }
 }
-
-// #[inline]
-// unsafe fn transmute<Src, Dst>(src: Src) -> Dst {
-//     let dst = ptr::read(&src as *const Src as *const Dst);
-//     mem::forget(src);
-//     dst
-// }
 
 /// A variant of `Option` that omits the niche optimisation, enabling the encapsulation of
 /// uninitialised data, which would otherwise appear as [None] under the niche optimisation.
@@ -160,7 +145,7 @@ pub(crate) enum Explicit<T> {
     Some(T),
 }
 impl<T> Explicit<T> {
-    #[inline]
+    #[inline(always)]
     pub(crate) fn as_ref(&self) -> &T {
         match self {
             Explicit::Some(value) => value,
@@ -168,7 +153,7 @@ impl<T> Explicit<T> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn as_mut(&mut self) -> &mut T {
         match self {
             Explicit::Some(value) => value,
@@ -176,7 +161,7 @@ impl<T> Explicit<T> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn take(&mut self) -> Explicit<T> {
         let mut replacement = Explicit::None;
         mem::swap(self, &mut replacement);
