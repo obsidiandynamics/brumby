@@ -40,6 +40,10 @@ name = "cri_comb"
 harness = false
 
 [[bench]]
+name = "cri_hypergrid"
+harness = false
+
+[[bench]]
 name = "cri_mc"
 harness = false
 
