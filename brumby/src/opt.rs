@@ -3,7 +3,6 @@ use anyhow::bail;
 
 use crate::capture::Capture;
 use crate::comb::{count_permutations, pick};
-use crate::stack_vec::StackVec;
 
 #[derive(Clone, Debug)]
 pub struct UnivariateDescentConfig {
@@ -115,7 +114,7 @@ impl HypergridSearchConfig<'_> {
 #[derive(Debug)]
 pub struct HypergridSearchOutcome<const C: usize> {
     pub steps: u64,
-    pub optimal_values: StackVec<f64, C>,
+    pub optimal_values: [f64; C],
     pub optimal_residual: f64,
 }
 
@@ -126,11 +125,7 @@ pub fn hypergrid_search<const C: usize>(
     config.validate().unwrap();
 
     let mut steps = 0;
-    // let mut values = Vec::with_capacity(config.bounds.len());
-    // values.resize(values.capacity(), 0.0);
-    let mut values = StackVec::default();
-    values.fill(&0.0);
-    // (0..C).for_each(|_| values.push(0.0)); //TODO replace with fill()
+    let mut values = [0.0; C];
 
     let mut optimal_values = values.clone();
     let mut optimal_residual = f64::MAX;
@@ -143,12 +138,16 @@ pub fn hypergrid_search<const C: usize>(
     //     (0..C).for_each(|_| cardinalities.push(config.resolution)); //TODO replace with fill()
     //     cardinalities
     // };
-    let mut cardinalities = StackVec::<_, C>::default();
-    cardinalities.fill(&config.resolution);
-    let mut ordinals = cardinalities.clone();
+    let cardinalities = [config.resolution; C];
+    let mut ordinals = [0; C];
     let permutations = count_permutations(&cardinalities);
-    // let mut bounds = (*config.bounds).to_vec(); //TODO
-    let mut bounds = StackVec::<_, C>::try_from(&*config.bounds).unwrap();
+    // let mut bounds = StackVec::<_, C>::try_from(&*config.bounds).unwrap();
+    const INIT_RANGE: RangeInclusive<f64> = 0.0..=0.0;
+    let mut bounds = [INIT_RANGE; C];
+    for (index, bound) in config.bounds.iter().enumerate() {
+        bounds[index] = bound.clone();
+    }
+    // let bounds = &*config.bounds.iter().cloned().collect::<[RangeInclusive<f64>; C]>();
     let inv_resolution = 1.0 / (config.resolution - 1) as f64;
 
     'outer: while steps < config.max_steps {

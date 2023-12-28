@@ -10,7 +10,6 @@ use brumby::opt::{
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
-use brumby::stack_vec::StackVec;
 
 use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::domain::Player::Named;
@@ -122,10 +121,10 @@ pub fn fit_scoregrid_half(
     };
     println!("initial estimates: {init_estimates:?}");
 
-    let init_estimates_sv = init_estimates.into_iter().collect();
+    let init_estimates = [init_estimates[0], init_estimates[1]];
     HypergridSearchOutcome {
         steps: 0,
-        optimal_values: init_estimates_sv,
+        optimal_values: init_estimates,
         optimal_residual: 0.0,
     }
 
@@ -185,7 +184,7 @@ pub fn fit_scoregrid_half(
 //     search_outcome
 // }
 
-pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_total_goals: u16) -> (HypergridSearchOutcome<3>, StackVec<f64, 3>) {
+pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_total_goals: u16) -> (HypergridSearchOutcome<3>, [f64; 3]) {
     let expected_total_goals_per_side = {
         let start = Instant::now();
         let init_estimate = match &total_goals.offer_type {
