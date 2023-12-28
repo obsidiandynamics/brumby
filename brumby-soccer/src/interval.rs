@@ -239,10 +239,10 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
     config.expansions.validate();
 
     let mut player_lookup = HashLookup::with_capacity(config.player_probs.len() + 1);
-    let mut home_scorers = Vec::with_capacity(config.player_probs.len() + 1);
-    let mut away_scorers = Vec::with_capacity(config.player_probs.len() + 1);
-    let mut home_assisters = Vec::with_capacity(config.player_probs.len() + 1);
-    let mut away_assisters = Vec::with_capacity(config.player_probs.len() + 1);
+    let mut home_scorers = StackVec::<_, NUM_PLAYER_STATS>::default();
+    let mut away_scorers = StackVec::<_, NUM_PLAYER_STATS>::default();
+    let mut home_assisters = StackVec::<_, NUM_PLAYER_STATS>::default();
+    let mut away_assisters = StackVec::<_, NUM_PLAYER_STATS>::default();
     let mut combined_home_player_goal_prob = 0.0;
     let mut combined_away_player_goal_prob = 0.0;
     for (player_index, (player, player_probs)) in config.player_probs.iter().enumerate() {

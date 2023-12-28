@@ -561,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[cfg(panic = "unwind")]
     fn push_with_overflow_will_drop() {
         let drop_count = AssertUnwindSafe(Rc::new(RefCell::new(0_usize)));
         let result = panic::catch_unwind(|| {
@@ -714,7 +714,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[cfg(panic = "unwind")]
     fn index_overflow_will_drop() {
         let drop_count = AssertUnwindSafe(Rc::new(RefCell::new(0_usize)));
         let result = panic::catch_unwind(|| {
@@ -798,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[cfg(panic = "unwind")]
     fn sv_overflow_will_drop() {
         let drop_count = AssertUnwindSafe(Rc::new(RefCell::new(0_usize)));
         let result = panic::catch_unwind(|| {
