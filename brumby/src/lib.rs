@@ -6,6 +6,7 @@
 
 extern crate core;
 
+pub mod arrays;
 pub mod capture;
 pub mod comb;
 pub mod csv;

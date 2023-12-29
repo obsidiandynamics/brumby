@@ -47,6 +47,18 @@ pub mod __macro_support {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("exceeds capacity ({target_capacity})")]
+pub struct CapacityExceeded {
+    pub target_capacity: usize,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("not filled to capacity ({target_capacity})")]
+pub struct IncompletelyFilled {
+    pub target_capacity: usize,
+}
+
 pub struct StackVec<T, const C: usize> {
     len: usize,
     array: Explicit<RawArray<T, C>>,
@@ -132,6 +144,15 @@ impl<T, const C: usize> StackVec<T, C> {
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         self
     }
+
+    #[inline(always)]
+    pub fn to_array(mut self) -> Result<[T; C], IncompletelyFilled> {
+        if self.len == C {
+            Ok(unsafe { self.array.take().unwrap().to_array() })
+        } else {
+            Err(IncompletelyFilled { target_capacity: C })
+        }
+    }
 }
 
 impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
@@ -140,19 +161,6 @@ impl<T: PartialEq, const C: usize> PartialEq for StackVec<T, C> {
         let self_slice = &**self;
         let other_slice = &**other;
         self_slice == other_slice
-        // if self.len != other.len {
-        //     return false;
-        // }
-        //
-        // for index in 0..self.len {
-        //     let self_item = unsafe { self.array.as_ref().get(index) };
-        //     let other_item = unsafe { other.array.as_ref().get(index) };
-        //     if self_item != other_item {
-        //         return false;
-        //     }
-        // }
-        //
-        // true
     }
 }
 impl<T: Eq, const C: usize> Eq for StackVec<T, C> {}
@@ -178,10 +186,6 @@ impl<T: Hash, const C: usize> Hash for StackVec<T, C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let slice = &**self;
         slice.hash(state);
-        // for index in 0..self.len {
-        //     let item = unsafe { self.array.as_ref().get(index) };
-        //     item.hash(state);
-        // }
     }
 }
 
@@ -197,12 +201,6 @@ impl<T: Debug, const C: usize> Debug for StackVec<T, C> {
         }
         write!(f, "]")
     }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-#[error("exceeds capacity ({target_capacity})")]
-pub struct CapacityExceeded {
-    target_capacity: usize,
 }
 
 impl<T, const B: usize, const C: usize> TryFrom<[T; B]> for StackVec<T, C> {
@@ -231,14 +229,19 @@ impl<T: Clone, const C: usize> TryFrom<&[T]> for StackVec<T, C> {
     }
 }
 
-impl<T, const C: usize> FromIterator<T> for StackVec<T, C> {
+pub struct FromIteratorResult<T, const C: usize>(pub Result<StackVec<T, C>, CapacityExceeded>);
+
+impl<T, const C: usize> FromIterator<T> for FromIteratorResult<T, C> {
     #[inline]
     fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
-        let mut sv = StackVec::default();
-        for item in iter {
-            sv.push(item);
+        fn __from_iter<T, const C: usize, I: IntoIterator<Item=T>>(iter: I) -> Result<StackVec<T, C>, CapacityExceeded> {
+            let mut sv = StackVec::default();
+            for item in iter {
+                sv.try_push(item)?;
+            }
+            Ok(sv)
         }
-        sv
+        Self(__from_iter(iter))
     }
 }
 
@@ -732,14 +735,14 @@ mod tests {
 
     #[test]
     fn from_iterator() {
-        let sv = (0..3).collect::<StackVec<_, 3>>();
-        assert_eq!(3, sv.len);
+        let FromIteratorResult(result) = (0..3).collect::<FromIteratorResult<_, 3>>();
+        assert_eq!(3, result.unwrap().len);
     }
 
     #[test]
-    #[should_panic(expected = "exceeds capacity (3)")]
     fn from_iterator_overflow() {
-        let _ = (0..4).collect::<StackVec<_, 3>>();
+        let FromIteratorResult(result) = (0..4).collect::<FromIteratorResult<_, 3>>();
+        assert_eq!(Err(CapacityExceeded { target_capacity: 3 }), result);
     }
 
     #[test]
@@ -854,6 +857,41 @@ mod tests {
 
         drop(sv);
         assert_eq!(5, *drop_count.borrow());
+    }
+
+    #[test]
+    fn to_array_owned() {
+        let sv: StackVec<_, 2> = sv![String::from("zero"), String::from("one")];
+        let array = sv.to_array().unwrap();
+        assert_eq!([String::from("zero"), String::from("one")], array);
+    }
+
+    #[test]
+    fn to_array_owned_eventually_drops() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let sv: StackVec<_, 2> = sv![Dropper(Rc::clone(&drop_count)), Dropper(Rc::clone(&drop_count))];
+        let array = sv.to_array().unwrap();
+        assert_eq!(0, *drop_count.borrow());
+
+        drop(array);
+        assert_eq!(2, *drop_count.borrow());
+    }
+
+    #[test]
+    fn to_array_incomplete() {
+        let sv: StackVec<_, 3> = sv![String::from("zero"), String::from("one")];
+        let result = sv.to_array();
+        assert_eq!(Err(IncompletelyFilled { target_capacity: 3 }), result);
+    }
+
+    #[test]
+    fn to_array_incomplete_drops() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let sv: StackVec<_, 3> = sv![Dropper(Rc::clone(&drop_count)), Dropper(Rc::clone(&drop_count))];
+        assert_eq!(0, *drop_count.borrow());
+        let result = sv.to_array();
+        assert_eq!(2, *drop_count.borrow());
+        assert_eq!(Err(IncompletelyFilled { target_capacity: 3 }), result);
     }
 
     #[test]

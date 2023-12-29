@@ -85,14 +85,16 @@ pub fn univariate_descent(
     }
 }
 
+pub type RangeCapture<'a, const C: usize> = Capture<'a, [RangeInclusive<f64>; C]>;
+
 #[derive(Clone, Debug)]
-pub struct HypergridSearchConfig<'a> {
+pub struct HypergridSearchConfig<'a, const C: usize> {
     pub max_steps: u64,
     pub acceptable_residual: f64,
-    pub bounds: Capture<'a, Vec<RangeInclusive<f64>>, [RangeInclusive<f64>]>,
+    pub bounds: RangeCapture<'a, C>,
     pub resolution: usize,
 }
-impl HypergridSearchConfig<'_> {
+impl<const C: usize> HypergridSearchConfig<'_, C> {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         if self.max_steps == 0 {
             bail!("at least one step must be specified")
@@ -119,35 +121,19 @@ pub struct HypergridSearchOutcome<const C: usize> {
 }
 
 pub fn hypergrid_search<const C: usize>(
-    config: &HypergridSearchConfig,
+    config: &HypergridSearchConfig<C>,
     mut constraint_f: impl FnMut(&[f64]) -> bool,
     mut loss_f: impl FnMut(&[f64]) -> f64) -> HypergridSearchOutcome<C> {
     config.validate().unwrap();
 
     let mut steps = 0;
     let mut values = [0.0; C];
-
-    let mut optimal_values = values.clone();
+    let mut optimal_values = [0.0; C];
     let mut optimal_residual = f64::MAX;
-
-    // let cardinalities = {
-    //     // let mut cardinalities = Vec::with_capacity(values.len());
-    //     // cardinalities.resize(cardinalities.capacity(), config.resolution);
-    //     // cardinalities
-    //     let mut cardinalities = StackVec::<_, C>::default();
-    //     (0..C).for_each(|_| cardinalities.push(config.resolution)); //TODO replace with fill()
-    //     cardinalities
-    // };
     let cardinalities = [config.resolution; C];
     let mut ordinals = [0; C];
     let permutations = count_permutations(&cardinalities);
-    // let mut bounds = StackVec::<_, C>::try_from(&*config.bounds).unwrap();
-    const INIT_RANGE: RangeInclusive<f64> = 0.0..=0.0;
-    let mut bounds = [INIT_RANGE; C];
-    for (index, bound) in config.bounds.iter().enumerate() {
-        bounds[index] = bound.clone();
-    }
-    // let bounds = &*config.bounds.iter().cloned().collect::<[RangeInclusive<f64>; C]>();
+    let mut bounds = (*config.bounds).clone();
     let inv_resolution = 1.0 / (config.resolution - 1) as f64;
 
     'outer: while steps < config.max_steps {
@@ -183,8 +169,6 @@ pub fn hypergrid_search<const C: usize>(
             let new_range = (bound.end() - bound.start()) / config.resolution as f64;
             let new_start = f64::max(*hard_bound.start(), value - new_range / 2.0);
             let new_end = f64::min(new_start + new_range, *hard_bound.end());
-            // let new_start = value - new_range / 2.0;
-            // let new_end = new_start + new_range;
             *bound = new_start..=new_end;
         }
     }

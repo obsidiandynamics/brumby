@@ -1,5 +1,6 @@
-use super::*;
 use assert_float_eq::*;
+
+use super::*;
 
 #[test]
 fn univariate_descent_sqrt() {
@@ -19,7 +20,7 @@ fn hypergrid_search_poly3() {
     let config = HypergridSearchConfig {
         max_steps: 100,
         acceptable_residual: 1e-12,
-        bounds: Capture::Owned(vec![0.0..=10.0, -10.0..=10.0, 0.0..=10.0]),
+        bounds: RangeCapture::Owned([0.0..=10.0, -10.0..=10.0, 0.0..=10.0]),
         resolution: 4,
     };
     // search for root of (x - 5)(x + 6)(x - 10) = 0

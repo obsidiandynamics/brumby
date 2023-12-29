@@ -1,8 +1,9 @@
+use std::ops::RangeInclusive;
 use std::time::Instant;
 
 use tracing::debug;
 
-use brumby::{factorial, poisson, sv};
+use brumby::{arrays, factorial, poisson, sv};
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::opt::{
@@ -765,10 +766,11 @@ fn fit_bivariate_binomial_scoregrid(
     max_total_goals: u16,
 ) -> HypergridSearchOutcome<3> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
-    let bounds = init_estimates
+    let arrays::FromIteratorResult::<RangeInclusive<f64>, 3>(bounds) = init_estimates
         .iter()
         .map(|&estimate| (estimate * 0.67)..=(estimate * 1.5))
-        .collect::<Vec<_>>();
+        .collect();
+    let bounds = bounds.unwrap();
     hypergrid_search(
         &HypergridSearchConfig {
             max_steps: 10,

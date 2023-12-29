@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::Side;
-use brumby::opt::{hypergrid_search, HypergridSearchConfig};
+use brumby::opt::{hypergrid_search, HypergridSearchConfig, RangeCapture};
 use brumby::probs::SliceExt;
 
 #[test]
@@ -115,11 +115,10 @@ pub fn univariate_poisson_binomial_similarity() {
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
-            bounds: vec![
+            bounds: RangeCapture::Owned([
                 interval_home_prob_est * 0.67..=interval_home_prob_est * 1.5,
                 interval_away_prob_est * 0.67..=interval_away_prob_est * 1.5,
-            ]
-            .into(),
+            ]),
             resolution: 4,
         },
         |_| true,
@@ -173,12 +172,11 @@ pub fn bivariate_poisson_binomial_similarity() {
         &HypergridSearchConfig {
             max_steps: 10,
             acceptable_residual: 1e-6,
-            bounds: vec![
+            bounds: RangeCapture::Owned([
                 interval_home_prob_est * 0.67..=interval_home_prob_est * 1.5,
                 interval_away_prob_est * 0.67..=interval_away_prob_est * 1.5,
                 interval_common_prob_est * 0.67..=interval_common_prob_est * 1.5,
-            ]
-            .into(),
+            ]),
             resolution: 4,
         },
         |_| true,

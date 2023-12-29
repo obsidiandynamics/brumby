@@ -1,5 +1,5 @@
-use std::{mem, slice};
-use std::mem::MaybeUninit;
+use std::{mem, ptr, slice};
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 
 pub struct RawArray<T, const C: usize> {
@@ -74,6 +74,13 @@ impl<T, const C: usize> RawArray<T, C> {
     }
 
     #[inline(always)]
+    pub unsafe fn to_array(self) -> [T; C] {
+        let src = ManuallyDrop::new(self);
+        let ptr = &src.array as *const [MaybeUninit<T>; C] as _;
+        ptr::read(ptr)
+    }
+
+    #[inline(always)]
     pub fn destructor(self, offset: usize, len: usize) -> Destructor<T, C> {
         Destructor {
             array: Explicit::Some(self),
@@ -82,6 +89,13 @@ impl<T, const C: usize> RawArray<T, C> {
         }
     }
 }
+
+// #[inline]
+// unsafe fn transmute<Src, Dst>(src: Src) -> Dst {
+//     let src = ManuallyDrop::new(src);
+//     let ptr = &*src as *const Src as _;
+//     ptr::read(ptr)
+// }
 
 impl<T, const C: usize> Drop for RawArray<T, C> {
     fn drop(&mut self) {
@@ -95,8 +109,6 @@ impl<T, const C: usize> Default for RawArray<T, C> {
         let array: [MaybeUninit<T>; C] = unsafe {
             MaybeUninit::uninit().assume_init()
         };
-        // let uninit_ptr = MaybeUninit::uninit();
-        // let array = uninit_ptr.assume_init();
         Self {
             array
         }
@@ -167,6 +179,14 @@ impl<T> Explicit<T> {
         mem::swap(self, &mut replacement);
         replacement
     }
+
+    #[inline(always)]
+    pub(crate) fn unwrap(self) -> T {
+        match self {
+            Explicit::Some(value) => value,
+            _ => panic!("invalid state")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -176,7 +196,7 @@ pub(crate) mod dropper {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Dropper(pub Rc<RefCell<usize>>);
 
     impl Drop for Dropper {
@@ -414,6 +434,36 @@ mod tests {
             array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
             assert_eq!(0, *drop_count.borrow());
             array.destruct(0, 2);
+            assert_eq!(2, *drop_count.borrow());
+        }
+    }
+
+    #[test]
+    fn to_array_moves_items() {
+        let mut raw_array = RawArray::<String, 2>::default();
+        unsafe {
+            raw_array.set_and_forget(0, String::from("zero"));
+            raw_array.set_and_forget(1, String::from("one"));
+
+            let array = raw_array.to_array();
+            assert_eq!([String::from("zero"), String::from("one")], array);
+        }
+    }
+
+    #[test]
+    fn to_array_moves_items_then_drops() {
+        let drop_count = Rc::new(RefCell::new(0_usize));
+        let mut raw_array = RawArray::<Dropper, 2>::default();
+        unsafe {
+            raw_array.set_and_forget(0, Dropper(Rc::clone(&drop_count)));
+            raw_array.set_and_forget(1, Dropper(Rc::clone(&drop_count)));
+            assert_eq!(0, *drop_count.borrow());
+
+            let array = raw_array.to_array();
+            assert_eq!(0, *drop_count.borrow());
+            assert_eq!(2, array.len());
+
+            drop(array);
             assert_eq!(2, *drop_count.borrow());
         }
     }
