@@ -138,12 +138,6 @@ pub struct Stub {
     pub normal: f64,
     pub overround: Overround,
 }
-//
-// #[derive(Debug)]
-// pub enum OutcomeSet {
-//     All,
-//     Specific( HashLookup<OutcomeType>)
-// }
 
 #[derive(Debug)]
 pub struct Config {

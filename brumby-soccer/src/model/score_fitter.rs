@@ -124,8 +124,7 @@ impl ScoreFitter {
             max_total_goals_half,
         );
 
-        let mut adj_optimal_h1 = [0.0; 3];
-        let mut adj_optimal_h2 = [0.0; 3];
+        let (mut adj_optimal_h1, mut adj_optimal_h2) = ([0.0; 3], [0.0; 3]);
         // only adjust the home and away scoring probs; common prob is locked to the full-time one
         for (i, &orig_h1) in h1_search_outcome.optimal_values.iter().enumerate() {
             let orig_h2 = h2_search_outcome.optimal_values[i];
@@ -142,8 +141,8 @@ impl ScoreFitter {
         adj_optimal_h1[2] = ft_search_outcome.optimal_values[2];
         adj_optimal_h2[2] = ft_search_outcome.optimal_values[2];
         model.goal_probs = Some(GoalProbs {
-            h1: BivariateProbs::from(adj_optimal_h1.as_slice()),
-            h2: BivariateProbs::from(adj_optimal_h2.as_slice()),
+            h1: BivariateProbs::from(&adj_optimal_h1),
+            h2: BivariateProbs::from(&adj_optimal_h2),
         });
 
         Ok(())

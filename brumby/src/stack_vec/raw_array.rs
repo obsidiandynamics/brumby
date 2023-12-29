@@ -8,33 +8,22 @@ pub struct RawArray<T, const C: usize> {
 impl<T, const C: usize> RawArray<T, C> {
     #[inline(always)]
     pub unsafe fn get(&self, index: usize) -> &T {
-        // let ptr = self.array.as_ptr();
-        // let pos = ptr.add(index) as *const T;
-        // &*pos
         &*self.array[index].as_ptr()
     }
 
     #[inline(always)]
     pub unsafe fn get_mut(&mut self, index: usize) -> &mut T {
-        // let ptr = self.array.as_mut_ptr();
-        // let pos = ptr.add(index) as *mut T;
-        // &mut *pos
         &mut *self.array[index].as_mut_ptr()
     }
 
     #[inline(always)]
     pub unsafe fn set_and_forget(&mut self, index: usize, value: T) {
-        // let ptr = self.array.as_mut_ptr();
-        // let pos = ptr.add(index) as *mut T;
-
         let ptr = self.array[index].as_mut_ptr();
         ptr.write(value);
     }
 
     #[inline(always)]
     pub unsafe fn take(&mut self, index: usize) -> T {
-        // let ptr = self.array.as_mut_ptr();
-        // let pos = ptr.add(index) as *mut T;
         let ptr = self.array[index].as_ptr();
         ptr.read()
     }
@@ -42,15 +31,9 @@ impl<T, const C: usize> RawArray<T, C> {
     #[inline(always)]
     pub unsafe fn drop_range(&mut self, offset: usize, len: usize) {
         if mem::needs_drop::<T>() {
-            // for index in offset..offset + len {
-            //     self.take(index);
-            // }
-            // let ptr = self.array.as_mut_ptr();
             for index in offset..offset + len {
                 let ptr = self.array[index].as_mut_ptr();
                 ptr.drop_in_place();
-                // let pos = ptr.add(index);
-                // pos.drop_in_place();
             }
         }
     }
@@ -149,7 +132,7 @@ impl<T, const C: usize> Drop for Destructor<T, C> {
 }
 
 /// A variant of `Option` that omits the niche optimisation, enabling the encapsulation of
-/// uninitialised data, which would otherwise appear as [None] under the niche optimisation.
+/// uninitialised data, which might otherwise appear as [None] under the niche optimisation.
 /// `repr(C)` forces the tag to be included in the memory layout.
 #[repr(C)]
 pub(crate) enum Explicit<T> {

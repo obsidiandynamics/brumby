@@ -167,8 +167,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // h2_search_outcome.optimal_values.normalise(ft_gamma_sum * 1.0);
 
     let exploration = explore_scores(
-        BivariateProbs::from(adj_optimal_h1.as_slice()),
-        BivariateProbs::from(adj_optimal_h2.as_slice()),
+        BivariateProbs::from(&adj_optimal_h1),
+        BivariateProbs::from(&adj_optimal_h2),
     );
 
     // let mut ft_scoregrid = allocate_scoregrid(MAX_TOTAL_GOALS_FULL);
@@ -431,8 +431,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     debug!("nil-all draw prob: {nil_all_draw_prob}");
     let fitted_goalscorer_probs = fit::fit_first_goalscorer_all(
-        &BivariateProbs::from(adj_optimal_h1.as_slice()),
-        &BivariateProbs::from(adj_optimal_h2.as_slice()),
+        &BivariateProbs::from(&adj_optimal_h1),
+        &BivariateProbs::from(&adj_optimal_h2),
         &first_gs,
         nil_all_draw_prob,
         INTERVALS,
@@ -445,8 +445,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &Config {
                 intervals: INTERVALS,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
-                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    h1_goals: BivariateProbs::from(&adj_optimal_h1),
+                    h2_goals: BivariateProbs::from(&adj_optimal_h2),
                     assists: UnivariateProbs {
                         home: 1.0,
                         away: 1.0,
@@ -524,8 +524,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &Config {
                 intervals: INTERVALS,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
-                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    h1_goals: BivariateProbs::from(&adj_optimal_h1),
+                    h2_goals: BivariateProbs::from(&adj_optimal_h2),
                     assists: UnivariateProbs {
                         home: 1.0,
                         away: 1.0,
@@ -622,8 +622,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("assist_probs: {assist_probs:?}");
 
     let fitted_assist_probs = fit::fit_anytime_assist_all(
-        &BivariateProbs::from(adj_optimal_h1.as_slice()),
-        &BivariateProbs::from(adj_optimal_h2.as_slice()),
+        &BivariateProbs::from(&adj_optimal_h1),
+        &BivariateProbs::from(&adj_optimal_h2),
         &assist_probs,
         &anytime_assist,
         nil_all_draw_prob,
@@ -640,8 +640,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &Config {
                 intervals: INTERVALS,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs::from(adj_optimal_h1.as_slice()),
-                    h2_goals: BivariateProbs::from(adj_optimal_h2.as_slice()),
+                    h1_goals: BivariateProbs::from(&adj_optimal_h1),
+                    h2_goals: BivariateProbs::from(&adj_optimal_h2),
                     assists: assist_probs.clone(),
                 },
                 player_probs: sv![(

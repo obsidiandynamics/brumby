@@ -53,9 +53,8 @@ pub struct UnivariateProbs {
     pub away: f64,
 }
 
-impl<'a> From<&'a [f64]> for UnivariateProbs {
-    fn from(params: &'a [f64]) -> Self {
-        assert_eq!(2, params.len());
+impl<'a> From<&'a [f64; 2]> for UnivariateProbs {
+    fn from(params: &'a [f64; 2]) -> Self {
         Self {
             home: params[0],
             away: params[1],
@@ -70,9 +69,8 @@ pub struct BivariateProbs {
     pub common: f64,
 }
 
-impl<'a> From<&'a [f64]> for BivariateProbs {
-    fn from(params: &'a [f64]) -> Self {
-        assert_eq!(3, params.len());
+impl<'a> From<&'a [f64; 3]> for BivariateProbs {
+    fn from(params: &'a [f64; 3]) -> Self {
         Self {
             home: params[0],
             away: params[1],

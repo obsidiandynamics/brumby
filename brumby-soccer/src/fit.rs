@@ -3,22 +3,21 @@ use std::time::Instant;
 
 use tracing::debug;
 
-use brumby::{arrays, factorial, poisson, sv};
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::opt::{
-    hypergrid_search, HypergridSearchConfig, HypergridSearchOutcome, univariate_descent,
+    hypergrid_search, univariate_descent, HypergridSearchConfig, HypergridSearchOutcome,
     UnivariateDescentConfig, UnivariateDescentOutcome,
 };
 use brumby::probs::SliceExt;
+use brumby::{arrays, factorial, poisson, sv};
 
-use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::domain::Player::Named;
-use crate::interval::{
-    BivariateProbs, Config, explore, PlayerProbs, PruneThresholds, TeamProbs,
-    UnivariateProbs,
-};
+use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
 use crate::interval::query::{isolate, requirements};
+use crate::interval::{
+    explore, BivariateProbs, Config, PlayerProbs, PruneThresholds, TeamProbs, UnivariateProbs,
+};
 use crate::scoregrid;
 
 const GOALSCORER_MIN_PROB: f64 = 0.0;
@@ -102,10 +101,17 @@ pub fn fit_scoregrid_half(
     away_goals_estimate: f64,
     offers: &[&Offer],
     intervals: u8,
-    max_total_goals_half: u16) -> HypergridSearchOutcome<2> {
-    let init_estimates = {
+    max_total_goals_half: u16,
+) -> HypergridSearchOutcome<2> {
+    let arrays::FromIteratorResult::<f64, 2>(init_estimates) = {
         let start = Instant::now();
-        let search_outcome = fit_univariate_poisson_scoregrid(home_goals_estimate, away_goals_estimate, offers, intervals, max_total_goals_half);
+        let search_outcome = fit_univariate_poisson_scoregrid(
+            home_goals_estimate,
+            away_goals_estimate,
+            offers,
+            intervals,
+            max_total_goals_half,
+        );
         let elapsed = start.elapsed();
         debug!("fitted univariate Poisson: took {elapsed:?}, search outcome: {search_outcome:?}, expectation: {:.3}", expectation_from_univariate_poisson(&search_outcome.optimal_values));
         search_outcome
@@ -118,11 +124,11 @@ pub fn fit_scoregrid_half(
                     &factorial::Calculator,
                 )
             })
-            .collect::<Vec<_>>()
+            .collect()
     };
+    let init_estimates = init_estimates.unwrap();
     println!("initial estimates: {init_estimates:?}");
 
-    let init_estimates = [init_estimates[0], init_estimates[1]];
     HypergridSearchOutcome {
         steps: 0,
         optimal_values: init_estimates,
@@ -185,15 +191,24 @@ pub fn fit_scoregrid_half(
 //     search_outcome
 // }
 
-pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_total_goals: u16) -> (HypergridSearchOutcome<3>, [f64; 3]) {
+pub fn fit_scoregrid_full(
+    h2h: &Offer,
+    total_goals: &Offer,
+    intervals: u8,
+    max_total_goals: u16,
+) -> (HypergridSearchOutcome<3>, [f64; 3]) {
     let expected_total_goals_per_side = {
         let start = Instant::now();
         let init_estimate = match &total_goals.offer_type {
             OfferType::TotalGoals(_, over) => over.0 as f64 + 0.5,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
-        let search_outcome =
-            fit_poisson_total_goals_scoregrid(init_estimate, total_goals, intervals, max_total_goals);
+        let search_outcome = fit_poisson_total_goals_scoregrid(
+            init_estimate,
+            total_goals,
+            intervals,
+            max_total_goals,
+        );
         let elapsed = start.elapsed();
         debug!("fitted f/t Poisson total goals ({init_estimate:.1}): took {elapsed:?}, {search_outcome:?}");
         search_outcome.optimal_value
@@ -201,8 +216,12 @@ pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_t
 
     let expected_home_goals = {
         let start = Instant::now();
-        let search_outcome =
-            fit_poisson_h2h_scoregrid(expected_total_goals_per_side, h2h, intervals, max_total_goals);
+        let search_outcome = fit_poisson_h2h_scoregrid(
+            expected_total_goals_per_side,
+            h2h,
+            intervals,
+            max_total_goals,
+        );
         let elapsed = start.elapsed();
         debug!("fitted f/t Poisson goals per side: took {elapsed:?}, {search_outcome:?}");
         search_outcome.optimal_value
@@ -223,31 +242,53 @@ pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_t
         search_outcome.optimal_value
     };
 
-    let est_lambdas = [expected_home_goals - expected_common_goals, 2.0 * expected_total_goals_per_side - expected_home_goals - expected_common_goals, expected_common_goals];
-    println!("est_lambdas: {est_lambdas:?}, expectation: {:.3}", expectation_from_bivariate_poisson(&est_lambdas));
+    let est_lambdas = [
+        expected_home_goals - expected_common_goals,
+        2.0 * expected_total_goals_per_side - expected_home_goals - expected_common_goals,
+        expected_common_goals,
+    ];
+    println!(
+        "est_lambdas: {est_lambdas:?}, expectation: {:.3}",
+        expectation_from_bivariate_poisson(&est_lambdas)
+    );
     // let init_estimates = est_lambdas.iter()
     //         .map(|optimal_value| {
     //             1.0 - poisson::univariate(0, optimal_value / INTERVALS as f64, &factorial::Calculator)
     //         })
     //         .collect::<Vec<_>>();
 
-    let (init_estimates, lambdas) = {
+    let (arrays::FromIteratorResult::<f64, 3>(init_estimates), lambdas) = {
         let start = Instant::now();
         let expected_away_goals = 2.0 * expected_total_goals_per_side - expected_home_goals;
-        let search_outcome = fit_bivariate_poisson_scoregrid(offers, expected_home_goals, expected_away_goals, expected_common_goals, intervals, max_total_goals);
+        let search_outcome = fit_bivariate_poisson_scoregrid(
+            offers,
+            expected_home_goals,
+            expected_away_goals,
+            expected_common_goals,
+            intervals,
+            max_total_goals,
+        );
         let elapsed = start.elapsed();
         debug!(
             "fitted f/t bivariate Poisson: took {elapsed:?}, {search_outcome:?}, expectation: {:.3}",
             expectation_from_bivariate_poisson(&search_outcome.optimal_values)
         );
-        (search_outcome
-            .optimal_values
-            .iter()
-            .map(|optimal_value| {
-                1.0 - poisson::univariate(0, optimal_value / intervals as f64, &factorial::Calculator)
-            })
-            .collect::<Vec<_>>(), search_outcome.optimal_values)
+        (
+            search_outcome
+                .optimal_values
+                .iter()
+                .map(|optimal_value| {
+                    1.0 - poisson::univariate(
+                        0,
+                        optimal_value / intervals as f64,
+                        &factorial::Calculator,
+                    )
+                })
+                .collect(),
+            search_outcome.optimal_values,
+        )
     };
+    let init_estimates= init_estimates.unwrap();
     println!("f/t: initial estimates: {init_estimates:?}");
 
     // HypergridSearchOutcome {
@@ -257,12 +298,8 @@ pub fn fit_scoregrid_full(h2h: &Offer, total_goals: &Offer, intervals: u8, max_t
     // }
 
     let start = Instant::now();
-    let search_outcome = fit_bivariate_binomial_scoregrid(
-        offers,
-        &init_estimates,
-        intervals,
-        max_total_goals,
-    );
+    let search_outcome =
+        fit_bivariate_binomial_scoregrid(offers, &init_estimates, intervals, max_total_goals);
     // let search_outcome = fit_scoregrid(&[&correct_score]);
     let elapsed = start.elapsed();
     debug!("fitted f/t bivariate binomial: took {elapsed:?}, {search_outcome:?}");
@@ -275,7 +312,7 @@ pub fn fit_first_goalscorer_all<'a>(
     first_goalscorer: &'a Offer,
     nil_all_draw_prob: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> Vec<(Player, f64)> {
     let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
@@ -285,36 +322,40 @@ pub fn fit_first_goalscorer_all<'a>(
     let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob);
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
     let start = Instant::now();
-    let probs = first_goalscorer.outcomes.items().iter().enumerate()
+    let probs = first_goalscorer
+        .outcomes
+        .items()
+        .iter()
+        .enumerate()
         .filter(|(_, outcome)| matches!(outcome, OutcomeType::Player(_)))
         .map(|(index, outcome)| {
-        match outcome {
-            OutcomeType::Player(player) => {
-                let side_ratio = match player {
-                    Named(side, _) => match side {
-                        Side::Home => home_ratio,
-                        Side::Away => away_ratio,
-                    },
-                    Player::Other => unreachable!(),
-                };
-                let init_estimate = first_goalscorer.market.probs[index] / side_ratio;
-                // let per_start = Instant::now();
-                let player_search_outcome = fit_first_goalscorer_one(
-                    h1_probs,
-                    h2_probs,
-                    player,
-                    init_estimate,
-                    first_goalscorer.market.probs[index],
-                    intervals,
-                    max_total_goals
-                );
-                // println!("first goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}, took {:?}", first_goalscorer.market.probs[index], per_start.elapsed());
-                (player.clone(), player_search_outcome.optimal_value)
+            match outcome {
+                OutcomeType::Player(player) => {
+                    let side_ratio = match player {
+                        Named(side, _) => match side {
+                            Side::Home => home_ratio,
+                            Side::Away => away_ratio,
+                        },
+                        Player::Other => unreachable!(),
+                    };
+                    let init_estimate = first_goalscorer.market.probs[index] / side_ratio;
+                    // let per_start = Instant::now();
+                    let player_search_outcome = fit_first_goalscorer_one(
+                        h1_probs,
+                        h2_probs,
+                        player,
+                        init_estimate,
+                        first_goalscorer.market.probs[index],
+                        intervals,
+                        max_total_goals,
+                    );
+                    // println!("first goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}, took {:?}", first_goalscorer.market.probs[index], per_start.elapsed());
+                    (player.clone(), player_search_outcome.optimal_value)
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
-        }
-    })
-    .collect::<Vec<_>>();
+        })
+        .collect();
     let elapsed = start.elapsed();
     debug!("first goalscorer fitting took {elapsed:?}");
     probs
@@ -327,7 +368,7 @@ fn fit_first_goalscorer_one(
     init_estimate: f64,
     expected_prob: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> UnivariateDescentOutcome {
     let mut config = Config {
         intervals,
@@ -379,7 +420,7 @@ pub fn fit_anytime_goalscorer_all<'a>(
     nil_all_draw_prob: f64,
     prob_est_adj: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> Vec<(Player, f64)> {
     let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
@@ -389,7 +430,11 @@ pub fn fit_anytime_goalscorer_all<'a>(
     let away_ratio = (away_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob);
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
     let start = Instant::now();
-    let probs = anytime_goalscorer.outcomes.items().iter().enumerate()
+    let probs = anytime_goalscorer
+        .outcomes
+        .items()
+        .iter()
+        .enumerate()
         .filter(|(_, outcome)| matches!(outcome, OutcomeType::Player(_)))
         .map(|(index, outcome)| {
             match outcome {
@@ -401,7 +446,8 @@ pub fn fit_anytime_goalscorer_all<'a>(
                         },
                         Player::Other => unreachable!(),
                     };
-                    let init_estimate = anytime_goalscorer.market.probs[index] / side_ratio * prob_est_adj;
+                    let init_estimate =
+                        anytime_goalscorer.market.probs[index] / side_ratio * prob_est_adj;
                     let player_search_outcome = fit_anytime_goalscorer_one(
                         h1_probs,
                         h2_probs,
@@ -409,7 +455,7 @@ pub fn fit_anytime_goalscorer_all<'a>(
                         init_estimate,
                         anytime_goalscorer.market.probs[index],
                         intervals,
-                        max_total_goals
+                        max_total_goals,
                     );
                     // println!("anytime goal for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", anytime_goalscorer.market.probs[index]);
                     (player.clone(), player_search_outcome.optimal_value)
@@ -417,7 +463,7 @@ pub fn fit_anytime_goalscorer_all<'a>(
                 _ => unreachable!(),
             }
         })
-        .collect::<Vec<_>>();
+        .collect();
     let elapsed = start.elapsed();
     debug!("anytime goalscorer fitting took {elapsed:?}");
     probs
@@ -430,7 +476,7 @@ fn fit_anytime_goalscorer_one(
     init_estimate: f64,
     expected_prob: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> UnivariateDescentOutcome {
     let mut config = Config {
         intervals,
@@ -483,7 +529,7 @@ pub fn fit_anytime_assist_all(
     nil_all_draw_prob: f64,
     booksum: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> Vec<(Player, f64)> {
     let home_rate = (h1_probs.home + h2_probs.home) / 2.0;
     let away_rate = (h1_probs.away + h2_probs.away) / 2.0;
@@ -495,33 +541,39 @@ pub fn fit_anytime_assist_all(
         (away_rate + common_rate / 2.0) / rate_sum * (1.0 - nil_all_draw_prob) * assist_probs.away;
     // println!("home_ratio={home_ratio} + away_ratio={away_ratio}");
     let start = Instant::now();
-    let probs = anytime_assist.outcomes.items().iter().enumerate().map(|(index, outcome)| {
-        match outcome {
-            OutcomeType::Player(player) => {
-                let side_ratio = match player {
-                    Named(side, _) => match side {
-                        Side::Home => home_ratio,
-                        Side::Away => away_ratio,
-                    },
-                    Player::Other => unreachable!(),
-                };
-                let init_estimate = anytime_assist.market.probs[index] / booksum / side_ratio;
-                let player_search_outcome = fit_anytime_assist_one(
-                    h1_probs,
-                    h2_probs,
-                    assist_probs,
-                    player,
-                    init_estimate,
-                    anytime_assist.market.probs[index],
-                    intervals,
-                    max_total_goals
-                );
-                // println!("assist for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", anytime_assist.market.probs[index]);
-                (player.clone(), player_search_outcome.optimal_value)
+    let probs = anytime_assist
+        .outcomes
+        .items()
+        .iter()
+        .enumerate()
+        .map(|(index, outcome)| {
+            match outcome {
+                OutcomeType::Player(player) => {
+                    let side_ratio = match player {
+                        Named(side, _) => match side {
+                            Side::Home => home_ratio,
+                            Side::Away => away_ratio,
+                        },
+                        Player::Other => unreachable!(),
+                    };
+                    let init_estimate = anytime_assist.market.probs[index] / booksum / side_ratio;
+                    let player_search_outcome = fit_anytime_assist_one(
+                        h1_probs,
+                        h2_probs,
+                        assist_probs,
+                        player,
+                        init_estimate,
+                        anytime_assist.market.probs[index],
+                        intervals,
+                        max_total_goals,
+                    );
+                    // println!("assist for player {player:?}, {player_search_outcome:?}, sample prob. {}, init_estimate: {init_estimate}", anytime_assist.market.probs[index]);
+                    (player.clone(), player_search_outcome.optimal_value)
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
-        }
-    }).collect::<Vec<_>>();
+        })
+        .collect();
     let elapsed = start.elapsed();
     debug!("anytime assist fitting took {elapsed:?}");
     probs
@@ -535,7 +587,7 @@ fn fit_anytime_assist_one(
     init_estimate: f64,
     expected_prob: f64,
     intervals: u8,
-    max_total_goals: u16
+    max_total_goals: u16,
 ) -> UnivariateDescentOutcome {
     let mut config = Config {
         intervals,
@@ -650,16 +702,24 @@ fn fit_poisson_common_scoregrid(
 ) -> UnivariateDescentOutcome {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
     let offers = [h2h];
-    univariate_descent(&UnivariateDescentConfig {
-        init_value: 0.0,
-        init_step: 0.1,
-        min_step: 0.0001,
-        max_steps: 100,
-        acceptable_residual: 1e-6,
-    }, |value| {
-        bivariate_poisson_scoregrid(home_goals_estimate - value, away_goals_estimate - value, value, &mut scoregrid);
-        scoregrid_error(&offers, &scoregrid)
-    })
+    univariate_descent(
+        &UnivariateDescentConfig {
+            init_value: 0.0,
+            init_step: 0.1,
+            min_step: 0.0001,
+            max_steps: 100,
+            acceptable_residual: 1e-6,
+        },
+        |value| {
+            bivariate_poisson_scoregrid(
+                home_goals_estimate - value,
+                away_goals_estimate - value,
+                value,
+                &mut scoregrid,
+            );
+            scoregrid_error(&offers, &scoregrid)
+        },
+    )
     // let bounds = [0.01..=0.5];
     // hypergrid_search(
     //     &HypergridSearchConfig {
@@ -689,7 +749,10 @@ fn fit_univariate_poisson_scoregrid(
     max_total_goals: u16,
 ) -> HypergridSearchOutcome<2> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
-    let bounds = [home_goals_estimate * 0.83..=home_goals_estimate * 1.2, away_goals_estimate * 0.83..=away_goals_estimate * 1.20];
+    let bounds = [
+        home_goals_estimate * 0.83..=home_goals_estimate * 1.2,
+        away_goals_estimate * 0.83..=away_goals_estimate * 1.20,
+    ];
     // let bounds = [0.2..=3.0, 0.2..=3.0];
     hypergrid_search(
         &HypergridSearchConfig {
@@ -716,7 +779,11 @@ fn fit_bivariate_poisson_scoregrid(
 ) -> HypergridSearchOutcome<3> {
     let mut scoregrid = allocate_scoregrid(intervals, max_total_goals);
     // println!("estimates: {home_estimate} and {away_estimate}");
-    let bounds = [home_estimate - 0.5..=home_estimate, away_estimate - 0.5..=away_estimate, common_estimate..=common_estimate + 0.5];
+    let bounds = [
+        home_estimate - 0.5..=home_estimate,
+        away_estimate - 0.5..=away_estimate,
+        common_estimate..=common_estimate + 0.5,
+    ];
     // let bounds = [0.2..=3.0, 0.2..=3.0, 0.0..=0.5];
     hypergrid_search(
         &HypergridSearchConfig {
@@ -761,7 +828,7 @@ fn fit_bivariate_poisson_scoregrid(
 
 fn fit_bivariate_binomial_scoregrid(
     offers: &[&Offer],
-    init_estimates: &[f64],
+    init_estimates: &[f64; 3],
     intervals: u8,
     max_total_goals: u16,
 ) -> HypergridSearchOutcome<3> {
