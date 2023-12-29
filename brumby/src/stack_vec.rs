@@ -1,13 +1,14 @@
-use bincode::enc::Encoder;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-use crate::stack_vec::raw_array::{Destructor, Explicit, RawArray};
-use bincode::de::Decoder;
-use bincode::error::{DecodeError, EncodeError};
 use bincode::{Decode, Encode};
+use bincode::de::Decoder;
+use bincode::enc::Encoder;
+use bincode::error::{DecodeError, EncodeError};
 use thiserror::Error;
+
+use crate::stack_vec::raw_array::{Destructor, RawArray};
 
 pub mod raw_array;
 
@@ -61,8 +62,7 @@ pub struct IncompletelyFilled {
 
 pub struct StackVec<T, const C: usize> {
     len: usize,
-    array: Explicit<RawArray<T, C>>,
-    // array: [Option<T>; C]
+    array: Option<RawArray<T, C>>,
 }
 impl<T, const C: usize> StackVec<T, C> {
     #[inline(always)]
@@ -84,7 +84,7 @@ impl<T, const C: usize> StackVec<T, C> {
     pub fn try_push(&mut self, value: T) -> Result<(), CapacityExceeded> {
         if self.len < C {
             unsafe {
-                self.array.as_mut().set_and_forget(self.len, value);
+                self.array.as_mut().unwrap().set_and_forget(self.len, value);
             }
             self.len += 1;
             Ok(())
@@ -124,7 +124,7 @@ impl<T, const C: usize> StackVec<T, C> {
     #[inline(always)]
     pub fn clear(&mut self) {
         unsafe {
-            self.array.as_mut().drop_range(0, self.len);
+            self.array.as_mut().unwrap().drop_range(0, self.len);
         }
         self.len = 0;
     }
@@ -171,11 +171,11 @@ impl<T: Clone, const C: usize> Clone for StackVec<T, C> {
         let mut clone = RawArray::default();
         for i in 0..self.len {
             unsafe {
-                clone.set_and_forget(i, self.array.as_ref().get(i).clone());
+                clone.set_and_forget(i, self.array.as_ref().unwrap().get(i).clone());
             }
         }
         Self {
-            array: Explicit::Some(clone),
+            array: Some(clone),
             ..*self
         }
     }
@@ -250,7 +250,7 @@ impl<T, const C: usize> Default for StackVec<T, C> {
     fn default() -> Self {
         Self {
             len: 0,
-            array: Explicit::Some(RawArray::default()),
+            array: Some(RawArray::default()),
         }
     }
 }
@@ -266,7 +266,7 @@ impl<T, const C: usize> Index<usize> for StackVec<T, C> {
                 self.len
             );
         }
-        unsafe { self.array.as_ref().get(index) }
+        unsafe { self.array.as_ref().unwrap().get(index) }
     }
 }
 
@@ -279,7 +279,7 @@ impl<T, const C: usize> IndexMut<usize> for StackVec<T, C> {
                 self.len
             );
         }
-        unsafe { self.array.as_mut().get_mut(index) }
+        unsafe { self.array.as_mut().unwrap().get_mut(index) }
     }
 }
 
@@ -288,14 +288,14 @@ impl<T, const C: usize> Deref for StackVec<T, C> {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        unsafe { self.array.as_ref().as_slice(self.len) }
+        unsafe { self.array.as_ref().unwrap().as_slice(self.len) }
     }
 }
 
 impl<T, const C: usize> DerefMut for StackVec<T, C> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.array.as_mut().as_mut_slice(self.len) }
+        unsafe { self.array.as_mut().unwrap().as_mut_slice(self.len) }
     }
 }
 
@@ -310,7 +310,7 @@ impl<'a, T, const C: usize> Iterator for Iter<'a, T, C> {
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.sv.len {
-            let next = unsafe { self.sv.array.as_ref().get(self.pos) };
+            let next = unsafe { self.sv.array.as_ref().unwrap().get(self.pos) };
             self.pos += 1;
             Some(next)
         } else {
@@ -408,12 +408,14 @@ impl<T: Decode, const C: usize> Decode for StackVec<T, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::stack_vec::raw_array::dropper::Dropper;
     use std::cell::RefCell;
     use std::panic;
     use std::panic::AssertUnwindSafe;
     use std::rc::Rc;
+
+    use crate::stack_vec::raw_array::dropper::Dropper;
+
+    use super::*;
 
     #[test]
     fn init() {

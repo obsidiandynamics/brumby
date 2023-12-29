@@ -66,7 +66,7 @@ impl<T, const C: usize> RawArray<T, C> {
     #[inline(always)]
     pub fn destructor(self, offset: usize, len: usize) -> Destructor<T, C> {
         Destructor {
-            array: Explicit::Some(self),
+            array: Some(self),
             offset,
             len,
         }
@@ -99,7 +99,7 @@ impl<T, const C: usize> Default for RawArray<T, C> {
 }
 
 pub struct Destructor<T, const C: usize> {
-    pub(crate) array: Explicit<RawArray<T, C>>,
+    pub(crate) array: Option<RawArray<T, C>>,
     pub(crate) offset: usize,
     pub(crate) len: usize
 }
@@ -109,21 +109,21 @@ impl<T, const C: usize> Deref for Destructor<T, C> {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        self.array.as_ref()
+        self.array.as_ref().unwrap()
     }
 }
 
 impl<T, const C: usize> DerefMut for Destructor<T, C> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.array.as_mut()
+        self.array.as_mut().unwrap()
     }
 }
 
 impl<T, const C: usize> Drop for Destructor<T, C> {
     #[inline(always)]
     fn drop(&mut self) {
-        if let Explicit::Some(array) = self.array.take() {
+        if let Some(array) = self.array.take() {
             unsafe {
                 array.destruct(self.offset, self.len);
             }
@@ -134,43 +134,43 @@ impl<T, const C: usize> Drop for Destructor<T, C> {
 /// A variant of `Option` that omits the niche optimisation, enabling the encapsulation of
 /// uninitialised data, which might otherwise appear as [None] under the niche optimisation.
 /// `repr(C)` forces the tag to be included in the memory layout.
-#[repr(C)]
-pub(crate) enum Explicit<T> {
-    None,
-    Some(T),
-}
-impl<T> Explicit<T> {
-    #[inline(always)]
-    pub(crate) fn as_ref(&self) -> &T {
-        match self {
-            Explicit::Some(value) => value,
-            _ => panic!("invalid state")
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn as_mut(&mut self) -> &mut T {
-        match self {
-            Explicit::Some(value) => value,
-            _ => panic!("invalid state")
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn take(&mut self) -> Explicit<T> {
-        let mut replacement = Explicit::None;
-        mem::swap(self, &mut replacement);
-        replacement
-    }
-
-    #[inline(always)]
-    pub(crate) fn unwrap(self) -> T {
-        match self {
-            Explicit::Some(value) => value,
-            _ => panic!("invalid state")
-        }
-    }
-}
+// #[repr(C)]
+// pub(crate) enum Explicit<T> {
+//     None,
+//     Some(T),
+// }
+// impl<T> Explicit<T> {
+//     #[inline(always)]
+//     pub(crate) fn as_ref(&self) -> &T {
+//         match self {
+//             Explicit::Some(value) => value,
+//             _ => panic!("invalid state")
+//         }
+//     }
+//
+//     #[inline(always)]
+//     pub(crate) fn as_mut(&mut self) -> &mut T {
+//         match self {
+//             Explicit::Some(value) => value,
+//             _ => panic!("invalid state")
+//         }
+//     }
+//
+//     #[inline(always)]
+//     pub(crate) fn take(&mut self) -> Explicit<T> {
+//         let mut replacement = Explicit::None;
+//         mem::swap(self, &mut replacement);
+//         replacement
+//     }
+//
+//     #[inline(always)]
+//     pub(crate) fn unwrap(self) -> T {
+//         match self {
+//             Explicit::Some(value) => value,
+//             _ => panic!("invalid state")
+//         }
+//     }
+// }
 
 #[cfg(test)]
 pub(crate) mod dropper {
@@ -197,50 +197,50 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn explicit_as_ref() {
-        let explicit = Explicit::Some("text");
-        assert_eq!("text", *explicit.as_ref());
-    }
-
-    #[test]
-    fn explicit_as_mut() {
-        let mut explicit = Explicit::Some("one");
-        let r = explicit.as_mut();
-        assert_eq!("one", *r);
-        *r = "two";
-        assert_eq!("two", *explicit.as_ref());
-    }
-
-    #[test]
-    #[should_panic(expected = "invalid state")]
-    fn explicit_as_mut_panics_when_none() {
-        let mut explicit: Explicit<()> = Explicit::None;
-        explicit.as_mut();
-    }
-
-    #[test]
-    #[should_panic(expected = "invalid state")]
-    fn explicit_as_ref_panics_when_none() {
-        let explicit: Explicit<()> = Explicit::None;
-        explicit.as_ref();
-    }
-
-    #[test]
-    fn explicit_take_leaves_none() {
-        {
-            let mut explicit = Explicit::Some(());
-            let taken = explicit.take();
-            assert!(matches!(explicit, Explicit::None));
-            assert!(matches!(taken, Explicit::Some(_)));
-        }
-        {
-            let mut explicit: Explicit<()> = Explicit::None;
-            let taken = explicit.take();
-            assert!(matches!(explicit, Explicit::None));
-            assert!(matches!(taken, Explicit::None));
-        }
-    }
+    // #[test]
+    // fn explicit_as_ref() {
+    //     let explicit = Explicit::Some("text");
+    //     assert_eq!("text", *explicit.as_ref());
+    // }
+    //
+    // #[test]
+    // fn explicit_as_mut() {
+    //     let mut explicit = Explicit::Some("one");
+    //     let r = explicit.as_mut();
+    //     assert_eq!("one", *r);
+    //     *r = "two";
+    //     assert_eq!("two", *explicit.as_ref());
+    // }
+    //
+    // #[test]
+    // #[should_panic(expected = "invalid state")]
+    // fn explicit_as_mut_panics_when_none() {
+    //     let mut explicit: Explicit<()> = Explicit::None;
+    //     explicit.as_mut();
+    // }
+    //
+    // #[test]
+    // #[should_panic(expected = "invalid state")]
+    // fn explicit_as_ref_panics_when_none() {
+    //     let explicit: Explicit<()> = Explicit::None;
+    //     explicit.as_ref();
+    // }
+    //
+    // #[test]
+    // fn explicit_take_leaves_none() {
+    //     {
+    //         let mut explicit = Explicit::Some(());
+    //         let taken = explicit.take();
+    //         assert!(matches!(explicit, Explicit::None));
+    //         assert!(matches!(taken, Explicit::Some(_)));
+    //     }
+    //     {
+    //         let mut explicit: Explicit<()> = Explicit::None;
+    //         let taken = explicit.take();
+    //         assert!(matches!(explicit, Explicit::None));
+    //         assert!(matches!(taken, Explicit::None));
+    //     }
+    // }
 
     #[test]
     fn empty() {
