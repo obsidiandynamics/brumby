@@ -1,38 +1,8 @@
 use stanza::style::{HAlign, Header, MinWidth, Separator, Styles};
 use stanza::table::{Col, Row, Table};
+use brumby::derived_price::DerivedPrice;
 use brumby::linear::matrix::Matrix;
-use brumby::market::MarketPrice;
 use brumby::selection::{Rank, Runner};
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct DerivedPrice {
-    pub probability: f64,
-    pub price: f64,
-}
-impl DerivedPrice {
-    pub fn fair_price(&self) -> f64 {
-        1.0 / self.probability
-    }
-
-    pub fn overround(&self) -> f64 {
-        1.0 / self.probability / self.price
-    }
-}
-
-impl Default for DerivedPrice {
-    fn default() -> Self {
-        Self {
-            probability: 0.,
-            price: f64::INFINITY
-        }
-    }
-}
-
-impl MarketPrice for DerivedPrice {
-    fn decimal(&self) -> f64 {
-        self.price
-    }
-}
 
 pub fn tabulate_derived_prices(derived: &Matrix<DerivedPrice>) -> Table {
     let mut table = Table::default()

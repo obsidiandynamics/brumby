@@ -10,6 +10,7 @@ pub mod arrays;
 pub mod capture;
 pub mod comb;
 pub mod csv;
+pub mod derived_price;
 pub mod display;
 pub mod factorial;
 pub mod feed_id;

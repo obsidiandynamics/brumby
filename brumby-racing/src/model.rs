@@ -9,10 +9,10 @@ use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, Overround, PriceBounds};
 use crate::model::cf::Coefficients;
 use crate::model::fit::{FitOptions, PlaceFitOutcome};
-use crate::print::DerivedPrice;
 use brumby::selection::{validate_plausible_selections, Selection};
 use brumby::timed::Timed;
 use brumby::{market, mc, selection};
+use brumby::derived_price::DerivedPrice;
 
 pub mod cf;
 pub mod fit;
@@ -361,7 +361,7 @@ fn derive_multi(
 ) -> Result<Timed<DerivedPrice>, anyhow::Error> {
     Timed::result(|| {
         validate_plausible_selections(selections)?;
-        let mut overround = 1.;
+        let mut overround = 1.0;
         let win_probs = &probs[0];
         for selection in selections {
             selection.validate(0..=PODIUM - 1, win_probs)?;

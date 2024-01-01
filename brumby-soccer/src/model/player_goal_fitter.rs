@@ -4,7 +4,7 @@ use tracing::debug;
 use crate::domain::{Offer, OfferType, OutcomeType};
 use crate::domain::error::{MissingOutcome, OfferCapture};
 use crate::fit;
-use crate::model::{FitError, get_offer, Model};
+use crate::model::{FitError, get_offer, get_or_create_player, Model};
 
 pub struct PlayerGoalFitter;
 impl PlayerGoalFitter {
@@ -65,7 +65,7 @@ impl PlayerGoalFitter {
         }
 
         for (player, player_goal_prob) in fitted_goalscorer_probs {
-            model.get_or_create_player(player).goal = Some(player_goal_prob);
+            get_or_create_player(&mut model.player_probs, player).goal = Some(player_goal_prob);
         }
 
         Ok(())

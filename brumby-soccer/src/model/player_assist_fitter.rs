@@ -5,7 +5,7 @@ use crate::domain::error::{MissingOutcome, OfferCapture};
 use crate::domain::{Offer, OfferType, OutcomeType};
 use crate::fit;
 use crate::interval::UnivariateProbs;
-use crate::model::{get_offer, FitError, Model};
+use crate::model::{get_offer, FitError, Model, get_or_create_player};
 
 pub struct PlayerAssistFitter;
 impl PlayerAssistFitter {
@@ -54,7 +54,7 @@ impl PlayerAssistFitter {
         model.assist_probs = Some(assist_probs);
 
         for (player, player_assist_prob) in fitted_assist_probs {
-            model.get_or_create_player(player).assist = Some(player_assist_prob);
+            get_or_create_player(&mut model.player_probs, player).assist = Some(player_assist_prob);
         }
 
         Ok(())

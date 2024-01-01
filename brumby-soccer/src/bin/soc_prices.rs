@@ -17,7 +17,7 @@ use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
-use brumby_soccer::domain::{Offer, OfferType, OutcomeType};
+use brumby_soccer::domain::{Offer, OfferType, OutcomeType, Over, Period, Player, Side};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
@@ -29,9 +29,7 @@ const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
 const INTERVALS: u8 = 18;
 const INCREMENTAL_OVERROUND: f64 = 0.01;
-// const MAX_TOTAL_GOALS_HALF: u16 = 4;
 const MAX_TOTAL_GOALS: u16 = 8;
-// const ERROR_TYPE: ErrorType = ErrorType::SquaredRelative;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -41,7 +39,6 @@ struct Args {
 
     /// download contest data by ID
     #[clap(short = 'd', long)]
-    // download: Option<String>,
     download: Option<SoccerFeedId>,
 
     /// print player goal markets
@@ -221,7 +218,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    // let selections = [
+    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), OutcomeType::Over(2)),
+    //     (OfferType::HeadToHead(Period::FullTime), OutcomeType::Win(Side::Home)),
+    //     (OfferType::FirstGoalscorer, OutcomeType::Player(Player::Named(Side::Away, String::from("João Pedro")))),
+    //     (OfferType::AnytimeGoalscorer, OutcomeType::Player(Player::Named(Side::Away, String::from("Welbeck")))),
+    //     // (OfferType::AnytimeGoalscorer, OutcomeType::Player(Player::Named(Side::Home, String::from("Bowen")))),
+    // ];
+    //
+    // let price = model.derive_multi(&selections)?;
+    // let scaling_exponent = compute_scaling_exponent(price.relatedness);
+    // let scaled_price = price.price.price / price.price.overround().powf(scaling_exponent - 1.0);
+    // info!("selections: {selections:?}, price: {price:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
+
     Ok(())
+}
+
+fn compute_scaling_exponent(relatedness: f64) -> f64 {
+    0.5 * f64::log10( 100.0 * relatedness)
 }
 
 fn implied_booksum<'a>(prices: impl Iterator<Item = &'a f64>) -> f64 {

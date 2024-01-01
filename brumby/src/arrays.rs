@@ -41,12 +41,12 @@ mod tests {
     #[test]
     fn from_iterator_capacity_exceeded() {
         let FromIteratorResult::<usize, 3>(result) = (0..4).into_iter().collect();
-        assert_eq!(Err(FromIteratorError::CapacityExceeded(CapacityExceeded { target_capacity: 3 })), result);
+        assert_eq!(Err(FromIteratorError::CapacityExceeded(CapacityExceeded { capacity: 3 })), result);
     }
 
     #[test]
     fn from_iterator_incompletely_filled() {
         let FromIteratorResult::<usize, 5>(result) = (0..4).into_iter().collect();
-        assert_eq!(Err(FromIteratorError::IncompletelyFilled(IncompletelyFilled { target_capacity: 5 })), result);
+        assert_eq!(Err(FromIteratorError::IncompletelyFilled(IncompletelyFilled { capacity: 5 })), result);
     }
 }

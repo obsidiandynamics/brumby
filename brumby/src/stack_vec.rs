@@ -49,15 +49,15 @@ pub mod __macro_support {
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("exceeds capacity ({target_capacity})")]
+#[error("exceeds capacity ({capacity})")]
 pub struct CapacityExceeded {
-    pub target_capacity: usize,
+    pub capacity: usize,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("not filled to capacity ({target_capacity})")]
+#[error("not filled to capacity ({capacity})")]
 pub struct IncompletelyFilled {
-    pub target_capacity: usize,
+    pub capacity: usize,
 }
 
 pub struct StackVec<T, const C: usize> {
@@ -89,7 +89,7 @@ impl<T, const C: usize> StackVec<T, C> {
             self.len += 1;
             Ok(())
         } else {
-            Err(CapacityExceeded { target_capacity: C })
+            Err(CapacityExceeded { capacity: C })
         }
     }
 
@@ -150,7 +150,7 @@ impl<T, const C: usize> StackVec<T, C> {
         if self.len == C {
             Ok(unsafe { self.array.take().unwrap().to_array() })
         } else {
-            Err(IncompletelyFilled { target_capacity: C })
+            Err(IncompletelyFilled { capacity: C })
         }
     }
 }
@@ -732,7 +732,7 @@ mod tests {
     #[test]
     fn from_array_overflow() {
         let result = StackVec::<_, 2>::try_from(["zero", "one", "two"]);
-        assert_eq!(CapacityExceeded { target_capacity: 2 }, result.unwrap_err());
+        assert_eq!(CapacityExceeded { capacity: 2 }, result.unwrap_err());
     }
 
     #[test]
@@ -744,7 +744,7 @@ mod tests {
     #[test]
     fn from_iterator_overflow() {
         let FromIteratorResult(result) = (0..4).collect::<FromIteratorResult<_, 3>>();
-        assert_eq!(Err(CapacityExceeded { target_capacity: 3 }), result);
+        assert_eq!(Err(CapacityExceeded { capacity: 3 }), result);
     }
 
     #[test]
@@ -883,7 +883,7 @@ mod tests {
     fn to_array_incomplete() {
         let sv: StackVec<_, 3> = sv![String::from("zero"), String::from("one")];
         let result = sv.to_array();
-        assert_eq!(Err(IncompletelyFilled { target_capacity: 3 }), result);
+        assert_eq!(Err(IncompletelyFilled { capacity: 3 }), result);
     }
 
     #[test]
@@ -893,7 +893,7 @@ mod tests {
         assert_eq!(0, *drop_count.borrow());
         let result = sv.to_array();
         assert_eq!(2, *drop_count.borrow());
-        assert_eq!(Err(IncompletelyFilled { target_capacity: 3 }), result);
+        assert_eq!(Err(IncompletelyFilled { capacity: 3 }), result);
     }
 
     #[test]

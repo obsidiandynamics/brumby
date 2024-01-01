@@ -12,8 +12,8 @@ use crate::domain::{Player, Score, Side};
 mod assist;
 pub mod query;
 
-const NUM_PLAYERS: usize = 3;
-const NUM_PLAYER_STATS: usize = NUM_PLAYERS + 1;
+pub const NUM_PLAYERS: usize = 3;
+pub const NUM_PLAYER_STATS: usize = NUM_PLAYERS + 1;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Prospect {
@@ -120,6 +120,17 @@ impl Expansions {
 
     pub fn requires_player_assist_probs(&self) -> bool {
         self.max_player_assists > 0
+    }
+    
+    pub fn empty() -> Self {
+        Self {
+            ht_score: false,
+            ft_score: false,
+            max_player_goals: 0,
+            player_split_goal_stats: false,
+            max_player_assists: 0,
+            first_goalscorer: false,
+        }
     }
 }
 
