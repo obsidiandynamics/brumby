@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use tracing::debug;
 
 use crate::domain::error::{MissingOutcome, OfferCapture};
-use crate::domain::{Offer, OfferType, OutcomeType};
+use crate::domain::{Offer, OfferType, Outcome};
 use crate::fit;
 use crate::interval::UnivariateProbs;
 use crate::model::{get_offer, FitError, Model, get_or_create_player};
@@ -19,10 +19,10 @@ impl PlayerAssistFitter {
             OfferCapture::try_from(get_offer(offers, &OfferType::FirstGoalscorer)?)?;
         let nil_all_draw_prob =
             first_goalscorer
-                .get_probability(&OutcomeType::None)
+                .get_probability(&Outcome::None)
                 .ok_or(MissingOutcome {
                     offer_type: OfferType::FirstGoalscorer,
-                    outcome_type: OutcomeType::None,
+                    outcome: Outcome::None,
                 })?;
 
         let anytime_goalscorer =

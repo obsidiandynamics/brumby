@@ -1,11 +1,11 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{error, OfferType, OutcomeType, Over};
+use crate::domain::{error, OfferType, Outcome, Over};
 use crate::domain::error::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
-    outcomes: &HashLookup<OutcomeType>,
+    outcomes: &HashLookup<Outcome>,
 ) -> Result<(), InvalidOutcome> {
     match offer_type {
         OfferType::TotalGoals(_, over) => {
@@ -21,7 +21,7 @@ pub(crate) fn validate_outcomes(
 
 pub(crate) fn validate_outcome(
     offer_type: &OfferType,
-    outcome: &OutcomeType,
+    outcome: &Outcome,
 ) -> Result<(), InvalidOutcome> {
     match offer_type {
         OfferType::TotalGoals(_, over) => {
@@ -30,7 +30,7 @@ pub(crate) fn validate_outcome(
                 Ok(())
             } else {
                 Err(InvalidOutcome::ExtraneousOutcome(ExtraneousOutcome {
-                    outcome_type: outcome.clone(),
+                    outcome: outcome.clone(),
                     offer_type: offer_type.clone(),
                 }))
             }
@@ -49,9 +49,9 @@ pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<()
     }
 }
 
-fn valid_outcomes(over: &Over) -> [OutcomeType; 2] {
+fn valid_outcomes(over: &Over) -> [Outcome; 2] {
     [
-        OutcomeType::Over(over.0), OutcomeType::Under(over.0 + 1),
+        Outcome::Over(over.0), Outcome::Under(over.0 + 1),
     ]
 }
 
@@ -73,7 +73,7 @@ mod tests {
     fn valid() {
         let offer = Offer {
             offer_type: OFFER_TYPE,
-            outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3)]),
+            outcomes: HashLookup::from(vec![Outcome::Over(2), Outcome::Under(3)]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
         };
         offer.validate().unwrap();
@@ -83,7 +83,7 @@ mod tests {
     fn wrong_booksum() {
         let offer = Offer {
             offer_type: OFFER_TYPE,
-            outcomes: HashLookup::from(vec![OutcomeType::Over(2), OutcomeType::Under(3)]),
+            outcomes: HashLookup::from(vec![Outcome::Over(2), Outcome::Under(3)]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.5], &PRICE_BOUNDS),
         };
         assert_eq!(
@@ -96,7 +96,7 @@ mod tests {
     fn missing_outcome() {
         let offer = Offer {
             offer_type: OFFER_TYPE,
-            outcomes: HashLookup::from(vec![OutcomeType::Over(2)]),
+            outcomes: HashLookup::from(vec![Outcome::Over(2)]),
             market: Market::frame(&Overround::fair(), vec![1.0], &PRICE_BOUNDS),
         };
         assert_eq!(
@@ -110,9 +110,9 @@ mod tests {
         let offer = Offer {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
-                OutcomeType::Over(2),
-                OutcomeType::Under(3),
-                OutcomeType::None,
+                Outcome::Over(2),
+                Outcome::Under(3),
+                Outcome::None,
             ]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.5, 0.1], &PRICE_BOUNDS),
         };

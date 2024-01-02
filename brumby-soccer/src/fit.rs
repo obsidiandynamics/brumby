@@ -13,7 +13,7 @@ use brumby::probs::SliceExt;
 use brumby::{arrays, factorial, poisson, sv};
 
 use crate::domain::Player::Named;
-use crate::domain::{Offer, OfferType, OutcomeType, Player, Side};
+use crate::domain::{Offer, OfferType, Outcome, Player, Side};
 use crate::interval::query::{isolate, requirements};
 use crate::interval::{
     explore, BivariateProbs, Config, PlayerProbs, PruneThresholds, TeamProbs, UnivariateProbs,
@@ -42,10 +42,10 @@ impl ErrorType {
 
 pub fn home_booksum(offer: &Offer) -> f64 {
     offer
-        .filter_outcomes_with_probs(|outcome_type, _| {
+        .filter_outcomes_with_probs(|outcome, _| {
             matches!(
-                outcome_type,
-                OutcomeType::Player(Player::Named(Side::Home, _))
+                outcome,
+                Outcome::Player(Player::Named(Side::Home, _))
             )
         })
         .map(|(_, prob)| prob)
@@ -54,10 +54,10 @@ pub fn home_booksum(offer: &Offer) -> f64 {
 
 pub fn away_booksum(offer: &Offer) -> f64 {
     offer
-        .filter_outcomes_with_probs(|outcome_type, _| {
+        .filter_outcomes_with_probs(|outcome, _| {
             matches!(
-                outcome_type,
-                OutcomeType::Player(Player::Named(Side::Away, _))
+                outcome,
+                Outcome::Player(Player::Named(Side::Away, _))
             )
         })
         .map(|(_, prob)| prob)
@@ -327,10 +327,10 @@ pub fn fit_first_goalscorer_all<'a>(
         .items()
         .iter()
         .enumerate()
-        .filter(|(_, outcome)| matches!(outcome, OutcomeType::Player(_)))
+        .filter(|(_, outcome)| matches!(outcome, Outcome::Player(_)))
         .map(|(index, outcome)| {
             match outcome {
-                OutcomeType::Player(player) => {
+                Outcome::Player(player) => {
                     let side_ratio = match player {
                         Named(side, _) => match side {
                             Side::Home => home_ratio,
@@ -390,7 +390,7 @@ fn fit_first_goalscorer_one(
         },
         expansions: requirements(&OfferType::FirstGoalscorer),
     };
-    let outcome_type = OutcomeType::Player(player.clone());
+    let outcome = Outcome::Player(player.clone());
     univariate_descent(
         &UnivariateDescentConfig {
             init_value: init_estimate,
@@ -404,7 +404,7 @@ fn fit_first_goalscorer_one(
             let exploration = explore(&config, 0..intervals);
             let isolated_prob = isolate(
                 &OfferType::FirstGoalscorer,
-                &outcome_type,
+                &outcome,
                 &exploration.prospects,
                 &exploration.player_lookup,
             );
@@ -435,10 +435,10 @@ pub fn fit_anytime_goalscorer_all<'a>(
         .items()
         .iter()
         .enumerate()
-        .filter(|(_, outcome)| matches!(outcome, OutcomeType::Player(_)))
+        .filter(|(_, outcome)| matches!(outcome, Outcome::Player(_)))
         .map(|(index, outcome)| {
             match outcome {
-                OutcomeType::Player(player) => {
+                Outcome::Player(player) => {
                     let side_ratio = match player {
                         Named(side, _) => match side {
                             Side::Home => home_ratio,
@@ -498,7 +498,7 @@ fn fit_anytime_goalscorer_one(
         },
         expansions: requirements(&OfferType::AnytimeGoalscorer),
     };
-    let outcome_type = OutcomeType::Player(player.clone());
+    let outcome = Outcome::Player(player.clone());
     univariate_descent(
         &UnivariateDescentConfig {
             init_value: init_estimate,
@@ -512,7 +512,7 @@ fn fit_anytime_goalscorer_one(
             let exploration = explore(&config, 0..intervals);
             let isolated_prob = isolate(
                 &OfferType::AnytimeGoalscorer,
-                &outcome_type,
+                &outcome,
                 &exploration.prospects,
                 &exploration.player_lookup,
             );
@@ -548,7 +548,7 @@ pub fn fit_anytime_assist_all(
         .enumerate()
         .map(|(index, outcome)| {
             match outcome {
-                OutcomeType::Player(player) => {
+                Outcome::Player(player) => {
                     let side_ratio = match player {
                         Named(side, _) => match side {
                             Side::Home => home_ratio,
@@ -609,7 +609,7 @@ fn fit_anytime_assist_one(
         },
         expansions: requirements(&OfferType::AnytimeAssist),
     };
-    let outcome_type = OutcomeType::Player(player.clone());
+    let outcome = Outcome::Player(player.clone());
     univariate_descent(
         &UnivariateDescentConfig {
             init_value: init_estimate,
@@ -623,7 +623,7 @@ fn fit_anytime_assist_one(
             let exploration = explore(&config, 0..intervals);
             let isolated_prob = isolate(
                 &OfferType::AnytimeAssist,
-                &outcome_type,
+                &outcome,
                 &exploration.prospects,
                 &exploration.player_lookup,
             );
@@ -877,15 +877,15 @@ fn bivariate_poisson_scoregrid(
 }
 
 /// Univariate binomial.
-fn univariate_binomial_scoregrid(
-    intervals: u8,
-    interval_home_prob: f64,
-    interval_away_prob: f64,
-    scoregrid: &mut Matrix<f64>,
-) {
-    scoregrid.fill(0.0);
-    scoregrid::from_binomial(intervals, interval_home_prob, interval_away_prob, scoregrid);
-}
+// fn univariate_binomial_scoregrid(
+//     intervals: u8,
+//     interval_home_prob: f64,
+//     interval_away_prob: f64,
+//     scoregrid: &mut Matrix<f64>,
+// ) {
+//     scoregrid.fill(0.0);
+//     scoregrid::from_binomial(intervals, interval_home_prob, interval_away_prob, scoregrid);
+// }
 
 /// Bivariate binomial.
 fn bivariate_binomial_scoregrid(

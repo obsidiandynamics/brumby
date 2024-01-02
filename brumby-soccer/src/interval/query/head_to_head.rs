@@ -34,26 +34,26 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(offer_type: &OfferType, outcome_type: &OutcomeType) -> QuerySpec {
-    QuerySpec::Generic(offer_type.clone(), outcome_type.clone())
+pub(crate) fn prepare(offer_type: &OfferType, outcome: &Outcome) -> QuerySpec {
+    QuerySpec::Generic(offer_type.clone(), outcome.clone())
 }
 
 #[inline]
 #[must_use]
 pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
     match query {
-        QuerySpec::Generic(OfferType::HeadToHead(period), outcome_type) => {
+        QuerySpec::Generic(OfferType::HeadToHead(period), outcome) => {
             let (home_goals, away_goals) = match period {
                 Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
                 Period::SecondHalf => { let h2_score = prospect.h2_score(); (h2_score.home, h2_score.away) },
                 Period::FullTime => (prospect.ft_score.home, prospect.ft_score.away),
             };
 
-            match outcome_type {
-                OutcomeType::Win(Side::Home) => home_goals > away_goals,
-                OutcomeType::Win(Side::Away) => away_goals > home_goals,
-                OutcomeType::Draw => home_goals == away_goals,
-                _ => panic!("{outcome_type:?} unsupported"),
+            match outcome {
+                Outcome::Win(Side::Home) => home_goals > away_goals,
+                Outcome::Win(Side::Away) => away_goals > home_goals,
+                Outcome::Draw => home_goals == away_goals,
+                _ => panic!("{outcome:?} unsupported"),
             }
         }
         _ => panic!("{query:?} unsupported"),

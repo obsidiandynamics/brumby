@@ -34,15 +34,15 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(offer_type: &OfferType, outcome_type: &OutcomeType) -> QuerySpec {
-    QuerySpec::Generic(offer_type.clone(), outcome_type.clone())
+pub(crate) fn prepare(offer_type: &OfferType, outcome: &Outcome) -> QuerySpec {
+    QuerySpec::Generic(offer_type.clone(), outcome.clone())
 }
 
 #[inline]
 #[must_use]
 pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
     match query {
-        QuerySpec::Generic(OfferType::CorrectScore(period), OutcomeType::Score(score)) => {
+        QuerySpec::Generic(OfferType::CorrectScore(period), Outcome::Score(score)) => {
             let (home_goals, away_goals) = match period {
                 Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
                 Period::SecondHalf => { let h2_score = prospect.h2_score(); (h2_score.home, h2_score.away) },

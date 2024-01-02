@@ -17,7 +17,7 @@ use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
 use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
-use brumby_soccer::domain::{Offer, OfferType, OutcomeType, Over, Period, Player, Side};
+use brumby_soccer::domain::{Offer, OfferType, Outcome, Over, Period, Player, Side};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
@@ -219,11 +219,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // let selections = [
-    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), OutcomeType::Over(2)),
-    //     (OfferType::HeadToHead(Period::FullTime), OutcomeType::Win(Side::Home)),
-    //     (OfferType::FirstGoalscorer, OutcomeType::Player(Player::Named(Side::Away, String::from("João Pedro")))),
-    //     (OfferType::AnytimeGoalscorer, OutcomeType::Player(Player::Named(Side::Away, String::from("Welbeck")))),
-    //     // (OfferType::AnytimeGoalscorer, OutcomeType::Player(Player::Named(Side::Home, String::from("Bowen")))),
+    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
+    //     (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
+    //     (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
+    //     (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
+    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
     // ];
     //
     // let price = model.derive_multi(&selections)?;
@@ -242,7 +242,7 @@ fn implied_booksum<'a>(prices: impl Iterator<Item = &'a f64>) -> f64 {
     prices.map(|&price| 1.0 / price).sum()
 }
 
-fn fit_offer(offer_type: OfferType, map: &HashMap<OutcomeType, f64>, normal: f64) -> Offer {
+fn fit_offer(offer_type: OfferType, map: &HashMap<Outcome, f64>, normal: f64) -> Offer {
     let mut entries = map.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
     let outcomes = entries

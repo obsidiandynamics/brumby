@@ -15,13 +15,13 @@ pub(crate) fn requirements() -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(outcome_type: &OutcomeType, player_lookup: &HashLookup<Player>) -> QuerySpec {
-    match outcome_type {
-        OutcomeType::Player(player) => {
+pub(crate) fn prepare(outcome: &Outcome, player_lookup: &HashLookup<Player>) -> QuerySpec {
+    match outcome {
+        Outcome::Player(player) => {
             QuerySpec::PlayerLookup(player_lookup.index_of(player).unwrap())
         }
-        OutcomeType::None => QuerySpec::NoAnytimeAssist,
-        _ => panic!("{outcome_type:?} unsupported"),
+        Outcome::None => QuerySpec::NoAnytimeAssist,
+        _ => panic!("{outcome:?} unsupported"),
     }
 }
 
@@ -105,10 +105,10 @@ mod tests {
 
         let alice_to_bob = isolate_set(
             &[
-                (OfferType::AnytimeAssist, OutcomeType::Player(alice.clone())),
+                (OfferType::AnytimeAssist, Outcome::Player(alice.clone())),
                 (
                     OfferType::AnytimeGoalscorer,
-                    OutcomeType::Player(bob.clone()),
+                    Outcome::Player(bob.clone()),
                 ),
             ],
             &exploration.prospects,
@@ -118,10 +118,10 @@ mod tests {
 
         let bob_to_alice = isolate_set(
             &[
-                (OfferType::AnytimeAssist, OutcomeType::Player(bob.clone())),
+                (OfferType::AnytimeAssist, Outcome::Player(bob.clone())),
                 (
                     OfferType::AnytimeGoalscorer,
-                    OutcomeType::Player(alice.clone()),
+                    Outcome::Player(alice.clone()),
                 ),
             ],
             &exploration.prospects,
@@ -131,10 +131,10 @@ mod tests {
 
         let alice_to_alice = isolate_set(
             &[
-                (OfferType::AnytimeAssist, OutcomeType::Player(alice.clone())),
+                (OfferType::AnytimeAssist, Outcome::Player(alice.clone())),
                 (
                     OfferType::AnytimeGoalscorer,
-                    OutcomeType::Player(alice.clone()),
+                    Outcome::Player(alice.clone()),
                 ),
             ],
             &exploration.prospects,
@@ -196,13 +196,13 @@ mod tests {
 
         let alice_to_bob = isolate_set(
             &[
-                (OfferType::AnytimeAssist, OutcomeType::Player(alice.clone())),
+                (OfferType::AnytimeAssist, Outcome::Player(alice.clone())),
                 (
                     OfferType::AnytimeGoalscorer,
-                    OutcomeType::Player(bob.clone()),
+                    Outcome::Player(bob.clone()),
                 ),
                 // the third condition is necessary because if the score is 1:1, Alice could have assisted to Other while Bob also scored
-                (OfferType::CorrectScore(Period::FullTime), OutcomeType::Score(Score { home: 1, away: 0 })),
+                (OfferType::CorrectScore(Period::FullTime), Outcome::Score(Score { home: 1, away: 0 })),
             ],
             &exploration.prospects,
             &exploration.player_lookup,

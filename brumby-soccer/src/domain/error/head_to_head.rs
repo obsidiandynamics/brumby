@@ -1,11 +1,11 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{error, OfferType, OutcomeType, Side};
+use crate::domain::{error, OfferType, Outcome, Side};
 use crate::domain::error::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
-    outcomes: &HashLookup<OutcomeType>,
+    outcomes: &HashLookup<Outcome>,
 ) -> Result<(), InvalidOutcome> {
     error::OutcomesCompleteAssertion {
         outcomes: &valid_outcomes(),
@@ -16,14 +16,14 @@ pub(crate) fn validate_outcomes(
 
 pub(crate) fn validate_outcome(
     offer_type: &OfferType,
-    outcome: &OutcomeType,
+    outcome: &Outcome,
 ) -> Result<(), InvalidOutcome> {
     let valid_outcomes = valid_outcomes();
     if valid_outcomes.contains(outcome) {
         Ok(())
     } else {
         Err(InvalidOutcome::ExtraneousOutcome(ExtraneousOutcome {
-            outcome_type: outcome.clone(),
+            outcome: outcome.clone(),
             offer_type: offer_type.clone(),
         }))
     }
@@ -34,11 +34,11 @@ pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<()
     Ok(())
 }
 
-fn valid_outcomes() -> [OutcomeType; 3] {
+fn valid_outcomes() -> [Outcome; 3] {
     [
-        OutcomeType::Win(Side::Home),
-        OutcomeType::Win(Side::Away),
-        OutcomeType::Draw,
+        Outcome::Win(Side::Home),
+        Outcome::Win(Side::Away),
+        Outcome::Draw,
     ]
 }
 
@@ -61,9 +61,9 @@ mod tests {
         let offer = Offer {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
-                OutcomeType::Draw,
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
+                Outcome::Draw,
             ]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.4, 0.2], &PRICE_BOUNDS),
         };
@@ -75,9 +75,9 @@ mod tests {
         let offer = Offer {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
-                OutcomeType::Draw,
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
+                Outcome::Draw,
             ]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.4, 0.1], &PRICE_BOUNDS),
         };
@@ -92,8 +92,8 @@ mod tests {
         let offer = Offer {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
             ]),
             market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
         };
@@ -108,10 +108,10 @@ mod tests {
         let offer = Offer {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
-                OutcomeType::Draw,
-                OutcomeType::None,
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
+                Outcome::Draw,
+                Outcome::None,
             ]),
             market: Market::frame(
                 &Overround::fair(),

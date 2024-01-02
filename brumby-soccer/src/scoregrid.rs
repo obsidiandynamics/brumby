@@ -5,7 +5,7 @@ use strum_macros::{EnumCount, EnumIter};
 use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
-use crate::domain::{OutcomeType, Period, Score, Side};
+use crate::domain::{Outcome, Period, Score, Side};
 use crate::interval::{explore, Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
@@ -254,10 +254,10 @@ pub fn from_bivariate_binomial(
     }
 }
 
-pub fn from_correct_score(outcomes: &[OutcomeType], probs: &[f64], scoregrid: &mut Matrix<f64>) {
+pub fn from_correct_score(outcomes: &[Outcome], probs: &[f64], scoregrid: &mut Matrix<f64>) {
     for (index, outcome) in outcomes.iter().enumerate() {
         match outcome {
-            OutcomeType::Score(score) => {
+            Outcome::Score(score) => {
                 if (score.home as usize) < scoregrid.rows()
                     && (score.away as usize) < scoregrid.cols()
                 {
@@ -322,14 +322,14 @@ pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
     scoregrid.flatten_mut().normalise(1.0);
 }
 
-impl OutcomeType {
+impl Outcome {
     pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
         match self {
-            OutcomeType::Win(side) => Self::gather_win(side, scoregrid),
-            OutcomeType::Draw => Self::gather_draw(scoregrid),
-            OutcomeType::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
-            OutcomeType::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
-            OutcomeType::Score(score) => Self::gather_correct_score(score, scoregrid),
+            Outcome::Win(side) => Self::gather_win(side, scoregrid),
+            Outcome::Draw => Self::gather_draw(scoregrid),
+            Outcome::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
+            Outcome::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
+            Outcome::Score(score) => Self::gather_correct_score(score, scoregrid),
             _ => unimplemented!(),
         }
     }

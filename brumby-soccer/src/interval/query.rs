@@ -1,6 +1,6 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{OfferType, OutcomeType, Player};
+use crate::domain::{OfferType, Outcome, Player};
 use crate::interval::{Expansions, Prospect, Prospects};
 
 mod anytime_assist;
@@ -13,7 +13,7 @@ mod total_goals;
 #[derive(Debug)]
 pub enum QuerySpec {
     None,
-    Generic(OfferType, OutcomeType),
+    Generic(OfferType, Outcome),
     PlayerLookup(usize),
     NoFirstGoalscorer,
     NoAnytimeGoalscorer,
@@ -37,18 +37,18 @@ pub fn requirements(offer_type: &OfferType) -> Expansions {
 #[must_use]
 pub fn prepare(
     offer_type: &OfferType,
-    outcome_type: &OutcomeType,
+    outcome: &Outcome,
     player_lookup: &HashLookup<Player>,
 ) -> QuerySpec {
     match offer_type {
-        OfferType::HeadToHead(_) => head_to_head::prepare(offer_type, outcome_type),
-        OfferType::TotalGoals(_, _) => total_goals::prepare(offer_type, outcome_type),
-        OfferType::CorrectScore(_) => correct_score::prepare(offer_type, outcome_type),
+        OfferType::HeadToHead(_) => head_to_head::prepare(offer_type, outcome),
+        OfferType::TotalGoals(_, _) => total_goals::prepare(offer_type, outcome),
+        OfferType::CorrectScore(_) => correct_score::prepare(offer_type, outcome),
         OfferType::DrawNoBet => unimplemented!(),
-        OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome_type, player_lookup),
-        OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome_type, player_lookup),
+        OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
+        OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
-        OfferType::AnytimeAssist => anytime_assist::prepare(outcome_type, player_lookup),
+        OfferType::AnytimeAssist => anytime_assist::prepare(outcome, player_lookup),
     }
 }
 
@@ -69,11 +69,11 @@ pub fn filter(offer_type: &OfferType, query: &QuerySpec, prospect: &Prospect) ->
 #[must_use]
 pub fn isolate(
     offer_type: &OfferType,
-    outcome_type: &OutcomeType,
+    outcome: &Outcome,
     prospects: &Prospects,
     player_lookup: &HashLookup<Player>,
 ) -> f64 {
-    let query = prepare(offer_type, outcome_type, player_lookup);
+    let query = prepare(offer_type, outcome, player_lookup);
     prospects
         .iter()
         .filter(|(prospect, _)| filter(offer_type, &query, prospect))
@@ -83,14 +83,14 @@ pub fn isolate(
 
 #[must_use]
 pub fn isolate_set(
-    selections: &[(OfferType, OutcomeType)],
+    selections: &[(OfferType, Outcome)],
     prospects: &Prospects,
     player_lookup: &HashLookup<Player>,
 ) -> f64 {
     let queries = selections
         .iter()
-        .map(|(offer_type, outcome_type)| {
-            (offer_type, prepare(offer_type, outcome_type, player_lookup))
+        .map(|(offer_type, outcome)| {
+            (offer_type, prepare(offer_type, outcome, player_lookup))
         })
         .collect::<Vec<_>>();
     prospects
@@ -137,7 +137,7 @@ mod tests {
         );
         let home_win = isolate(
             &OfferType::HeadToHead(Period::FullTime),
-            &OutcomeType::Win(Side::Home),
+            &Outcome::Win(Side::Home),
             &exploration.prospects,
             &exploration.player_lookup,
         );
@@ -146,7 +146,7 @@ mod tests {
         let home_win_set = isolate_set(
             &[(
                 OfferType::HeadToHead(Period::FullTime),
-                OutcomeType::Win(Side::Home),
+                Outcome::Win(Side::Home),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -181,7 +181,7 @@ mod tests {
         let home_win = isolate_set(
             &[(
                 OfferType::HeadToHead(Period::FullTime),
-                OutcomeType::Win(Side::Home),
+                Outcome::Win(Side::Home),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -191,7 +191,7 @@ mod tests {
         let one_nil = isolate_set(
             &[(
                 OfferType::CorrectScore(Period::FullTime),
-                OutcomeType::Score(Score { home: 1, away: 0 }),
+                Outcome::Score(Score { home: 1, away: 0 }),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -203,11 +203,11 @@ mod tests {
             &[
                 (
                     OfferType::CorrectScore(Period::FullTime),
-                    OutcomeType::Score(Score { home: 1, away: 0 }),
+                    Outcome::Score(Score { home: 1, away: 0 }),
                 ),
                 (
                     OfferType::HeadToHead(Period::FullTime),
-                    OutcomeType::Win(Side::Home),
+                    Outcome::Win(Side::Home),
                 ),
             ],
             &exploration.prospects,
@@ -243,7 +243,7 @@ mod tests {
         let home_win = isolate_set(
             &[(
                 OfferType::HeadToHead(Period::FullTime),
-                OutcomeType::Win(Side::Home),
+                Outcome::Win(Side::Home),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -253,7 +253,7 @@ mod tests {
         let nil_one = isolate_set(
             &[(
                 OfferType::CorrectScore(Period::FullTime),
-                OutcomeType::Score(Score { home: 0, away: 1 }),
+                Outcome::Score(Score { home: 0, away: 1 }),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -264,11 +264,11 @@ mod tests {
             &[
                 (
                     OfferType::CorrectScore(Period::FullTime),
-                    OutcomeType::Score(Score { home: 0, away: 1 }),
+                    Outcome::Score(Score { home: 0, away: 1 }),
                 ),
                 (
                     OfferType::HeadToHead(Period::FullTime),
-                    OutcomeType::Win(Side::Home),
+                    Outcome::Win(Side::Home),
                 ),
             ],
             &exploration.prospects,

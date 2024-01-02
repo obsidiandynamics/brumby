@@ -7,7 +7,7 @@ use brumby::capture::Capture;
 use brumby::hash_lookup::HashLookup;
 use brumby::probs::SliceExt;
 
-use crate::domain::{Offer, OfferType, OutcomeType};
+use crate::domain::{Offer, OfferType, Outcome};
 
 mod head_to_head;
 mod total_goals;
@@ -80,7 +80,7 @@ pub enum InvalidOutcome {
 }
 
 impl OfferType {
-    pub fn validate_outcomes(&self, outcomes: &HashLookup<OutcomeType>) -> Result<(), InvalidOutcome> {
+    pub fn validate_outcomes(&self, outcomes: &HashLookup<Outcome>) -> Result<(), InvalidOutcome> {
         match self {
             OfferType::TotalGoals(_, _) => total_goals::validate_outcomes(self, outcomes),
             OfferType::HeadToHead(_) => head_to_head::validate_outcomes(self, outcomes),
@@ -88,7 +88,7 @@ impl OfferType {
         }
     }
 
-    pub fn validate_outcome(&self, outcome: &OutcomeType) -> Result<(), InvalidOutcome> {
+    pub fn validate_outcome(&self, outcome: &Outcome) -> Result<(), InvalidOutcome> {
         match self {
             OfferType::TotalGoals(_, _) => total_goals::validate_outcome(self, outcome),
             OfferType::HeadToHead(_) => head_to_head::validate_outcome(self, outcome),
@@ -153,7 +153,7 @@ pub struct MisalignedOffer {
 pub struct OfferAlignmentAssertion;
 impl OfferAlignmentAssertion {
     pub fn check(
-        outcomes: &[OutcomeType],
+        outcomes: &[Outcome],
         probs: &[f64],
         offer_type: &OfferType,
     ) -> Result<(), MisalignedOffer> {
@@ -170,26 +170,26 @@ impl OfferAlignmentAssertion {
 }
 
 #[derive(Debug, Error)]
-#[error("{outcome_type:?} missing from {offer_type:?}")]
+#[error("{outcome:?} missing from {offer_type:?}")]
 pub struct MissingOutcome {
-    pub outcome_type: OutcomeType,
+    pub outcome: Outcome,
     pub offer_type: OfferType,
 }
 
 #[derive(Debug)]
 pub struct OutcomesIntactAssertion<'a> {
-    pub outcomes: &'a [OutcomeType],
+    pub outcomes: &'a [Outcome],
 }
 impl<'a> OutcomesIntactAssertion<'a> {
     pub fn check(
         &self,
-        outcomes: &HashLookup<OutcomeType>,
+        outcomes: &HashLookup<Outcome>,
         offer_type: &OfferType,
     ) -> Result<(), MissingOutcome> {
         for outcome in self.outcomes.iter() {
             if outcomes.index_of(outcome).is_none() {
                 return Err(MissingOutcome {
-                    outcome_type: outcome.clone(),
+                    outcome: outcome.clone(),
                     offer_type: offer_type.clone(),
                 });
             }
@@ -199,26 +199,26 @@ impl<'a> OutcomesIntactAssertion<'a> {
 }
 
 #[derive(Debug, Error)]
-#[error("{outcome_type:?} does not belong in {offer_type:?}")]
+#[error("{outcome:?} does not belong in {offer_type:?}")]
 pub struct ExtraneousOutcome {
-    pub outcome_type: OutcomeType,
+    pub outcome: Outcome,
     pub offer_type: OfferType,
 }
 
-pub struct OutcomesMatchAssertion<F: FnMut(&OutcomeType) -> bool> {
+pub struct OutcomesMatchAssertion<F: FnMut(&Outcome) -> bool> {
     pub matcher: F,
 }
-impl<F: FnMut(&OutcomeType) -> bool> OutcomesMatchAssertion<F> {
+impl<F: FnMut(&Outcome) -> bool> OutcomesMatchAssertion<F> {
     pub fn check(
         &mut self,
-        outcomes: &[OutcomeType],
+        outcomes: &[Outcome],
         offer_type: &OfferType,
     ) -> Result<(), ExtraneousOutcome> {
         let mismatched = outcomes.iter().find(|&outcome| !(self.matcher)(outcome));
         match mismatched {
             None => Ok(()),
             Some(mismatched_outcome) => Err(ExtraneousOutcome {
-                outcome_type: mismatched_outcome.clone(),
+                outcome: mismatched_outcome.clone(),
                 offer_type: offer_type.clone(),
             }),
         }
@@ -227,12 +227,12 @@ impl<F: FnMut(&OutcomeType) -> bool> OutcomesMatchAssertion<F> {
 
 #[derive(Debug)]
 pub struct OutcomesCompleteAssertion<'a> {
-    pub outcomes: &'a [OutcomeType],
+    pub outcomes: &'a [Outcome],
 }
 impl<'a> OutcomesCompleteAssertion<'a> {
     pub fn check(
         &self,
-        outcomes: &HashLookup<OutcomeType>,
+        outcomes: &HashLookup<Outcome>,
         offer_type: &OfferType,
     ) -> Result<(), InvalidOutcome> {
         OutcomesIntactAssertion {

@@ -16,15 +16,15 @@ pub(crate) fn requirements() -> Expansions {
 #[inline]
 #[must_use]
 pub(crate) fn prepare(
-    outcome_type: &OutcomeType,
+    outcome: &Outcome,
     player_lookup: &HashLookup<Player>,
 ) -> QuerySpec {
-    match outcome_type {
-        OutcomeType::Player(player) => {
+    match outcome {
+        Outcome::Player(player) => {
             QuerySpec::PlayerLookup(player_lookup.index_of(player).unwrap())
         }
-        OutcomeType::None => QuerySpec::NoFirstGoalscorer,
-        _ => panic!("{outcome_type:?} unsupported"),
+        Outcome::None => QuerySpec::NoFirstGoalscorer,
+        _ => panic!("{outcome:?} unsupported"),
     }
 }
 

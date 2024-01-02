@@ -1,4 +1,4 @@
-use crate::domain::{OfferType, OutcomeType, Over, Period, Player, Score, Side};
+use crate::domain::{OfferType, Outcome, Over, Period, Player, Score, Side};
 use racing_scraper::sports::soccer::contest_model::ContestModel;
 use racing_scraper::sports::soccer::market_model::{HomeAway, Player as ScraperPlayer, SoccerMarket};
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use brumby::feed_id::FeedId;
 pub struct ContestSummary {
     pub id: String,
     pub name: String,
-    pub offerings: FxHashMap<OfferType, HashMap<OutcomeType, f64>>,
+    pub offerings: FxHashMap<OfferType, HashMap<Outcome, f64>>,
 }
 
 impl From<ContestModel> for ContestSummary {
@@ -28,7 +28,7 @@ impl From<ContestModel> for ContestSummary {
                         OfferType::CorrectScore(Period::FullTime),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
-                                OutcomeType::Score(Score {
+                                Outcome::Score(Score {
                                     home: market.score.home as u8,
                                     away: market.score.away as u8,
                                 }),
@@ -42,8 +42,8 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::TotalGoals(Period::FullTime, Over(over)),
                         HashMap::from([
-                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
@@ -51,9 +51,9 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::HeadToHead(Period::FullTime),
                         HashMap::from([
-                            (OutcomeType::Win(Side::Home), h2h.home),
-                            (OutcomeType::Win(Side::Away), h2h.away),
-                            (OutcomeType::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home), h2h.home),
+                            (Outcome::Win(Side::Away), h2h.away),
+                            (Outcome::Draw, h2h.draw),
                         ]),
                     );
                 }
@@ -61,8 +61,8 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::AnytimeGoalscorer,
                         HashMap::from_iter(players.into_iter().map(|player| {
-                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
-                            (outcome_type, odds)
+                            let OutcomeOdds(outcome, odds) = OutcomeOdds::from(player);
+                            (outcome, odds)
                         })),
                     );
                 }
@@ -73,8 +73,8 @@ impl From<ContestModel> for ContestSummary {
                             // if player.side.is_none() {
                             //     println!("PLAYER {player:?}");
                             // }
-                            let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
-                            (outcome_type, odds)
+                            let OutcomeOdds(outcome, odds) = OutcomeOdds::from(player);
+                            (outcome, odds)
                         })),
                     );
                 }
@@ -83,7 +83,7 @@ impl From<ContestModel> for ContestSummary {
                         OfferType::CorrectScore(Period::FirstHalf),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
-                                OutcomeType::Score(Score {
+                                Outcome::Score(Score {
                                     home: market.score.home as u8,
                                     away: market.score.away as u8,
                                 }),
@@ -97,7 +97,7 @@ impl From<ContestModel> for ContestSummary {
                         OfferType::CorrectScore(Period::SecondHalf),
                         HashMap::from_iter(markets.iter().map(|market| {
                             (
-                                OutcomeType::Score(Score {
+                                Outcome::Score(Score {
                                     home: market.score.home as u8,
                                     away: market.score.away as u8,
                                 }),
@@ -123,8 +123,8 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::TotalGoals(Period::FirstHalf, Over(over)),
                         HashMap::from([
-                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
@@ -132,9 +132,9 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::HeadToHead(Period::FirstHalf),
                         HashMap::from([
-                            (OutcomeType::Win(Side::Home), h2h.home),
-                            (OutcomeType::Win(Side::Away), h2h.away),
-                            (OutcomeType::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home), h2h.home),
+                            (Outcome::Win(Side::Away), h2h.away),
+                            (Outcome::Draw, h2h.draw),
                         ]),
                     );
                 }
@@ -143,8 +143,8 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::TotalGoals(Period::SecondHalf, Over(over)),
                         HashMap::from([
-                            (OutcomeType::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (OutcomeType::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
@@ -152,9 +152,9 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::HeadToHead(Period::SecondHalf),
                         HashMap::from([
-                            (OutcomeType::Win(Side::Home), h2h.home),
-                            (OutcomeType::Win(Side::Away), h2h.away),
-                            (OutcomeType::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home), h2h.home),
+                            (Outcome::Win(Side::Away), h2h.away),
+                            (Outcome::Draw, h2h.draw),
                         ]),
                     );
                 }
@@ -163,8 +163,8 @@ impl From<ContestModel> for ContestSummary {
                         offerings.insert(
                             OfferType::AnytimeAssist,
                             HashMap::from_iter(players.into_iter().map(|player| {
-                                let OutcomeOdds(outcome_type, odds) = OutcomeOdds::from(player);
-                                (outcome_type, odds)
+                                let OutcomeOdds(outcome, odds) = OutcomeOdds::from(player);
+                                (outcome, odds)
                             })),
                         );
                     }
@@ -199,15 +199,15 @@ impl From<HomeAway> for Side {
     }
 }
 
-struct OutcomeOdds(OutcomeType, f64);
+struct OutcomeOdds(Outcome, f64);
 
 impl From<ScraperPlayer> for OutcomeOdds {
     fn from(player: ScraperPlayer) -> Self {
-        let outcome_type = match player.side {
-            None => OutcomeType::None,
-            Some(side) => OutcomeType::Player(Player::Named(side.into(), player.name)),
+        let outcome = match player.side {
+            None => Outcome::None,
+            Some(side) => Outcome::Player(Player::Named(side.into(), player.name)),
         };
-        OutcomeOdds(outcome_type, player.odds)
+        OutcomeOdds(outcome, player.odds)
     }
 }
 

@@ -8,7 +8,7 @@ const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
 fn aligned_offer() {
     let offer = Offer {
         offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-        outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+        outcomes: HashLookup::from([Outcome::Over(2), Outcome::Under(3)]),
         market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
     };
     assert!(offer.validate().is_ok());
@@ -18,7 +18,7 @@ fn aligned_offer() {
 fn misaligned_offer() {
     let offer = Offer {
         offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-        outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+        outcomes: HashLookup::from([Outcome::Over(2), Outcome::Under(3)]),
         market: Market::frame(&Overround::fair(), vec![0.4], &PRICE_BOUNDS),
     };
     assert_eq!(
@@ -70,7 +70,7 @@ fn booksum_outside_expected() {
 #[test]
 fn alignment_correct() {
     OfferAlignmentAssertion::check(
-        &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
+        &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
         &[0.5, 0.5],
         &OfferType::DrawNoBet,
     )
@@ -80,7 +80,7 @@ fn alignment_correct() {
 #[test]
 fn alignment_incorrect() {
     let err = OfferAlignmentAssertion::check(
-        &[OutcomeType::Win(Side::Home)],
+        &[Outcome::Win(Side::Home)],
         &[0.5, 0.5],
         &OfferType::DrawNoBet,
     )
@@ -94,13 +94,13 @@ fn alignment_incorrect() {
 #[test]
 fn outcomes_intact() {
     let assertion = OutcomesIntactAssertion {
-        outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
     };
     assertion
         .check(
             &HashLookup::from(vec![
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
             ]),
             &OfferType::DrawNoBet,
         )
@@ -110,11 +110,11 @@ fn outcomes_intact() {
 #[test]
 fn outcome_missing() {
     let assertion = OutcomesIntactAssertion {
-        outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
     };
     let err = assertion
         .check(
-            &HashLookup::from([OutcomeType::Win(Side::Home)]),
+            &HashLookup::from([Outcome::Win(Side::Home)]),
             &OfferType::DrawNoBet,
         )
         .unwrap_err();
@@ -124,14 +124,14 @@ fn outcome_missing() {
 #[test]
 fn outcomes_match() {
     let mut assertion = OutcomesMatchAssertion {
-        matcher: |outcome| matches!(outcome, OutcomeType::Win(_) | OutcomeType::Draw),
+        matcher: |outcome| matches!(outcome, Outcome::Win(_) | Outcome::Draw),
     };
     assertion
         .check(
             &[
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
-                OutcomeType::Draw,
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
+                Outcome::Draw,
             ],
             &OfferType::HeadToHead(Period::FullTime),
         )
@@ -141,11 +141,11 @@ fn outcomes_match() {
 #[test]
 fn outcome_does_not_match() {
     let mut assertion = OutcomesMatchAssertion {
-        matcher: |outcome| matches!(outcome, OutcomeType::Win(_) | OutcomeType::Draw),
+        matcher: |outcome| matches!(outcome, Outcome::Win(_) | Outcome::Draw),
     };
     let err = assertion
         .check(
-            &[OutcomeType::Win(Side::Home), OutcomeType::None],
+            &[Outcome::Win(Side::Home), Outcome::None],
             &OfferType::HeadToHead(Period::FullTime),
         )
         .unwrap_err();
@@ -158,13 +158,13 @@ fn outcome_does_not_match() {
 #[test]
 fn outcomes_complete() {
     let assertion = OutcomesCompleteAssertion {
-        outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
     };
     assertion
         .check(
             &HashLookup::from([
-                OutcomeType::Win(Side::Home),
-                OutcomeType::Win(Side::Away),
+                Outcome::Win(Side::Home),
+                Outcome::Win(Side::Away),
             ]),
             &OfferType::DrawNoBet,
         )
@@ -174,12 +174,12 @@ fn outcomes_complete() {
 #[test]
 fn outcomes_incomplete() {
     let assertion = OutcomesCompleteAssertion {
-        outcomes: &[OutcomeType::Win(Side::Home), OutcomeType::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
     };
     {
         let err = assertion
             .check(
-                &HashLookup::from([OutcomeType::Win(Side::Home)]),
+                &HashLookup::from([Outcome::Win(Side::Home)]),
                 &OfferType::DrawNoBet,
             )
             .unwrap_err();
@@ -189,9 +189,9 @@ fn outcomes_incomplete() {
         let err = assertion
             .check(
                 &HashLookup::from([
-                    OutcomeType::Win(Side::Home),
-                    OutcomeType::Win(Side::Away),
-                    OutcomeType::Draw,
+                    Outcome::Win(Side::Home),
+                    Outcome::Win(Side::Away),
+                    Outcome::Draw,
                 ]),
                 &OfferType::DrawNoBet,
             )
@@ -204,7 +204,7 @@ fn outcomes_incomplete() {
 fn unvalidated_offer_unchecked() {
     let offer = Offer {
         offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-        outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+        outcomes: HashLookup::from([Outcome::Over(2), Outcome::Under(3)]),
         market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
     };
     let unvalidated_offer = UnvalidatedOffer::from(Capture::from(offer));
@@ -215,7 +215,7 @@ fn unvalidated_offer_unchecked() {
 fn unvalidated_offer_unwrap_valid() {
     let offer = Offer {
         offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-        outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+        outcomes: HashLookup::from([Outcome::Over(2), Outcome::Under(3)]),
         market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
     };
     let unvalidated_offer = UnvalidatedOffer::from(Capture::from(offer));
@@ -226,7 +226,7 @@ fn unvalidated_offer_unwrap_valid() {
 fn unvalidated_offer_unwrap_invalid() {
     let offer = Offer {
         offer_type: OfferType::TotalGoals(Period::FullTime, Over(2)),
-        outcomes: HashLookup::from([OutcomeType::Over(2), OutcomeType::Under(3)]),
+        outcomes: HashLookup::from([Outcome::Over(2), Outcome::Under(3)]),
         market: Market::frame(&Overround::fair(), vec![0.4], &PRICE_BOUNDS),
     };
     let unvalidated_offer = UnvalidatedOffer::from(Capture::from(offer));

@@ -6,28 +6,45 @@ pub struct RawArray<T, const C: usize> {
     array: [MaybeUninit<T>; C]
 }
 impl<T, const C: usize> RawArray<T, C> {
+    /// # Safety
+    ///
+    /// This function should not be called if location at `index` is uninitialised.
     #[inline(always)]
     pub unsafe fn get(&self, index: usize) -> &T {
         &*self.array[index].as_ptr()
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if location at `index` is uninitialised.
     #[inline(always)]
     pub unsafe fn get_mut(&mut self, index: usize) -> &mut T {
         &mut *self.array[index].as_mut_ptr()
     }
 
+    /// # Safety
+    ///
+    /// This function does not clean up the existing item and should not be called if
+    /// location at `index` is already initialised.
     #[inline(always)]
     pub unsafe fn set_and_forget(&mut self, index: usize, value: T) {
         let ptr = self.array[index].as_mut_ptr();
         ptr.write(value);
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if location at `index` is uninitialised.
     #[inline(always)]
     pub unsafe fn take(&mut self, index: usize) -> T {
         let ptr = self.array[index].as_ptr();
         ptr.read()
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if the locations in the range `offset..offset + len` are
+    /// uninitialised.
     #[inline(always)]
     pub unsafe fn drop_range(&mut self, offset: usize, len: usize) {
         if mem::needs_drop::<T>() {
@@ -38,24 +55,40 @@ impl<T, const C: usize> RawArray<T, C> {
         }
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if the locations in the range `offset..offset + len` are
+    /// uninitialised.
     #[inline(always)]
     unsafe fn destruct(mut self, offset: usize, len: usize) {
         self.drop_range(offset, len);
         mem::forget(self);
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if the locations in the range `0..len` are
+    /// uninitialised.
     #[inline(always)]
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {
         let ptr = self.array.as_ptr() as *const T;
         slice::from_raw_parts(ptr, len)
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called if the locations in the range `0..len` are
+    /// uninitialised.
     #[inline(always)]
     pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
         let ptr = self.array.as_mut_ptr() as *mut T;
         slice::from_raw_parts_mut(ptr, len)
     }
 
+    /// # Safety
+    ///
+    /// This function should not be called unless all locations in the underlying array
+    /// are initialised.
     #[inline(always)]
     pub unsafe fn to_array(self) -> [T; C] {
         let src = ManuallyDrop::new(self);
@@ -72,13 +105,6 @@ impl<T, const C: usize> RawArray<T, C> {
         }
     }
 }
-
-// #[inline]
-// unsafe fn transmute<Src, Dst>(src: Src) -> Dst {
-//     let src = ManuallyDrop::new(src);
-//     let ptr = &*src as *const Src as _;
-//     ptr::read(ptr)
-// }
 
 impl<T, const C: usize> Drop for RawArray<T, C> {
     fn drop(&mut self) {
@@ -131,47 +157,6 @@ impl<T, const C: usize> Drop for Destructor<T, C> {
     }
 }
 
-/// A variant of `Option` that omits the niche optimisation, enabling the encapsulation of
-/// uninitialised data, which might otherwise appear as [None] under the niche optimisation.
-/// `repr(C)` forces the tag to be included in the memory layout.
-// #[repr(C)]
-// pub(crate) enum Explicit<T> {
-//     None,
-//     Some(T),
-// }
-// impl<T> Explicit<T> {
-//     #[inline(always)]
-//     pub(crate) fn as_ref(&self) -> &T {
-//         match self {
-//             Explicit::Some(value) => value,
-//             _ => panic!("invalid state")
-//         }
-//     }
-//
-//     #[inline(always)]
-//     pub(crate) fn as_mut(&mut self) -> &mut T {
-//         match self {
-//             Explicit::Some(value) => value,
-//             _ => panic!("invalid state")
-//         }
-//     }
-//
-//     #[inline(always)]
-//     pub(crate) fn take(&mut self) -> Explicit<T> {
-//         let mut replacement = Explicit::None;
-//         mem::swap(self, &mut replacement);
-//         replacement
-//     }
-//
-//     #[inline(always)]
-//     pub(crate) fn unwrap(self) -> T {
-//         match self {
-//             Explicit::Some(value) => value,
-//             _ => panic!("invalid state")
-//         }
-//     }
-// }
-
 #[cfg(test)]
 pub(crate) mod dropper {
     //! Testing of destructors.
@@ -196,51 +181,6 @@ mod tests {
     use crate::stack_vec::raw_array::dropper::Dropper;
 
     use super::*;
-
-    // #[test]
-    // fn explicit_as_ref() {
-    //     let explicit = Explicit::Some("text");
-    //     assert_eq!("text", *explicit.as_ref());
-    // }
-    //
-    // #[test]
-    // fn explicit_as_mut() {
-    //     let mut explicit = Explicit::Some("one");
-    //     let r = explicit.as_mut();
-    //     assert_eq!("one", *r);
-    //     *r = "two";
-    //     assert_eq!("two", *explicit.as_ref());
-    // }
-    //
-    // #[test]
-    // #[should_panic(expected = "invalid state")]
-    // fn explicit_as_mut_panics_when_none() {
-    //     let mut explicit: Explicit<()> = Explicit::None;
-    //     explicit.as_mut();
-    // }
-    //
-    // #[test]
-    // #[should_panic(expected = "invalid state")]
-    // fn explicit_as_ref_panics_when_none() {
-    //     let explicit: Explicit<()> = Explicit::None;
-    //     explicit.as_ref();
-    // }
-    //
-    // #[test]
-    // fn explicit_take_leaves_none() {
-    //     {
-    //         let mut explicit = Explicit::Some(());
-    //         let taken = explicit.take();
-    //         assert!(matches!(explicit, Explicit::None));
-    //         assert!(matches!(taken, Explicit::Some(_)));
-    //     }
-    //     {
-    //         let mut explicit: Explicit<()> = Explicit::None;
-    //         let taken = explicit.take();
-    //         assert!(matches!(explicit, Explicit::None));
-    //         assert!(matches!(taken, Explicit::None));
-    //     }
-    // }
 
     #[test]
     fn empty() {

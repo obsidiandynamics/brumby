@@ -1,4 +1,4 @@
-use brumby_soccer::domain::{OfferType, OutcomeType, Player, Side};
+use brumby_soccer::domain::{OfferType, Outcome, Player, Side};
 use criterion::{criterion_group, criterion_main, Criterion};
 use brumby::sv;
 
@@ -32,7 +32,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     // println!("prospects: {}", exploration.prospects.len());
     let isolated = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             isolate(
                 &OfferType::AnytimeGoalscorer,
-                &OutcomeType::Player(player.clone()),
+                &Outcome::Player(player.clone()),
                 &exploration.prospects,
                 &exploration.player_lookup,
             )
@@ -55,7 +55,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             isolate(
                 &OfferType::AnytimeGoalscorer,
-                &OutcomeType::Player(player.clone()),
+                &Outcome::Player(player.clone()),
                 &exploration.prospects,
                 &exploration.player_lookup,
             )

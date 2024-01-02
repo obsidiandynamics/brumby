@@ -19,7 +19,7 @@ use brumby::sv;
 use brumby::timed::Timed;
 
 use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
-use crate::domain::{Offer, OfferCategory, OfferType, OutcomeType, Over, Period, Player};
+use crate::domain::{Offer, OfferCategory, OfferType, Outcome, Over, Period, Player};
 use crate::interval;
 use crate::interval::query::{isolate, requirements};
 use crate::interval::{BivariateProbs, Expansions, Exploration, PlayerProbs, PruneThresholds, query, TeamProbs, UnivariateProbs};
@@ -132,7 +132,7 @@ pub struct TooManyPlayers {
 #[error("missing {offer_type:?}/{outcome:?} among derivatives")]
 pub struct MissingDerivative {
     pub offer_type: OfferType,
-    pub outcome: OutcomeType
+    pub outcome: Outcome
 }
 
 #[derive(Debug, Error)]
@@ -175,7 +175,7 @@ pub struct GoalProbs {
 #[derive(Debug)]
 pub struct Stub {
     pub offer_type: OfferType,
-    pub outcomes: HashLookup<OutcomeType>,
+    pub outcomes: HashLookup<Outcome>,
     pub normal: f64,
     pub overround: Overround,
 }
@@ -350,7 +350,7 @@ impl Model {
         Ok((offer, cache_stats))
     }
 
-    pub fn derive_multi(&self, selections: &[(OfferType, OutcomeType)]) -> Result<MultiPrice, MultiDerivationError> {
+    pub fn derive_multi(&self, selections: &[(OfferType, Outcome)]) -> Result<MultiPrice, MultiDerivationError> {
         if selections.is_empty() {
             return Err(MultiDerivationError::NoSelections(NoSelections));
         }
@@ -411,7 +411,7 @@ impl Model {
     fn collect_requirements(
         &self,
         offer_type: &OfferType,
-        outcome: &OutcomeType,
+        outcome: &Outcome,
         agg_reqs: &mut Expansions,
         agg_player_probs: &mut FxHashMap<Player, PlayerProbs>,
     ) -> Result<(), MultiDerivationError> {
@@ -514,17 +514,17 @@ fn explore_cached(
 fn frame_prices_from_exploration(
     exploration: &Exploration,
     offer_type: &OfferType,
-    outcomes: &[OutcomeType],
+    outcomes: &[Outcome],
     normal: f64,
     overround: &Overround,
     price_bounds: &PriceBounds,
 ) -> Offer {
     let mut probs = outcomes
         .iter()
-        .map(|outcome_type| {
+        .map(|outcome| {
             isolate(
                 offer_type,
-                outcome_type,
+                outcome,
                 &exploration.prospects,
                 &exploration.player_lookup,
             )

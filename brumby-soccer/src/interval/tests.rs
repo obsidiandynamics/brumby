@@ -1,7 +1,7 @@
 use assert_float_eq::*;
 use brumby::sv;
 
-use crate::domain::{OfferType, OutcomeType, Player};
+use crate::domain::{OfferType, Outcome, Player};
 use crate::interval::query::isolate;
 
 use super::*;
@@ -194,7 +194,7 @@ fn explore_2x2() {
 
     let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -202,7 +202,7 @@ fn explore_2x2() {
 
     let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -210,7 +210,7 @@ fn explore_2x2() {
 
     let anytime_goalscorer_none = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -218,7 +218,7 @@ fn explore_2x2() {
 
     let anytime_goalscorer_other = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -226,7 +226,7 @@ fn explore_2x2() {
 
     let anytime_assist_none = isolate(
         &OfferType::AnytimeAssist,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -234,7 +234,7 @@ fn explore_2x2() {
 
     let anytime_assist_other = isolate(
         &OfferType::AnytimeAssist,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -368,7 +368,7 @@ fn explore_2x2_pruned_2_goals() {
 
     let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -376,7 +376,7 @@ fn explore_2x2_pruned_2_goals() {
 
     let fist_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -537,7 +537,7 @@ fn explore_1x1_player_goal() {
 
     let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -545,7 +545,7 @@ fn explore_1x1_player_goal() {
 
     let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -553,7 +553,7 @@ fn explore_1x1_player_goal() {
 
     let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -561,7 +561,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_goalscorer_none = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -569,7 +569,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_goalscorer_player = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -577,7 +577,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_goalscorer_other = isolate(
         &OfferType::AnytimeGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -585,7 +585,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_assist_none = isolate(
         &OfferType::AnytimeAssist,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -593,7 +593,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_assist_player = isolate(
         &OfferType::AnytimeAssist,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -601,7 +601,7 @@ fn explore_1x1_player_goal() {
 
     let anytime_assist_other = isolate(
         &OfferType::AnytimeAssist,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -631,7 +631,7 @@ fn explore_2x2_player_goal() {
 
     let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -639,7 +639,7 @@ fn explore_2x2_player_goal() {
 
     let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -647,7 +647,7 @@ fn explore_2x2_player_goal() {
 
     let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -677,7 +677,7 @@ fn explore_2x2_player_goal_asymmetric() {
 
     let first_goalscorer_none = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::None,
+        &Outcome::None,
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -685,7 +685,7 @@ fn explore_2x2_player_goal_asymmetric() {
 
     let first_goalscorer_player = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(player.clone()),
+        &Outcome::Player(player.clone()),
         &exploration.prospects,
         &exploration.player_lookup,
     );
@@ -693,7 +693,7 @@ fn explore_2x2_player_goal_asymmetric() {
 
     let first_goalscorer_other = isolate(
         &OfferType::FirstGoalscorer,
-        &OutcomeType::Player(Player::Other),
+        &Outcome::Player(Player::Other),
         &exploration.prospects,
         &exploration.player_lookup,
     );
