@@ -1,11 +1,12 @@
 use bincode::Encode;
+use serde::{Deserialize, Serialize};
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::Market;
 
 pub mod error;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Score {
     pub home: u8,
     pub away: u8,
@@ -27,20 +28,20 @@ impl Score {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Over(pub u8);
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Under(pub u8);
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Period {
     FirstHalf,
     SecondHalf,
     FullTime
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum OfferType {
     HeadToHead(Period),
     TotalGoals(Period, Over),
@@ -78,19 +79,19 @@ pub enum OfferCategory {
     AnytimeAssist
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode, Serialize, Deserialize)]
 pub enum Side {
     Home,
     Away,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode, Serialize, Deserialize)]
 pub enum Player {
     Named(Side, String),
     Other
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Outcome {
     Win(Side),
     Draw,

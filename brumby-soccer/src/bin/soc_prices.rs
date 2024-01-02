@@ -218,18 +218,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    // let selections = [
-    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
-    //     (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
-    //     (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
-    //     (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
-    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
-    // ];
-    //
-    // let price = model.derive_multi(&selections)?;
-    // let scaling_exponent = compute_scaling_exponent(price.relatedness);
-    // let scaled_price = price.price.price / price.price.overround().powf(scaling_exponent - 1.0);
-    // info!("selections: {selections:?}, price: {price:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
+    let selections = [
+        // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
+        (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
+        (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
+        (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
+        // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
+    ];
+    let encoded = serde_json::to_string(&selections)?;
+    info!("selections: {encoded}");
+
+    let price = model.derive_multi(&selections)?;
+    let scaling_exponent = compute_scaling_exponent(price.relatedness);
+    let scaled_price = price.price.price / price.price.overround().powf(scaling_exponent - 1.0);
+    info!("selections: {selections:?}, price: {price:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
 
     Ok(())
 }
