@@ -1,10 +1,13 @@
-use std::collections::HashMap;
 use std::env;
+use std::collections::HashMap;
 use std::error::Error;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use clap::Parser;
+use regex::Regex;
 use rustc_hash::FxHashMap;
 use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
@@ -16,14 +19,14 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
-use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
-use brumby_soccer::domain::{Offer, OfferType, Outcome, Over, Period, Player, Side};
+use brumby_soccer::{fit, model, print};
+use brumby_soccer::data::{ContestSummary, download_by_id, SoccerFeedId};
+use brumby_soccer::domain::{Offer, OfferType, Outcome};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
+use brumby_soccer::model::{Model, score_fitter, Stub};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
-use brumby_soccer::model::{score_fitter, Model, Stub};
-use brumby_soccer::{fit, model, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
@@ -48,6 +51,9 @@ struct Args {
     /// print player assists markets
     #[clap(long = "player-assists")]
     player_assists: bool,
+
+    /// JSON file containing the selections to price
+    selections: Option<String>,
 }
 impl Args {
     fn validate(&self) -> anyhow::Result<()> {
@@ -58,6 +64,21 @@ impl Args {
         }
         Ok(())
     }
+}
+
+fn load_selections(filename: &str) -> anyhow::Result<Vec<(OfferType, Outcome)>> {
+    let file = File::open(filename).context(format!("opening file '{filename}'"))?;
+    let reader = BufReader::new(file);
+    let mut contents = String::new();
+    let comment = Regex::new(r"^.*#")?;
+    for line in reader.lines() {
+        let line = line?;
+        if !comment.is_match(&line) {
+            contents.push_str(&line);
+        }
+    }
+    let selections = serde_json::from_str(&contents)?;
+    Ok(selections)
 }
 
 #[tokio::main]
@@ -218,15 +239,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    let selections = [
-        // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
-        (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
-        (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
-        (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
-        // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
-    ];
-    let encoded = serde_json::to_string(&selections)?;
-    info!("selections: {encoded}");
+    // let selections = [
+    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
+    //     (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
+    //     (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
+    //     (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
+    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
+    // ];
+    // let encoded = serde_json::to_string(&selections)?;
+    // info!("selections: {encoded}");
+    let selections = load_selections(args.selections.as_ref().unwrap())?;
 
     let price = model.derive_multi(&selections)?;
     let scaling_exponent = compute_scaling_exponent(price.relatedness);

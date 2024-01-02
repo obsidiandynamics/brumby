@@ -25,3 +25,5 @@ Cargo.lock
 /.idea
 /coverage
 lcov.info
+
+selections.json
