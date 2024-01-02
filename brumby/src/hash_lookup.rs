@@ -54,6 +54,15 @@ impl<T: Eq + PartialEq + Hash> HashLookup<T> {
     }
 }
 
+impl<T: Eq + PartialEq + Hash> Default for HashLookup<T> {
+    fn default() -> Self {
+        Self {
+            item_to_index: FxHashMap::with_capacity_and_hasher(0, Default::default()),
+            index_to_item: vec![],
+        }
+    }
+}
+
 impl<T: Eq + PartialEq + Hash> Index<usize> for HashLookup<T> {
     type Output = T;
 

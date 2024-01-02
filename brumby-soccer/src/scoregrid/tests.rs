@@ -1,7 +1,8 @@
 use super::*;
-use crate::domain::Side;
+use crate::domain::{DrawHandicap, Side, WinHandicap};
 use brumby::opt::{hypergrid_search, HypergridSearchConfig, RangeCapture};
 use brumby::probs::SliceExt;
+use assert_float_eq::*;
 
 #[test]
 pub fn iterate_scoregrid_5x5() {
@@ -36,31 +37,59 @@ fn create_test_4x4_scoregrid() -> Matrix<f64> {
 #[test]
 pub fn outcome_win_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.65, Outcome::Win(Side::Home).gather(&scoregrid));
-    assert_eq!(0.15, Outcome::Win(Side::Away).gather(&scoregrid));
+    assert_float_absolute_eq!(0.65, Outcome::Win(Side::Home, WinHandicap::AheadOver(0)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.15, Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)).gather(&scoregrid));
+}
+
+#[test]
+pub fn outcome_win_handicap_1_gather() {
+    let scoregrid = create_test_4x4_scoregrid();
+    assert_float_absolute_eq!(0.4, Outcome::Win(Side::Home, WinHandicap::AheadOver(1)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.35, Outcome::Win(Side::Away, WinHandicap::BehindUnder(1)).gather(&scoregrid));
+}
+
+#[test]
+pub fn outcome_win_handicap_2_gather() {
+    let scoregrid = create_test_4x4_scoregrid();
+    assert_float_absolute_eq!(0.16, Outcome::Win(Side::Home, WinHandicap::AheadOver(2)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.6, Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)).gather(&scoregrid));
 }
 
 #[test]
 pub fn outcome_draw_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.2, Outcome::Draw.gather(&scoregrid));
+    assert_float_absolute_eq!(0.2, Outcome::Draw(DrawHandicap::Ahead(0)).gather(&scoregrid));
+}
+
+#[test]
+pub fn outcome_draw_handicap_1_gather() {
+    let scoregrid = create_test_4x4_scoregrid();
+    assert_float_absolute_eq!(0.25, Outcome::Draw(DrawHandicap::Ahead(1)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.1, Outcome::Draw(DrawHandicap::Behind(1)).gather(&scoregrid));
+}
+
+#[test]
+pub fn outcome_draw_handicap_2_gather() {
+    let scoregrid = create_test_4x4_scoregrid();
+    assert_float_absolute_eq!(0.24, Outcome::Draw(DrawHandicap::Ahead(2)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.04, Outcome::Draw(DrawHandicap::Behind(2)).gather(&scoregrid));
 }
 
 #[test]
 pub fn outcome_goals_ou_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(0.35, Outcome::Under(3).gather(&scoregrid));
-    assert_eq!(0.65, Outcome::Over(2).gather(&scoregrid));
+    assert_float_absolute_eq!(0.35, Outcome::Under(3).gather(&scoregrid));
+    assert_float_absolute_eq!(0.65, Outcome::Over(2).gather(&scoregrid));
 }
 
 #[test]
 pub fn outcome_correct_score_gather() {
     let scoregrid = create_test_4x4_scoregrid();
-    assert_eq!(
+    assert_float_absolute_eq!(
         0.04,
         Outcome::Score(Score::new(0, 0)).gather(&scoregrid)
     );
-    assert_eq!(
+    assert_float_absolute_eq!(
         0.08,
         Outcome::Score(Score::new(3, 2)).gather(&scoregrid)
     );

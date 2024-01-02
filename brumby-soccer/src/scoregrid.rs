@@ -5,7 +5,7 @@ use strum_macros::{EnumCount, EnumIter};
 use brumby::multinomial::binomial;
 
 use brumby::comb::{count_permutations, pick};
-use crate::domain::{Outcome, Period, Score, Side};
+use crate::domain::{DrawHandicap, Outcome, Period, Score, Side, WinHandicap};
 use crate::interval::{explore, Config, PruneThresholds, BivariateProbs, TeamProbs, UnivariateProbs};
 use brumby::linear::matrix::Matrix;
 use brumby::multinomial::bivariate_binomial;
@@ -325,8 +325,8 @@ pub fn inflate_zero(additive: f64, scoregrid: &mut Matrix<f64>) {
 impl Outcome {
     pub fn gather(&self, scoregrid: &Matrix<f64>) -> f64 {
         match self {
-            Outcome::Win(side) => Self::gather_win(side, scoregrid),
-            Outcome::Draw => Self::gather_draw(scoregrid),
+            Outcome::Win(side, win_handicap) => Self::gather_win(side, scoregrid, win_handicap),
+            Outcome::Draw(draw_handicap) => Self::gather_draw(scoregrid, draw_handicap),
             Outcome::Under(goals) => Self::gather_goals_under(*goals, scoregrid),
             Outcome::Over(goals) => Self::gather_goals_over(*goals, scoregrid),
             Outcome::Score(score) => Self::gather_correct_score(score, scoregrid),
@@ -334,31 +334,42 @@ impl Outcome {
         }
     }
 
-    fn gather_win(side: &Side, scoregrid: &Matrix<f64>) -> f64 {
+    fn gather_win(side: &Side, scoregrid: &Matrix<f64>, win_handicap: &WinHandicap) -> f64 {
         let mut prob = 0.0;
-        match side {
-            Side::Home => {
-                for row in 1..scoregrid.rows() {
-                    for col in 0..row {
-                        prob += scoregrid[(row, col)];
+        for home_goals in 0..scoregrid.rows() {
+            for away_goals in 0..scoregrid.cols() {
+                let matches = {
+                    let (home_goals, away_goals) = (home_goals as u8, away_goals as u8);
+                    match (side, win_handicap) {
+                        (Side::Home, WinHandicap::AheadOver(by)) => home_goals.saturating_sub(away_goals) > *by,
+                        (Side::Home, WinHandicap::BehindUnder(by)) => home_goals > away_goals || away_goals - home_goals < *by,
+                        (Side::Away, WinHandicap::AheadOver(by)) => away_goals.saturating_sub(home_goals) > *by,
+                        (Side::Away, WinHandicap::BehindUnder(by)) => away_goals > home_goals || home_goals - away_goals < *by,
                     }
-                }
-            }
-            Side::Away => {
-                for col in 1..scoregrid.cols() {
-                    for row in 0..col {
-                        prob += scoregrid[(row, col)];
-                    }
+                };
+                if matches {
+                    prob += scoregrid[(home_goals, away_goals)];
                 }
             }
         }
         prob
     }
 
-    fn gather_draw(scoregrid: &Matrix<f64>) -> f64 {
+    fn gather_draw(scoregrid: &Matrix<f64>, draw_handicap: &DrawHandicap) -> f64 {
         let mut prob = 0.0;
-        for index in 0..scoregrid.rows() {
-            prob += scoregrid[(index, index)];
+        for home_goals in 0..scoregrid.rows() {
+            for away_goals in 0..scoregrid.cols() {
+                let matches = {
+                    let (home_goals, away_goals) = (home_goals as u8, away_goals as u8);
+                    match draw_handicap {
+                        DrawHandicap::Ahead(by) => home_goals >= away_goals && home_goals - away_goals == *by,
+                        DrawHandicap::Behind(by) => away_goals >= home_goals && away_goals - home_goals == *by,
+                    }
+                };
+                if matches {
+                    prob += scoregrid[(home_goals, away_goals)];
+                }
+            }
         }
         prob
     }

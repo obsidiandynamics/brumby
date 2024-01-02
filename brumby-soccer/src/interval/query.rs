@@ -13,7 +13,7 @@ mod total_goals;
 #[derive(Debug)]
 pub enum QuerySpec {
     None,
-    Generic(OfferType, Outcome),
+    PassThrough(OfferType, Outcome),
     PlayerLookup(usize),
     NoFirstGoalscorer,
     NoAnytimeGoalscorer,
@@ -23,10 +23,10 @@ pub enum QuerySpec {
 #[must_use]
 pub fn requirements(offer_type: &OfferType) -> Expansions {
     match offer_type {
-        OfferType::HeadToHead(period) => head_to_head::requirements(period),
+        OfferType::HeadToHead(period, _) => head_to_head::requirements(period),
         OfferType::TotalGoals(period, _) => total_goals::requirements(period),
         OfferType::CorrectScore(period) => correct_score::requirements(period),
-        OfferType::DrawNoBet => unimplemented!(),
+        OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -41,10 +41,10 @@ pub fn prepare(
     player_lookup: &HashLookup<Player>,
 ) -> QuerySpec {
     match offer_type {
-        OfferType::HeadToHead(_) => head_to_head::prepare(offer_type, outcome),
+        OfferType::HeadToHead(_, _) => head_to_head::prepare(offer_type, outcome),
         OfferType::TotalGoals(_, _) => total_goals::prepare(offer_type, outcome),
         OfferType::CorrectScore(_) => correct_score::prepare(offer_type, outcome),
-        OfferType::DrawNoBet => unimplemented!(),
+        OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -55,10 +55,10 @@ pub fn prepare(
 #[must_use]
 pub fn filter(offer_type: &OfferType, query: &QuerySpec, prospect: &Prospect) -> bool {
     match offer_type {
-        OfferType::HeadToHead(_) => head_to_head::filter(query, prospect),
+        OfferType::HeadToHead(_, _) => head_to_head::filter(query, prospect),
         OfferType::TotalGoals(_, _) => total_goals::filter(query, prospect),
         OfferType::CorrectScore(_) => correct_score::filter(query, prospect),
-        OfferType::DrawNoBet => unimplemented!(),
+        OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -107,7 +107,7 @@ pub fn isolate_set(
 #[cfg(test)]
 mod tests {
     use brumby::sv;
-    use crate::domain::{Period, Score, Side};
+    use crate::domain::{DrawHandicap, Period, Score, Side, WinHandicap};
     use crate::interval::{explore, Config, BivariateProbs, TeamProbs, UnivariateProbs};
 
     use super::*;
@@ -136,8 +136,8 @@ mod tests {
             0..4,
         );
         let home_win = isolate(
-            &OfferType::HeadToHead(Period::FullTime),
-            &Outcome::Win(Side::Home),
+            &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+            &Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
             &exploration.prospects,
             &exploration.player_lookup,
         );
@@ -145,8 +145,8 @@ mod tests {
 
         let home_win_set = isolate_set(
             &[(
-                OfferType::HeadToHead(Period::FullTime),
-                Outcome::Win(Side::Home),
+                OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -180,8 +180,8 @@ mod tests {
 
         let home_win = isolate_set(
             &[(
-                OfferType::HeadToHead(Period::FullTime),
-                Outcome::Win(Side::Home),
+                OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -206,8 +206,8 @@ mod tests {
                     Outcome::Score(Score { home: 1, away: 0 }),
                 ),
                 (
-                    OfferType::HeadToHead(Period::FullTime),
-                    Outcome::Win(Side::Home),
+                    OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                    Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
                 ),
             ],
             &exploration.prospects,
@@ -242,8 +242,8 @@ mod tests {
 
         let home_win = isolate_set(
             &[(
-                OfferType::HeadToHead(Period::FullTime),
-                Outcome::Win(Side::Home),
+                OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
             )],
             &exploration.prospects,
             &exploration.player_lookup,
@@ -267,8 +267,8 @@ mod tests {
                     Outcome::Score(Score { home: 0, away: 1 }),
                 ),
                 (
-                    OfferType::HeadToHead(Period::FullTime),
-                    Outcome::Win(Side::Home),
+                    OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                    Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
                 ),
             ],
             &exploration.prospects,

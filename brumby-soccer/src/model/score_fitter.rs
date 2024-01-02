@@ -6,7 +6,7 @@ use tracing::debug;
 
 use brumby::probs::Fraction;
 
-use crate::domain::{Offer, OfferCategory, OfferType, Period};
+use crate::domain::{DrawHandicap, Offer, OfferCategory, OfferType, Period};
 use crate::domain::error::OfferCapture;
 use crate::fit;
 use crate::interval::BivariateProbs;
@@ -66,7 +66,7 @@ impl ScoreFitter {
         let ft_goals = OfferCapture::try_from(ft_goals)?;
 
         let ft_h2h =
-            OfferCapture::try_from(get_offer(offers, &OfferType::HeadToHead(Period::FullTime))?)?;
+            OfferCapture::try_from(get_offer(offers, &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)))?)?;
         let (ft_search_outcome, lambdas) = fit::fit_scoregrid_full(
             &ft_h2h,
             &ft_goals,
@@ -81,7 +81,7 @@ impl ScoreFitter {
         let h1_goals = OfferCapture::try_from(h1_goals)?;
         let h1_h2h = OfferCapture::try_from(get_offer(
             offers,
-            &OfferType::HeadToHead(Period::FirstHalf),
+            &OfferType::HeadToHead(Period::FirstHalf, DrawHandicap::Ahead(0)),
         )?)?;
 
         let (h2_goals, h2_goals_over) = most_balanced_goals(offers.values(), &Period::SecondHalf)
@@ -90,7 +90,7 @@ impl ScoreFitter {
         let h2_goals = OfferCapture::try_from(h2_goals)?;
         let h2_h2h = OfferCapture::try_from(get_offer(
             offers,
-            &OfferType::HeadToHead(Period::SecondHalf),
+            &OfferType::HeadToHead(Period::SecondHalf, DrawHandicap::Ahead(0)),
         )?)?;
 
         debug!(

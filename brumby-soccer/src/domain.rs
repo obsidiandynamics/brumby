@@ -42,11 +42,31 @@ pub enum Period {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum DrawHandicap {
+    Ahead(u8),
+    Behind(u8),
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum WinHandicap {
+    AheadOver(u8),
+    BehindUnder(u8),
+}
+impl WinHandicap {
+    pub fn flip(&self) -> WinHandicap {
+        match self {
+            WinHandicap::AheadOver(by) => WinHandicap::BehindUnder(*by),
+            WinHandicap::BehindUnder(by) => WinHandicap::AheadOver(*by),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum OfferType {
-    HeadToHead(Period),
+    HeadToHead(Period, DrawHandicap),
     TotalGoals(Period, Over),
     CorrectScore(Period),
-    DrawNoBet,
+    DrawNoBet(DrawHandicap),
     AnytimeGoalscorer,
     FirstGoalscorer,
     PlayerShotsOnTarget(Over),
@@ -55,10 +75,10 @@ pub enum OfferType {
 impl OfferType {
     pub fn category(&self) -> OfferCategory {
         match self {
-            OfferType::HeadToHead(_) => OfferCategory::HeadToHead,
+            OfferType::HeadToHead(_, _) => OfferCategory::HeadToHead,
             OfferType::TotalGoals(_, _) => OfferCategory::TotalGoals,
             OfferType::CorrectScore(_) => OfferCategory::CorrectScore,
-            OfferType::DrawNoBet => OfferCategory::DrawNoBet,
+            OfferType::DrawNoBet(_) => OfferCategory::DrawNoBet,
             OfferType::AnytimeGoalscorer => OfferCategory::AnytimeGoalscorer,
             OfferType::FirstGoalscorer => OfferCategory::FirstGoalscorer,
             OfferType::PlayerShotsOnTarget(_) => OfferCategory::PlayerShotsOnTarget,
@@ -93,8 +113,8 @@ pub enum Player {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Outcome {
-    Win(Side),
-    Draw,
+    Win(Side, WinHandicap),
+    Draw(DrawHandicap),
     Under(u8),
     Over(u8),
     Score(Score),

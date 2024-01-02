@@ -3,39 +3,67 @@ use brumby::hash_lookup::HashLookup;
 use crate::domain::{error, OfferType, Outcome, Over};
 use crate::domain::error::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
 
+// pub(crate) fn validate_outcomes(
+//     offer_type: &OfferType,
+//     outcomes: &HashLookup<Outcome>,
+// ) -> Result<(), InvalidOutcome> {
+//     match offer_type {
+//         OfferType::TotalGoals(_, over) => {
+//             error::OutcomesCompleteAssertion {
+//                 outcomes: &valid_outcomes(over),
+//             }
+//             .check(outcomes, offer_type)?;
+//             Ok(())
+//         }
+//         _ => unreachable!(),
+//     }
+// }
+
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
     outcomes: &HashLookup<Outcome>,
+    over: &Over,
 ) -> Result<(), InvalidOutcome> {
-    match offer_type {
-        OfferType::TotalGoals(_, over) => {
-            error::OutcomesCompleteAssertion {
-                outcomes: &valid_outcomes(over),
-            }
-            .check(outcomes, offer_type)?;
-            Ok(())
-        }
-        _ => unreachable!(),
+    error::OutcomesCompleteAssertion {
+        outcomes: &valid_outcomes(over),
     }
+    .check(outcomes, offer_type)?;
+    Ok(())
 }
+
+// pub(crate) fn validate_outcome(
+//     offer_type: &OfferType,
+//     outcome: &Outcome,
+// ) -> Result<(), InvalidOutcome> {
+//     match offer_type {
+//         OfferType::TotalGoals(_, over) => {
+//             let valid_outcomes = valid_outcomes(over);
+//             if valid_outcomes.contains(outcome) {
+//                 Ok(())
+//             } else {
+//                 Err(InvalidOutcome::ExtraneousOutcome(ExtraneousOutcome {
+//                     outcome: outcome.clone(),
+//                     offer_type: offer_type.clone(),
+//                 }))
+//             }
+//         }
+//         _ => unreachable!(),
+//     }
+// }
 
 pub(crate) fn validate_outcome(
     offer_type: &OfferType,
     outcome: &Outcome,
+    over: &Over,
 ) -> Result<(), InvalidOutcome> {
-    match offer_type {
-        OfferType::TotalGoals(_, over) => {
-            let valid_outcomes = valid_outcomes(over);
-            if valid_outcomes.contains(outcome) {
-                Ok(())
-            } else {
-                Err(InvalidOutcome::ExtraneousOutcome(ExtraneousOutcome {
-                    outcome: outcome.clone(),
-                    offer_type: offer_type.clone(),
-                }))
-            }
-        }
-        _ => unreachable!(),
+    let valid_outcomes = valid_outcomes(over);
+    if valid_outcomes.contains(outcome) {
+        Ok(())
+    } else {
+        Err(InvalidOutcome::ExtraneousOutcome(ExtraneousOutcome {
+            outcome: outcome.clone(),
+            offer_type: offer_type.clone(),
+        }))
     }
 }
 

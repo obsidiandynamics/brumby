@@ -1,4 +1,4 @@
-use crate::domain::{OfferType, Outcome, Over, Period, Player, Score, Side};
+use crate::domain::{DrawHandicap, OfferType, Outcome, Over, Period, Player, Score, Side, WinHandicap};
 use racing_scraper::sports::soccer::contest_model::ContestModel;
 use racing_scraper::sports::soccer::market_model::{HomeAway, Player as ScraperPlayer, SoccerMarket};
 use std::collections::HashMap;
@@ -49,11 +49,11 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::H2H(h2h) => {
                     offerings.insert(
-                        OfferType::HeadToHead(Period::FullTime),
+                        OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home), h2h.home),
-                            (Outcome::Win(Side::Away), h2h.away),
-                            (Outcome::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
                         ]),
                     );
                 }
@@ -130,11 +130,11 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::FirstHalfH2H(h2h) => {
                     offerings.insert(
-                        OfferType::HeadToHead(Period::FirstHalf),
+                        OfferType::HeadToHead(Period::FirstHalf, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home), h2h.home),
-                            (Outcome::Win(Side::Away), h2h.away),
-                            (Outcome::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
                         ]),
                     );
                 }
@@ -150,11 +150,11 @@ impl From<ContestModel> for ContestSummary {
                 }
                 SoccerMarket::SecondHalfH2H(h2h) => {
                     offerings.insert(
-                        OfferType::HeadToHead(Period::SecondHalf),
+                        OfferType::HeadToHead(Period::SecondHalf, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home), h2h.home),
-                            (Outcome::Win(Side::Away), h2h.away),
-                            (Outcome::Draw, h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
                         ]),
                     );
                 }

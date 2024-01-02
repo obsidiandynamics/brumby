@@ -107,10 +107,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 implied_booksum(prices.values())
             );
             let normal = match &offer_type {
-                OfferType::HeadToHead(_)
+                OfferType::HeadToHead(_, _)
                 | OfferType::TotalGoals(_, _)
                 | OfferType::CorrectScore(_)
-                | OfferType::DrawNoBet => 1.0,
+                | OfferType::DrawNoBet(_) => 1.0,
                 OfferType::AnytimeGoalscorer
                 | OfferType::FirstGoalscorer
                 | OfferType::PlayerShotsOnTarget(_)
@@ -144,7 +144,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter(|(offer_type, _)| {
             matches!(
                 offer_type,
-                OfferType::HeadToHead(_)
+                OfferType::HeadToHead(_, _)
                     | OfferType::TotalGoals(_, _)
                     | OfferType::CorrectScore(_)
                     | OfferType::FirstGoalscorer

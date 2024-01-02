@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::{Over, Period, Side};
+use crate::domain::{DrawHandicap, Over, Period, Side, WinHandicap};
 use brumby::market::{Market, Overround};
 
 const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
@@ -70,23 +70,23 @@ fn booksum_outside_expected() {
 #[test]
 fn alignment_correct() {
     OfferAlignmentAssertion::check(
-        &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
+        &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))],
         &[0.5, 0.5],
-        &OfferType::DrawNoBet,
+        &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
     )
-        .unwrap();
+    .unwrap();
 }
 
 #[test]
 fn alignment_incorrect() {
     let err = OfferAlignmentAssertion::check(
-        &[Outcome::Win(Side::Home)],
+        &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0))],
         &[0.5, 0.5],
-        &OfferType::DrawNoBet,
+        &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
     )
-        .unwrap_err();
+    .unwrap_err();
     assert_eq!(
-        "1:2 outcomes:probabilities mapped for DrawNoBet",
+        "1:2 outcomes:probabilities mapped for DrawNoBet(Ahead(0))",
         err.to_string()
     );
 }
@@ -94,15 +94,12 @@ fn alignment_incorrect() {
 #[test]
 fn outcomes_intact() {
     let assertion = OutcomesIntactAssertion {
-        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))],
     };
     assertion
         .check(
-            &HashLookup::from(vec![
-                Outcome::Win(Side::Home),
-                Outcome::Win(Side::Away),
-            ]),
-            &OfferType::DrawNoBet,
+            &HashLookup::from(vec![Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))]),
+            &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
         )
         .unwrap();
 }
@@ -110,30 +107,30 @@ fn outcomes_intact() {
 #[test]
 fn outcome_missing() {
     let assertion = OutcomesIntactAssertion {
-        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))],
     };
     let err = assertion
         .check(
-            &HashLookup::from([Outcome::Win(Side::Home)]),
-            &OfferType::DrawNoBet,
+            &HashLookup::from([Outcome::Win(Side::Home, WinHandicap::AheadOver(0))]),
+            &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
         )
         .unwrap_err();
-    assert_eq!("Win(Away) missing from DrawNoBet", err.to_string());
+    assert_eq!("Win(Away, BehindUnder(0)) missing from DrawNoBet(Ahead(0))", err.to_string());
 }
 
 #[test]
 fn outcomes_match() {
     let mut assertion = OutcomesMatchAssertion {
-        matcher: |outcome| matches!(outcome, Outcome::Win(_) | Outcome::Draw),
+        matcher: |outcome| matches!(outcome, Outcome::Win(_, _) | Outcome::Draw(_)),
     };
     assertion
         .check(
             &[
-                Outcome::Win(Side::Home),
-                Outcome::Win(Side::Away),
-                Outcome::Draw,
+                Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
+                Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)),
+                Outcome::Draw(DrawHandicap::Ahead(0)),
             ],
-            &OfferType::HeadToHead(Period::FullTime),
+            &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
         )
         .unwrap();
 }
@@ -141,16 +138,16 @@ fn outcomes_match() {
 #[test]
 fn outcome_does_not_match() {
     let mut assertion = OutcomesMatchAssertion {
-        matcher: |outcome| matches!(outcome, Outcome::Win(_) | Outcome::Draw),
+        matcher: |outcome| matches!(outcome, Outcome::Win(_, _) | Outcome::Draw(_)),
     };
     let err = assertion
         .check(
-            &[Outcome::Win(Side::Home), Outcome::None],
-            &OfferType::HeadToHead(Period::FullTime),
+            &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::None],
+            &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
         )
         .unwrap_err();
     assert_eq!(
-        "None does not belong in HeadToHead(FullTime)",
+        "None does not belong in HeadToHead(FullTime, Ahead(0))",
         err.to_string()
     );
 }
@@ -158,15 +155,12 @@ fn outcome_does_not_match() {
 #[test]
 fn outcomes_complete() {
     let assertion = OutcomesCompleteAssertion {
-        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))],
     };
     assertion
         .check(
-            &HashLookup::from([
-                Outcome::Win(Side::Home),
-                Outcome::Win(Side::Away),
-            ]),
-            &OfferType::DrawNoBet,
+            &HashLookup::from([Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))]),
+            &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
         )
         .unwrap();
 }
@@ -174,29 +168,29 @@ fn outcomes_complete() {
 #[test]
 fn outcomes_incomplete() {
     let assertion = OutcomesCompleteAssertion {
-        outcomes: &[Outcome::Win(Side::Home), Outcome::Win(Side::Away)],
+        outcomes: &[Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), Outcome::Win(Side::Away, WinHandicap::BehindUnder(0))],
     };
     {
         let err = assertion
             .check(
-                &HashLookup::from([Outcome::Win(Side::Home)]),
-                &OfferType::DrawNoBet,
+                &HashLookup::from([Outcome::Win(Side::Home, WinHandicap::AheadOver(0))]),
+                &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
             )
             .unwrap_err();
-        assert_eq!("Win(Away) missing from DrawNoBet", err.to_string());
+        assert_eq!("Win(Away, BehindUnder(0)) missing from DrawNoBet(Ahead(0))", err.to_string());
     }
     {
         let err = assertion
             .check(
                 &HashLookup::from([
-                    Outcome::Win(Side::Home),
-                    Outcome::Win(Side::Away),
-                    Outcome::Draw,
+                    Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
+                    Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)),
+                    Outcome::Draw(DrawHandicap::Ahead(0)),
                 ]),
-                &OfferType::DrawNoBet,
+                &OfferType::DrawNoBet(DrawHandicap::Ahead(0)),
             )
             .unwrap_err();
-        assert_eq!("Draw does not belong in DrawNoBet", err.to_string());
+        assert_eq!("Draw(Ahead(0)) does not belong in DrawNoBet(Ahead(0))", err.to_string());
     }
 }
 
@@ -208,7 +202,10 @@ fn unvalidated_offer_unchecked() {
         market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
     };
     let unvalidated_offer = UnvalidatedOffer::from(Capture::from(offer));
-    assert_eq!(OfferType::TotalGoals(Period::FullTime, Over(2)), unvalidated_offer.unchecked().offer_type);
+    assert_eq!(
+        OfferType::TotalGoals(Period::FullTime, Over(2)),
+        unvalidated_offer.unchecked().offer_type
+    );
 }
 
 #[test]
