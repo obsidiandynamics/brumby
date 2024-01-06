@@ -1,4 +1,9 @@
-use std::ops::{Add, AddAssign};
+use std::collections::hash_map::Entry;
+use std::ops::{Add, AddAssign, Range};
+use bincode::Encode;
+use rustc_hash::FxHashMap;
+use crate::interval;
+use crate::interval::Exploration;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CacheStats {
@@ -49,6 +54,37 @@ impl AddAssign for CacheStats {
     fn add_assign(&mut self, rhs: Self) {
         self.hits += rhs.hits;
         self.misses += rhs.misses;
+    }
+}
+
+type Bytes = Vec<u8>;
+
+#[derive(Debug, Encode)]
+pub struct CacheableIntervalArgs {
+    pub config: interval::Config,
+    pub include_intervals: Range<u8>,
+}
+
+#[derive(Debug, Default)]
+pub struct CachingContext {
+    pub cache: FxHashMap<Bytes, Exploration>,
+    pub stats: CacheStats
+}
+impl CachingContext {
+    pub fn explore(
+        &mut self,
+        args: CacheableIntervalArgs,
+    ) -> &Exploration {
+        let encoded = bincode::encode_to_vec(&args, bincode::config::standard()).unwrap();
+        let (exploration, cache_hit) = match self.cache.entry(encoded) {
+            Entry::Occupied(entry) => (entry.into_mut(), true),
+            Entry::Vacant(entry) => {
+                let exploration = interval::explore(&args.config, args.include_intervals);
+                (entry.insert(exploration), false)
+            }
+        };
+        self.stats += cache_hit;
+        exploration
     }
 }
 

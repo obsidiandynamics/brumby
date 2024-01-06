@@ -1,5 +1,5 @@
-use std::env;
 use std::collections::HashMap;
+use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -19,14 +19,14 @@ use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
-use brumby_soccer::{fit, model, print};
-use brumby_soccer::data::{ContestSummary, download_by_id, SoccerFeedId};
+use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, Outcome};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
-use brumby_soccer::model::{Model, score_fitter, Stub};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
+use brumby_soccer::model::{score_fitter, Model, Stub};
+use brumby_soccer::{fit, model, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
@@ -70,7 +70,7 @@ fn load_selections(filename: &str) -> anyhow::Result<Vec<(OfferType, Outcome)>> 
     let file = File::open(filename).context(format!("opening file '{filename}'"))?;
     let reader = BufReader::new(file);
     let mut contents = String::new();
-    let comment = Regex::new(r"^.*#")?;
+    let comment = Regex::new(r"^.*(#|//)")?;
     for line in reader.lines() {
         let line = line?;
         if !comment.is_match(&line) {
@@ -241,25 +241,50 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // let selections = [
     //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
-    //     (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
-    //     (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
-    //     (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
+    //     // (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
+    //     // (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
+    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
     //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
     // ];
     // let encoded = serde_json::to_string(&selections)?;
     // info!("selections: {encoded}");
-    let selections = load_selections(args.selections.as_ref().unwrap())?;
-
-    let price = model.derive_multi(&selections)?;
-    let scaling_exponent = compute_scaling_exponent(price.relatedness);
-    let scaled_price = price.price.price / price.price.overround().powf(scaling_exponent - 1.0);
-    info!("selections: {selections:?}, price: {price:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
-
+    if let Some(ref selections) = args.selections {
+        let selections = load_selections(selections)?;
+        let price = model.derive_multi(&selections)?;
+        let relatedness =
+            compute_relatedness_coefficient(&selections, model.offers(), price.probability);
+        let scaling_exponent = compute_scaling_exponent(relatedness);
+        let scaled_price = price.price / price.overround().powf(scaling_exponent - 1.0);
+        info!("selections: {selections:?}, price: {price:?}, relatedness: {relatedness:.3}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
+    }
     Ok(())
 }
 
+fn compute_unrelated_probability(
+    selections: &[(OfferType, Outcome)],
+    offers: &FxHashMap<OfferType, Offer>,
+) -> f64 {
+    selections
+        .iter()
+        .map(|(offer_type, outcome)| {
+            let offer = offers.get(offer_type).unwrap();
+            let outcome_index = offer.outcomes.index_of(outcome).unwrap();
+            offer.market.probs[outcome_index]
+        })
+        .product()
+}
+
+fn compute_relatedness_coefficient(
+    selections: &[(OfferType, Outcome)],
+    offers: &FxHashMap<OfferType, Offer>,
+    related_prob: f64,
+) -> f64 {
+    let unrelated_prob = compute_unrelated_probability(selections, offers);
+    unrelated_prob / related_prob
+}
+
 fn compute_scaling_exponent(relatedness: f64) -> f64 {
-    0.5 * f64::log10( 100.0 * relatedness)
+    0.5 * f64::log10(100.0 * relatedness)
 }
 
 fn implied_booksum<'a>(prices: impl Iterator<Item = &'a f64>) -> f64 {

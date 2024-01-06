@@ -1,10 +1,8 @@
 use std::collections::hash_map::Entry;
 use std::error::Error;
-use std::ops::Range;
 use std::time::Instant;
 
 use anyhow::anyhow;
-use bincode::Encode;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::debug;
@@ -18,14 +16,14 @@ use brumby::stack_vec::FromIteratorResult;
 use brumby::sv;
 use brumby::timed::Timed;
 
-use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{Offer, OfferCategory, OfferType, Outcome, Over, Period, Player};
+use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::interval;
-use crate::interval::query::{isolate, requirements};
 use crate::interval::{BivariateProbs, Expansions, Exploration, PlayerProbs, PruneThresholds, query, TeamProbs, UnivariateProbs};
-use crate::model::cache_stats::CacheStats;
+use crate::interval::query::{isolate, requirements};
+use crate::model::cache::{CacheableIntervalArgs, CacheStats, CachingContext};
 
-mod cache_stats;
+mod cache;
 pub mod player_assist_fitter;
 pub mod player_goal_fitter;
 pub mod score_fitter;
@@ -153,12 +151,6 @@ pub enum UnmetRequirement {
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct ValidationError(#[from] pub Box<dyn Error>);
-// impl ValidationError {
-//     pub fn err<'a, S, T>(str: S) -> Result<T, ValidationError> where S: Into<&'a str> {
-//         let str: &str = str.into();
-//         Err(ValidationError::from(Box::from(str)))
-//     }
-// }
 
 impl From<anyhow::Error> for ValidationError {
     fn from(value: anyhow::Error) -> Self {
@@ -202,10 +194,29 @@ impl Config {
     }
 }
 
+// #[derive(Debug)]
+// pub struct MultiPrice {
+//     pub price: DerivedPrice,
+//     pub relatedness: f64
+// }
+
 #[derive(Debug)]
-pub struct MultiPrice {
-    pub price: DerivedPrice,
-    pub relatedness: f64
+pub struct MultiDerivation {
+    pub quotation: DerivedPrice,
+    pub redundancies: Vec<(OfferType, Outcome)>,
+    // pub fringes: FxHashMap<(OfferType, Outcome), Fringe>
+}
+
+#[derive(Debug)]
+pub struct Fringe {
+    pub quotation: DerivedPrice,
+    pub redundancies: Vec<(OfferType, Outcome)>,
+}
+
+struct Selection {
+    offer_type: OfferType,
+    outcome: Outcome,
+    single_prob: f64,
 }
 
 #[derive(Debug)]
@@ -227,8 +238,7 @@ impl Model {
         price_bounds: &PriceBounds,
     ) -> Result<Timed<CacheStats>, SingleDerivationError> {
         Timed::result(|| {
-            let mut cache = FxHashMap::default();
-            let mut cache_stats = CacheStats::default();
+            let mut caching_context = CachingContext::default();
             for stub in stubs {
                 debug!(
                     "deriving {:?} ({} outcomes)",
@@ -237,13 +247,11 @@ impl Model {
                 );
                 stub.offer_type.validate_outcomes(&stub.outcomes)?;
                 let start = Instant::now();
-                let (offer, derive_cache_stats) =
-                    self.derive_offer(stub, price_bounds, &mut cache)?;
-                debug!("... took {:?}, {derive_cache_stats:?}", start.elapsed());
-                cache_stats += derive_cache_stats;
+                let offer = self.derive_offer(stub, price_bounds, &mut caching_context)?;
+                debug!("... took {:?}, progressive {:?}", start.elapsed(), caching_context.stats);
                 self.offers.insert(offer.offer_type.clone(), offer);
             }
-            Ok(cache_stats)
+            Ok(caching_context.stats)
         })
     }
 
@@ -251,8 +259,8 @@ impl Model {
         &mut self,
         stub: &Stub,
         price_bounds: &PriceBounds,
-        cache: &mut FxHashMap<Vec<u8>, Exploration>,
-    ) -> Result<(Offer, CacheStats), SingleDerivationError> {
+        caching_context: &mut CachingContext,
+    ) -> Result<Offer, SingleDerivationError> {
         let reqs = requirements(&stub.offer_type);
         self.ensure_team_requirements(&reqs)?;
         let requires_player_goal_probs = reqs.requires_player_goal_probs();
@@ -268,10 +276,9 @@ impl Model {
             min_prob: 0.0,
         };
 
-        let (offer, cache_stats) = if requires_player_goal_probs || requires_player_assist_probs {
+        let offer = if requires_player_goal_probs || requires_player_assist_probs {
             // requires player probabilities — must be explored individually for each outcome
             let mut probs = Vec::with_capacity(stub.outcomes.len());
-            let mut cache_stats = CacheStats::default();
             for outcome in &stub.outcomes {
                 let player_probs = match outcome.get_player() {
                     None => sv![],
@@ -287,7 +294,7 @@ impl Model {
                     }
                 };
 
-                let (exploration, cache_hit) = explore_cached(
+                let exploration = caching_context.explore(
                     CacheableIntervalArgs {
                         config: interval::Config {
                             intervals: self.config.intervals,
@@ -297,10 +304,8 @@ impl Model {
                             expansions: reqs.clone(),
                         },
                         include_intervals: 0..self.config.intervals,
-                    },
-                    cache,
+                    }
                 );
-                cache_stats += cache_hit;
 
                 let prob = isolate(
                     &stub.offer_type,
@@ -313,17 +318,14 @@ impl Model {
             debug!("... normalizing: {} -> {}", probs.sum(), stub.normal);
             probs.normalise(stub.normal);
             let market = Market::frame(&stub.overround, probs, price_bounds);
-            (
-                Offer {
-                    offer_type: stub.offer_type.clone(),
-                    outcomes: stub.outcomes.clone(),
-                    market,
-                },
-                cache_stats,
-            )
+            Offer {
+                offer_type: stub.offer_type.clone(),
+                outcomes: stub.outcomes.clone(),
+                market,
+            }
         } else {
             // doesn't require player probabilities — can be explored as a whole
-            let (exploration, cache_hit) = explore_cached(
+            let exploration = caching_context.explore(
                 CacheableIntervalArgs {
                     config: interval::Config {
                         intervals: self.config.intervals,
@@ -333,24 +335,22 @@ impl Model {
                         expansions: reqs,
                     },
                     include_intervals: 0..self.config.intervals,
-                },
-                cache,
+                }
             );
 
-            let offer = frame_prices_from_exploration(
+            frame_prices_from_exploration(
                 exploration,
                 &stub.offer_type,
                 stub.outcomes.items(),
                 stub.normal,
                 &stub.overround,
                 price_bounds,
-            );
-            (offer, CacheStats::default() + cache_hit)
+            )
         };
-        Ok((offer, cache_stats))
+        Ok(offer)
     }
 
-    pub fn derive_multi(&self, selections: &[(OfferType, Outcome)]) -> Result<MultiPrice, MultiDerivationError> {
+    pub fn derive_multi(&self, selections: &[(OfferType, Outcome)]) -> Result<DerivedPrice, MultiDerivationError> {
         if selections.is_empty() {
             return Err(MultiDerivationError::NoSelections(NoSelections));
         }
@@ -358,7 +358,7 @@ impl Model {
         let mut agg_player_probs = FxHashMap::<Player, PlayerProbs>::with_capacity_and_hasher(interval::NUM_PLAYERS, Default::default());
         let mut agg_reqs = Expansions::empty();
         let mut overround = 1.0;
-        let mut unrelated_prob = 1.0;
+        // let mut unrelated_prob = 1.0;
         for (offer_type, outcome) in selections {
             self.collect_requirements(offer_type, outcome, &mut agg_reqs, &mut agg_player_probs)?;
 
@@ -371,7 +371,7 @@ impl Model {
                 outcome: outcome.clone(),
             }))?;
             let single_prob = offer.market.probs[outcome_index];
-            unrelated_prob *= single_prob;
+            // unrelated_prob *= single_prob;
             let single_price = offer.market.prices[outcome_index];
             overround *= 1.0 / single_prob / single_price;
         }
@@ -398,13 +398,10 @@ impl Model {
         let exploration = interval::explore(&config, 0..self.config.intervals);
         let probability = query::isolate_set(selections, &exploration.prospects, &exploration.player_lookup);
         let price = 1.0 / probability / overround;
-        let relatedness = unrelated_prob / probability;
-        Ok(MultiPrice {
-            price: DerivedPrice {
-                probability,
-                price,
-            },
-            relatedness,
+        // let relatedness = unrelated_prob / probability;
+        Ok(DerivedPrice {
+            probability,
+            price,
         })
     }
 
@@ -488,26 +485,6 @@ impl TryFrom<Config> for Model {
             player_probs: Default::default(),
             offers: Default::default(),
         })
-    }
-}
-
-#[derive(Debug, Encode)]
-struct CacheableIntervalArgs {
-    config: interval::Config,
-    include_intervals: Range<u8>,
-}
-
-fn explore_cached(
-    args: CacheableIntervalArgs,
-    cache: &mut FxHashMap<Vec<u8>, Exploration>,
-) -> (&Exploration, bool) {
-    let encoded = bincode::encode_to_vec(&args, bincode::config::standard()).unwrap();
-    match cache.entry(encoded) {
-        Entry::Occupied(entry) => (entry.into_mut(), true),
-        Entry::Vacant(entry) => {
-            let exploration = interval::explore(&args.config, args.include_intervals);
-            (entry.insert(exploration), false)
-        }
     }
 }
 

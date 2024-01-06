@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    pub fn win_handicap_1_gather() {
+    pub fn win_ahead_1_gather() {
         let exploration = create_test_4x4_exploration();
         assert_float_absolute_eq!(
             0.4,
@@ -160,6 +160,29 @@ mod tests {
             isolate(
                 &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(1)),
                 &Outcome::Win(Side::Away, WinHandicap::BehindUnder(1)),
+                &exploration.prospects,
+                &exploration.player_lookup
+            )
+        );
+    }
+
+    #[test]
+    pub fn win_behind_1_gather() {
+        let exploration = create_test_4x4_exploration();
+        assert_float_absolute_eq!(
+            0.85,
+            isolate(
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
+                &Outcome::Win(Side::Home, WinHandicap::BehindUnder(1)),
+                &exploration.prospects,
+                &exploration.player_lookup
+            )
+        );
+        assert_float_absolute_eq!(
+            0.05,
+            isolate(
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
+                &Outcome::Win(Side::Away, WinHandicap::AheadOver(1)),
                 &exploration.prospects,
                 &exploration.player_lookup
             )
@@ -195,7 +218,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.1,
             isolate(
-                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(1)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
                 &Outcome::Draw(DrawHandicap::Behind(1)),
                 &exploration.prospects,
                 &exploration.player_lookup

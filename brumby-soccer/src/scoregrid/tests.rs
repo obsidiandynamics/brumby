@@ -42,14 +42,21 @@ pub fn outcome_win_gather() {
 }
 
 #[test]
-pub fn outcome_win_handicap_1_gather() {
+pub fn outcome_win_ahead_1_gather() {
     let scoregrid = create_test_4x4_scoregrid();
     assert_float_absolute_eq!(0.4, Outcome::Win(Side::Home, WinHandicap::AheadOver(1)).gather(&scoregrid));
     assert_float_absolute_eq!(0.35, Outcome::Win(Side::Away, WinHandicap::BehindUnder(1)).gather(&scoregrid));
 }
 
 #[test]
-pub fn outcome_win_handicap_2_gather() {
+pub fn outcome_win_behind_1_gather() {
+    let scoregrid = create_test_4x4_scoregrid();
+    assert_float_absolute_eq!(0.85, Outcome::Win(Side::Home, WinHandicap::BehindUnder(1)).gather(&scoregrid));
+    assert_float_absolute_eq!(0.05, Outcome::Win(Side::Away, WinHandicap::AheadOver(1)).gather(&scoregrid));
+}
+
+#[test]
+pub fn outcome_win_ahead_2_gather() {
     let scoregrid = create_test_4x4_scoregrid();
     assert_float_absolute_eq!(0.16, Outcome::Win(Side::Home, WinHandicap::AheadOver(2)).gather(&scoregrid));
     assert_float_absolute_eq!(0.6, Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)).gather(&scoregrid));
