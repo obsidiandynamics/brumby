@@ -203,7 +203,7 @@ pub struct Config {
     pub expansions: Expansions,
 }
 
-#[derive(Debug, Default, Encode)]
+#[derive(Debug, Default, Encode, Clone)]
 pub struct PlayerProbs {
     pub goal: Option<f64>,
     pub assist: Option<f64>,

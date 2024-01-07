@@ -250,12 +250,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // info!("selections: {encoded}");
     if let Some(ref selections) = args.selections {
         let selections = load_selections(selections)?;
-        let price = model.derive_multi(&selections)?;
-        let relatedness =
-            compute_relatedness_coefficient(&selections, model.offers(), price.probability);
-        let scaling_exponent = compute_scaling_exponent(relatedness);
-        let scaled_price = price.price / price.overround().powf(scaling_exponent - 1.0);
-        info!("selections: {selections:?}, price: {price:?}, relatedness: {relatedness:.3}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}");
+        let derivation = model.derive_multi(&selections)?;
+        let elapsed = derivation.elapsed;
+        let derivation = derivation.value;
+        // let relatedness =
+        //     compute_relatedness_coefficient(&selections, model.offers(), derivation.probability);
+        let scaling_exponent = compute_scaling_exponent(derivation.relatedness);
+        let scaled_price = derivation.quotation.price
+            / derivation
+                .quotation
+                .overround()
+                .powf(scaling_exponent - 1.0);
+        info!("selections: {selections:?}, quotation: {:?}, relatedness: {:.3}, redundancies: {:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}, took: {elapsed:?}",
+            derivation.quotation, derivation.relatedness, derivation.redundancies);
+        for (offer, fringe_vec) in derivation.fringes {
+            info!("fringe offer: {offer:?}");
+            for fringe in fringe_vec {
+                info!("  {fringe:?}");
+            }
+        }
     }
     Ok(())
 }
