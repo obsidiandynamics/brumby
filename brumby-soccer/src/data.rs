@@ -70,9 +70,6 @@ impl From<ContestModel> for ContestSummary {
                     offerings.insert(
                         OfferType::FirstGoalscorer,
                         HashMap::from_iter(players.into_iter().map(|player| {
-                            // if player.side.is_none() {
-                            //     println!("PLAYER {player:?}");
-                            // }
                             let OutcomeOdds(outcome, odds) = OutcomeOdds::from(player);
                             (outcome, odds)
                         })),
@@ -181,11 +178,7 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::FirstHalfCornersOverUnder(_, _) => {}
                 SoccerMarket::SecondHalfCornersOverUnder(_, _) => {}
                 SoccerMarket::TwoWayHandicap(prices, handicap) => {
-                    let win_handicap = if handicap > 0.0 {
-                        WinHandicap::BehindUnder(handicap as u8 + 1)
-                    } else {
-                        WinHandicap::AheadOver(-handicap as u8)
-                    };
+                    let win_handicap = to_win_handicap(handicap);
                     // println!("handicap: {handicap}, prices: {prices:?}");
                     // println!("home: {:?}, away: {:?}", win_handicap, win_handicap.flip_asian());
                     offerings.insert(
@@ -196,14 +189,28 @@ impl From<ContestModel> for ContestSummary {
                         ]),
                     );
                 }
-                SoccerMarket::FirstHalfTwoWayHandicap(_, _) => {}
-                SoccerMarket::SecondHalfTwoWayHandicap(_, _) => {}
+                SoccerMarket::FirstHalfTwoWayHandicap(prices, handicap) => {
+                    let win_handicap = to_win_handicap(handicap);
+                    offerings.insert(
+                        OfferType::AsianHandicap(Period::FirstHalf, win_handicap.clone()),
+                        HashMap::from([
+                            (Outcome::Win(Side::Home, win_handicap.clone()), prices.home),
+                            (Outcome::Win(Side::Away, win_handicap.flip_asian()), prices.away),
+                        ]),
+                    );
+                }
+                SoccerMarket::SecondHalfTwoWayHandicap(prices, handicap) => {
+                    let win_handicap = to_win_handicap(handicap);
+                    offerings.insert(
+                        OfferType::AsianHandicap(Period::SecondHalf, win_handicap.clone()),
+                        HashMap::from([
+                            (Outcome::Win(Side::Home, win_handicap.clone()), prices.home),
+                            (Outcome::Win(Side::Away, win_handicap.flip_asian()), prices.away),
+                        ]),
+                    );
+                }
                 SoccerMarket::ThreeWayHandicap(h2h, handicap) => {
-                    let draw_handicap = if handicap > 0 {
-                        DrawHandicap::Behind(handicap as u8)
-                    } else {
-                        DrawHandicap::Ahead(-handicap as u8)
-                    };
+                    let draw_handicap = to_draw_handicap(handicap);
                     let win_handicap = draw_handicap.to_win_handicap();
                     offerings.insert(
                         OfferType::HeadToHead(Period::FullTime, draw_handicap.clone()),
@@ -221,6 +228,22 @@ impl From<ContestModel> for ContestSummary {
             name,
             offerings,
         }
+    }
+}
+
+fn to_draw_handicap(handicap: i8) -> DrawHandicap {
+    if handicap > 0 {
+        DrawHandicap::Behind(handicap as u8)
+    } else {
+        DrawHandicap::Ahead(-handicap as u8)
+    }
+}
+
+fn to_win_handicap(handicap: f32) -> WinHandicap {
+    if handicap > 0.0 {
+        WinHandicap::BehindUnder(handicap as u8 + 1)
+    } else {
+        WinHandicap::AheadOver(-handicap as u8)
     }
 }
 
