@@ -39,6 +39,10 @@ impl Prospect {
             away: self.ft_score.away - self.ht_score.away,
         }
     }
+
+    fn total_goals(&self) -> u16 {
+        u16::max(self.ht_score.total(), self.ft_score.total())
+    }
 }
 
 pub type Prospects = FxHashMap<Prospect, f64>;
@@ -336,7 +340,7 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
             );
 
             // at least one more goal allowed before pruning
-            if current_prospect.ft_score.total() < config.prune_thresholds.max_total_goals {
+            if current_prospect.total_goals() < config.prune_thresholds.max_total_goals {
                 // only the home team scores
                 for (scorer_index, player_score_prob) in &home_scorers {
                     for (assister, player_assist_prob) in assist::Iter::new(
@@ -391,7 +395,7 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
             }
 
             // at least two more goals allowed before pruning
-            if current_prospect.ft_score.total() + 1 < config.prune_thresholds.max_total_goals {
+            if current_prospect.total_goals() + 1 < config.prune_thresholds.max_total_goals {
                 // both teams score
                 for (home_scorer_index, home_player_score_prob) in &home_scorers {
                     for (away_scorer_index, away_player_score_prob) in &away_scorers {

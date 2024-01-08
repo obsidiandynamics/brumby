@@ -13,20 +13,20 @@ use stanza::renderer::console::Console;
 use stanza::renderer::Renderer;
 use stanza::style::Styles;
 use stanza::table::{Cell, Content, Row, Table};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
-use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
+use brumby_soccer::{fit, model, print};
+use brumby_soccer::data::{ContestSummary, download_by_id, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, Outcome};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
+use brumby_soccer::model::{FitError, Model, score_fitter, Stub};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
-use brumby_soccer::model::{score_fitter, Model, Stub};
-use brumby_soccer::{fit, model, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
@@ -134,10 +134,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
     score_fitter.fit(&mut model, &sample_offers)?;
 
     let player_goal_fitter = PlayerGoalFitter;
-    player_goal_fitter.fit(&mut model, &sample_offers)?;
+    let fit_result = player_goal_fitter.fit(&mut model, &sample_offers);
+    match fit_result {
+        Ok(_) => {}
+        Err(FitError::MissingOffer(missing_offer)) => {
+            warn!("skipped fitting player goals: {missing_offer}");
+        }
+        Err(err) => {
+            panic!("failed fitting player goals: {err}");
+        }
+    };
 
     let player_assist_fitter = PlayerAssistFitter;
-    player_assist_fitter.fit(&mut model, &sample_offers)?;
+    let fit_result = player_assist_fitter.fit(&mut model, &sample_offers);
+    match fit_result {
+        Ok(_) => {}
+        Err(FitError::MissingOffer(missing_offer)) => {
+            warn!("skipped fitting player assists: {missing_offer}");
+        }
+        Err(err) => {
+            panic!("failed fitting player assists: {err}");
+        }
+    };
 
     let stubs = sample_offers
         .iter()
@@ -261,40 +279,53 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .quotation
                 .overround()
                 .powf(scaling_exponent - 1.0);
-        info!("selections: {selections:?}, quotation: {:?}, relatedness: {:.3}, redundancies: {:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}, took: {elapsed:?}",
-            derivation.quotation, derivation.relatedness, derivation.redundancies);
+        info!("selections: {selections:?}, quotation: {:?}, overround: {:.3}, relatedness: {:.3}, redundancies: {:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}, took: {elapsed:?}",
+            derivation.quotation, derivation.quotation.overround(), derivation.relatedness, derivation.redundancies);
+        let mut total_fringes = 0;
+        let mut unattainable_fringes = 0;
         for (offer, fringe_vec) in derivation.fringes {
             info!("fringe offer: {offer:?}");
             for fringe in fringe_vec {
-                info!("  {fringe:?}");
+                let scaling_exponent = compute_scaling_exponent(fringe.relatedness);
+                let scaled_price = fringe.quotation.price
+                    / fringe
+                    .quotation
+                    .overround()
+                    .powf(scaling_exponent - 1.0);
+                total_fringes += 1;
+                if fringe.quotation.probability == 0.0 {
+                    unattainable_fringes += 1;
+                }
+                info!("  {fringe:?}, overround: {:.3}, scaled_price: {scaled_price:.3}", fringe.quotation.overround());
             }
         }
+        info!("{total_fringes} fringes derived, {unattainable_fringes} are unattainable");
     }
     Ok(())
 }
 
-fn compute_unrelated_probability(
-    selections: &[(OfferType, Outcome)],
-    offers: &FxHashMap<OfferType, Offer>,
-) -> f64 {
-    selections
-        .iter()
-        .map(|(offer_type, outcome)| {
-            let offer = offers.get(offer_type).unwrap();
-            let outcome_index = offer.outcomes.index_of(outcome).unwrap();
-            offer.market.probs[outcome_index]
-        })
-        .product()
-}
+// fn compute_unrelated_probability(
+//     selections: &[(OfferType, Outcome)],
+//     offers: &FxHashMap<OfferType, Offer>,
+// ) -> f64 {
+//     selections
+//         .iter()
+//         .map(|(offer_type, outcome)| {
+//             let offer = offers.get(offer_type).unwrap();
+//             let outcome_index = offer.outcomes.index_of(outcome).unwrap();
+//             offer.market.probs[outcome_index]
+//         })
+//         .product()
+// }
 
-fn compute_relatedness_coefficient(
-    selections: &[(OfferType, Outcome)],
-    offers: &FxHashMap<OfferType, Offer>,
-    related_prob: f64,
-) -> f64 {
-    let unrelated_prob = compute_unrelated_probability(selections, offers);
-    unrelated_prob / related_prob
-}
+// fn compute_relatedness_coefficient(
+//     selections: &[(OfferType, Outcome)],
+//     offers: &FxHashMap<OfferType, Offer>,
+//     related_prob: f64,
+// ) -> f64 {
+//     let unrelated_prob = compute_unrelated_probability(selections, offers);
+//     unrelated_prob / related_prob
+// }
 
 fn compute_scaling_exponent(relatedness: f64) -> f64 {
     0.5 * f64::log10(100.0 * relatedness)

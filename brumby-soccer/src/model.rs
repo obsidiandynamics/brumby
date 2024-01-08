@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::anyhow;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use brumby::capture::Capture;
 use brumby::derived_price::DerivedPrice;
@@ -226,8 +226,8 @@ pub struct Fringe {
 struct Selection {
     offer_type: OfferType,
     outcome: Outcome,
-    overround: f64,
-    prob: f64,
+    single_overround: f64,
+    single_prob: f64,
 }
 
 #[derive(Debug)]
@@ -337,6 +337,11 @@ impl Model {
                 market,
             }
         } else {
+            // let LOG = stub.offer_type == TotalGoals(Period::FirstHalf, Over(4)); //TODO
+            // if LOG {
+            //     trace!("reqs: {reqs:?}");
+            // }
+
             // doesn't require player probabilities — can be explored as a whole
             let exploration = caching_context.explore(CacheableIntervalArgs {
                 config: interval::Config {
@@ -348,6 +353,11 @@ impl Model {
                 },
                 include_intervals: 0..self.config.intervals,
             });
+            // if LOG {
+            //     for prospect in &exploration.prospects {
+            //         trace!("  prospect: {prospect:?}");
+            //     }
+            // }
 
             frame_prices_from_exploration(
                 exploration,
@@ -365,10 +375,12 @@ impl Model {
         &self,
         selections: &[(OfferType, Outcome)],
     ) -> Result<Timed<MultiDerivation>, MultiDerivationError> {
+        if selections.is_empty() {
+            return Err(MultiDerivationError::NoSelections(NoSelections));
+        }
+        const PRUNE_MIN_PROB: f64 = 1e-5;
+
         Timed::result(|| {
-            if selections.is_empty() {
-                return Err(MultiDerivationError::NoSelections(NoSelections));
-            }
             let mut caching_context = CachingContext::default();
             let mut agg_player_probs = FxHashMap::<Player, PlayerProbs>::with_capacity_and_hasher(
                 interval::NUM_PLAYERS,
@@ -376,8 +388,9 @@ impl Model {
             );
             let mut agg_reqs = Expansions::empty();
             let mut sorted_selections = Vec::with_capacity(selections.len());
-            // let mut overround = 1.0;
-            // let mut unrelated_prob = 1.0;
+
+            let mut exploration_elapsed = Duration::new(0, 0);
+            let mut query_elapsed = Duration::new(0, 0);
             for (offer_type, outcome) in selections {
                 self.collect_requirements(
                     offer_type,
@@ -399,21 +412,21 @@ impl Model {
                         outcome: outcome.clone(),
                     }),
                 )?;
-                let prob = offer.market.probs[outcome_index];
+                let single_prob = offer.market.probs[outcome_index];
                 // unrelated_prob *= single_prob;
-                let price = offer.market.prices[outcome_index];
-                let overround = 1.0 / prob / price;
+                let single_price = offer.market.prices[outcome_index];
+                let single_overround = 1.0 / single_prob / single_price;
                 // overround *= 1.0 / single_prob / single_price;
                 sorted_selections.push(Selection {
                     offer_type: offer_type.clone(),
                     outcome: outcome.clone(),
-                    overround,
-                    prob,
+                    single_overround,
+                    single_prob,
                 });
             }
-            debug!("agg_reqs: {agg_reqs:?}, agg_player_probs: {agg_player_probs:?}");
-            sorted_selections.sort_by(|s1, s2| s1.prob.total_cmp(&s2.prob));
-            debug!("sorted selections: {sorted_selections:?}");
+            trace!("agg_reqs: {agg_reqs:?}, agg_player_probs: {agg_player_probs:?}");
+            sorted_selections.sort_by(|s1, s2| s1.single_prob.total_cmp(&s2.single_prob));
+            trace!("sorted selections: {sorted_selections:?}");
 
             let FromIteratorResult(player_probs) = agg_player_probs
                 .iter()
@@ -429,7 +442,7 @@ impl Model {
             };
             let prune_thresholds = PruneThresholds {
                 max_total_goals: self.config.max_total_goals,
-                min_prob: 0.0,
+                min_prob: PRUNE_MIN_PROB,
             };
             let config = interval::Config {
                 intervals: self.config.intervals,
@@ -439,86 +452,102 @@ impl Model {
                 expansions: agg_reqs.clone(),
             };
 
-            let exploration = caching_context.explore(CacheableIntervalArgs {
-                config,
-                include_intervals: 0..self.config.intervals,
-            });
+            let pruned;
             let mut keep = Vec::with_capacity(sorted_selections.len());
             let mut redundancies = vec![];
             let mut lowest_prob = f64::MAX;
-            for end_index in 1..=sorted_selections.len() {
-                let prefix = sorted_selections[0..end_index]
-                    .iter()
-                    .map(|selection| (selection.offer_type.clone(), selection.outcome.clone()))
-                    .collect::<Vec<_>>();
-                let prob =
-                    query::isolate_set(&prefix, &exploration.prospects, &exploration.player_lookup);
-                debug!("prefix: {prefix:?}, prob: {prob:.3}");
-                let tail = &sorted_selections[end_index - 1];
-                if prob < lowest_prob {
-                    lowest_prob = prob;
-                    keep.push(tail.clone());
-                } else {
-                    redundancies.push(tail.clone());
+            {
+                let exploration_start = Instant::now();
+                let exploration = caching_context.explore(CacheableIntervalArgs {
+                    config,
+                    include_intervals: 0..self.config.intervals,
+                });
+                exploration_elapsed += exploration_start.elapsed();
+                trace!("prospects: {}, took: {:?}", exploration.prospects.len(), exploration_start.elapsed());
+                pruned = exploration.pruned;
+                let query_start = Instant::now();
+                for end_index in 1..=sorted_selections.len() {
+                    let prefix = sorted_selections[0..end_index]
+                        .iter()
+                        .map(|selection| (selection.offer_type.clone(), selection.outcome.clone()))
+                        .collect::<Vec<_>>();
+                    let prob =
+                        query::isolate_set(&prefix, &exploration.prospects, &exploration.player_lookup);
+                    trace!("prefix: {prefix:?}, prob: {prob:.3}");
+                    let tail = &sorted_selections[end_index - 1];
+                    if prob < lowest_prob {
+                        lowest_prob = prob;
+                        keep.push(tail.clone());
+                    } else {
+                        redundancies.push(tail.clone());
+                    }
                 }
+                query_elapsed += query_start.elapsed();
             }
 
-            let overround = keep
-                .iter()
-                .map(|selection| selection.overround)
-                .product::<f64>();
-            let price = 1.0 / lowest_prob / overround;
-            let unrelated_prob = keep.iter().map(|selection| selection.prob).product::<f64>();
-            let relatedness = unrelated_prob / lowest_prob;
-            let redundancies = redundancies
-                .into_iter()
-                .map(|selection| (selection.offer_type, selection.outcome))
-                .collect::<Vec<_>>();
             let mut fringes =
                 FxHashMap::with_capacity_and_hasher(self.offers.len(), Default::default());
 
             // fringes
-            let mut exploration_elapsed = Duration::new(0, 0);
-            let mut query_elapsed = Duration::new(0, 0);
             for (offer_type, offer) in &self.offers {
+                if !is_fringe_supported(offer_type) && selections_contain_offer_type(selections, offer_type) {
+                    continue;
+                }
                 let reqs = requirements(offer_type);
                 let reuse_exploration = !reqs.requires_player_goal_probs() && !reqs.requires_player_assist_probs();
                 let mut exploration = None;
                 let mut fringes_vec = Vec::with_capacity(offer.outcomes.len());
                 for (outcome_index, outcome) in offer.outcomes.items().iter().enumerate() {
-                    let prob = offer.market.probs[outcome_index];
-                    if prob == 0.0 {
+                    // let LOG = offer_type == &TotalGoals(Period::FirstHalf, Over(4)) && outcome == &Outcome::Over(4);
+
+                    let single_prob = offer.market.probs[outcome_index];
+                    if single_prob == 0.0 {
                         continue;
                     }
-                    let price = offer.market.prices[outcome_index];
-                    let mut sorted_selections = sorted_selections.clone();
-                    let overround = 1.0 / prob / price;
-                    sorted_selections.push(Selection {
+                    if selections_contains(selections, offer_type, outcome) {
+                        continue;
+                    }
+
+                    let single_price = offer.market.prices[outcome_index];
+                    let mut fringe_sorted_selections = keep.clone();
+                    let single_overround = 1.0 / single_prob / single_price;
+
+                    // if LOG {
+                    //     trace!("price: {single_price:.3}, prob: {single_prob:.3}, overround: {single_overround:.3}");
+                    // }
+                    fringe_sorted_selections.push(Selection {
                         offer_type: offer_type.clone(),
                         outcome: outcome.clone(),
-                        overround,
-                        prob,
+                        single_overround,
+                        single_prob,
                     });
-                    sorted_selections.sort_by(|s1, s2| s1.prob.total_cmp(&s2.prob));
-                    // debug!("agg_reqs: {agg_reqs:?}, agg_player_probs: {agg_player_probs:?}");
-                    // debug!("sorted selections: {sorted_selections:?}");
+                    fringe_sorted_selections.sort_by(|s1, s2| s1.single_prob.total_cmp(&s2.single_prob));
 
-                    let mut agg_reqs = agg_reqs.clone();
-                    let mut agg_player_probs = agg_player_probs.clone();
+                    let mut fringe_agg_reqs = agg_reqs.clone();
+                    let mut fringe_agg_player_probs = agg_player_probs.clone();
                     self.collect_requirements(
                         offer_type,
                         outcome,
-                        &mut agg_reqs,
-                        &mut agg_player_probs,
+                        &mut fringe_agg_reqs,
+                        &mut fringe_agg_player_probs,
                     )?;
 
-                    let FromIteratorResult(player_probs) = agg_player_probs
+                    // if LOG {
+                    //     trace!("fringe_agg_reqs: {fringe_agg_reqs:?}, agg_player_probs: {fringe_agg_player_probs:?}");
+                    //     trace!("fringe_sorted selections: {fringe_sorted_selections:?}");
+                    // }
+
+                    let FromIteratorResult(player_probs) = fringe_agg_player_probs
                         .iter()
                         .map(|(player, player_probs)| (player.clone(), player_probs.clone()))
                         .collect();
-                    let player_probs = player_probs.map_err(|err| TooManyPlayers {
-                        capacity: err.capacity,
-                    })?;
+                    let player_probs = match player_probs {
+                        Ok(player_probs) => player_probs,
+                        Err(_) => {
+                            trace!("skipping {offer_type:?}/{outcome:?}: too many players");
+                            continue;
+                        }
+                    };
                     let team_probs = TeamProbs {
                         h1_goals: self.goal_probs.clone().unwrap_or_default().h1,
                         h2_goals: self.goal_probs.clone().unwrap_or_default().h2,
@@ -526,60 +555,74 @@ impl Model {
                     };
                     let prune_thresholds = PruneThresholds {
                         max_total_goals: self.config.max_total_goals,
-                        min_prob: 0.0,
+                        min_prob: PRUNE_MIN_PROB,
                     };
                     let config = interval::Config {
                         intervals: self.config.intervals,
                         team_probs,
                         player_probs,
                         prune_thresholds,
-                        expansions: agg_reqs.clone(),
+                        expansions: fringe_agg_reqs.clone(),
                     };
 
-                    let start = Instant::now();
                     if exploration.is_none() || !reuse_exploration {
+                        let exploration_start = Instant::now();
                         exploration = Some(caching_context.explore(CacheableIntervalArgs {
                             config,
                             include_intervals: 0..self.config.intervals,
                         }));
-                    } else {
-                        // debug!("reusing exploration for {offer_type:?}/{outcome:?}");
+                        exploration_elapsed += exploration_start.elapsed();
+                        trace!("fringe {offer_type:?}/{outcome:?}, prospects: {}, took {:?}", exploration.unwrap().prospects.len(), exploration_start.elapsed());
                     }
                     let exploration = exploration.unwrap();
-                    exploration_elapsed += start.elapsed();
+                    let fringe_pruned = exploration.pruned;
 
-                    let mut keep = Vec::with_capacity(sorted_selections.len());
-                    let mut redundancies = vec![];
-                    let mut lowest_prob = f64::MAX;
-                    for end_index in 1..=sorted_selections.len() {
-                        let prefix = sorted_selections[0..end_index]
+                    let mut fringe_keep = Vec::with_capacity(fringe_sorted_selections.len());
+                    let mut fringe_redundancies = vec![];
+                    let mut fringe_lowest_prob = f64::MAX;
+
+                    let query_start = Instant::now();
+                    for end_index in 1..=fringe_sorted_selections.len() {
+                        let prefix = fringe_sorted_selections[0..end_index]
                             .iter()
                             .map(|selection| (selection.offer_type.clone(), selection.outcome.clone()))
                             .collect::<Vec<_>>();
-                        let start = Instant::now();
                         let prob =
                             query::isolate_set(&prefix, &exploration.prospects, &exploration.player_lookup);
-                        query_elapsed += start.elapsed();
                         // debug!("prefix: {prefix:?}, prob: {prob:.3}");
-                        let tail = &sorted_selections[end_index - 1];
-                        if prob < lowest_prob {
-                            lowest_prob = prob;
-                            keep.push(tail.clone());
+                        let tail = &fringe_sorted_selections[end_index - 1];
+                        if prob < fringe_lowest_prob {
+                            fringe_lowest_prob = prob;
+                            fringe_keep.push(tail.clone());
                         } else {
-                            redundancies.push(tail.clone());
+                            fringe_redundancies.push(tail.clone());
                         }
                     }
-                    let price = 1.0 / lowest_prob / overround;
-                    let unrelated_prob = keep.iter().map(|selection| selection.prob).product::<f64>();
-                    let relatedness = unrelated_prob / lowest_prob;
-                    let redundancies = redundancies
+                    query_elapsed += query_start.elapsed();
+
+                    let probability = fringe_lowest_prob / (1.0 - fringe_pruned);
+                    let overround = fringe_keep
+                        .iter()
+                        .map(|selection| selection.single_overround)
+                        .product::<f64>();
+                    let price = 1.0 / probability / overround;
+                    let unrelated_prob = fringe_keep.iter().map(|selection| selection.single_prob).product::<f64>();
+                    let relatedness = unrelated_prob / probability;
+                    let redundancies = fringe_redundancies
                         .into_iter()
                         .map(|selection| (selection.offer_type, selection.outcome))
                         .collect::<Vec<_>>();
+
+                    // if LOG {
+                    //     trace!("probability: {probability:.3}, overround: {overround:.3}, price: {price:.3}, pruned: {:.3}", exploration.pruned);
+                    //     // for prospect in &exploration.prospects {
+                    //     //     trace!("  prospect: {prospect:?}");
+                    //     // }
+                    // }
                     fringes_vec.push(Fringe {
                         outcome: outcome.clone(),
                         quotation: DerivedPrice {
-                            probability: lowest_prob,
+                            probability,
                             price,
                         },
                         redundancies,
@@ -590,11 +633,25 @@ impl Model {
                 fringes.insert(offer_type.clone(), fringes_vec);
             }
 
+            debug!("pruned: {:.6}", pruned);
             debug!("cache stats: {:?}", caching_context.stats);
             debug!("elapsed: exploration: {exploration_elapsed:?}, query: {query_elapsed:?}");
+
+            let probability = lowest_prob / (1.0 - pruned);
+            let overround = keep
+                .iter()
+                .map(|selection| selection.single_overround)
+                .product::<f64>();
+            let price = 1.0 / probability / overround;
+            let unrelated_prob = keep.iter().map(|selection| selection.single_prob).product::<f64>();
+            let relatedness = unrelated_prob / probability;
+            let redundancies = redundancies
+                .into_iter()
+                .map(|selection| (selection.offer_type, selection.outcome))
+                .collect::<Vec<_>>();
             Ok(MultiDerivation {
                 quotation: DerivedPrice {
-                    probability: lowest_prob,
+                    probability,
                     price,
                 },
                 redundancies,
@@ -670,6 +727,18 @@ impl Model {
             .and_then(|player_probs| player_probs.assist)
             .ok_or_else(|| UnmetRequirement::PlayerAssistProbability(player.clone()))
     }
+}
+
+fn is_fringe_supported(offer_type: &OfferType) -> bool {
+    matches!(offer_type, OfferType::AnytimeAssist | OfferType::AnytimeGoalscorer)
+}
+
+fn selections_contain_offer_type(selections: &[(OfferType, Outcome)], search_offer_type: &OfferType) -> bool {
+    selections.iter().any(|(offer_type, _)| offer_type == search_offer_type)
+}
+
+fn selections_contains(selections: &[(OfferType, Outcome)], search_offer_type: &OfferType, search_outcome: &Outcome) -> bool {
+    selections.iter().any(|(offer_type, outcome)| offer_type == search_offer_type && outcome == search_outcome)
 }
 
 impl TryFrom<Config> for Model {
