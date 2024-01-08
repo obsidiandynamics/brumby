@@ -46,6 +46,14 @@ pub enum DrawHandicap {
     Ahead(u8),
     Behind(u8),
 }
+impl DrawHandicap {
+    pub fn to_win_handicap(&self) -> WinHandicap {
+        match self {
+            DrawHandicap::Ahead(by) => WinHandicap::AheadOver(*by),
+            DrawHandicap::Behind(by) => WinHandicap::BehindUnder(*by)
+        }
+    }
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum WinHandicap {
@@ -53,10 +61,17 @@ pub enum WinHandicap {
     BehindUnder(u8),
 }
 impl WinHandicap {
-    pub fn flip(&self) -> WinHandicap {
+    pub fn flip_european(&self) -> WinHandicap {
         match self {
             WinHandicap::AheadOver(by) => WinHandicap::BehindUnder(*by),
             WinHandicap::BehindUnder(by) => WinHandicap::AheadOver(*by),
+        }
+    }
+
+    pub fn flip_asian(&self) -> WinHandicap {
+        match self {
+            WinHandicap::AheadOver(by) => WinHandicap::BehindUnder(*by + 1),
+            WinHandicap::BehindUnder(by) => WinHandicap::AheadOver(*by - 1),
         }
     }
 }
@@ -66,6 +81,7 @@ pub enum OfferType {
     HeadToHead(Period, DrawHandicap),
     TotalGoals(Period, Over),
     CorrectScore(Period),
+    AsianHandicap(Period, WinHandicap),
     DrawNoBet(DrawHandicap),
     AnytimeGoalscorer,
     FirstGoalscorer,
@@ -79,6 +95,7 @@ impl OfferType {
             OfferType::TotalGoals(_, _) => OfferCategory::TotalGoals,
             OfferType::CorrectScore(_) => OfferCategory::CorrectScore,
             OfferType::DrawNoBet(_) => OfferCategory::DrawNoBet,
+            OfferType::AsianHandicap(_, _) => OfferCategory::AsianHandicap,
             OfferType::AnytimeGoalscorer => OfferCategory::AnytimeGoalscorer,
             OfferType::FirstGoalscorer => OfferCategory::FirstGoalscorer,
             OfferType::PlayerShotsOnTarget(_) => OfferCategory::PlayerShotsOnTarget,
@@ -92,11 +109,12 @@ pub enum OfferCategory {
     HeadToHead,
     TotalGoals,
     CorrectScore,
+    AsianHandicap,
     DrawNoBet,
     AnytimeGoalscorer,
     FirstGoalscorer,
     PlayerShotsOnTarget,
-    AnytimeAssist
+    AnytimeAssist,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Encode, Serialize, Deserialize)]

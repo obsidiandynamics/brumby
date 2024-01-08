@@ -180,6 +180,40 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::PlayerShotsOutsideBox(_, _) => {}
                 SoccerMarket::FirstHalfCornersOverUnder(_, _) => {}
                 SoccerMarket::SecondHalfCornersOverUnder(_, _) => {}
+                SoccerMarket::TwoWayHandicap(prices, handicap) => {
+                    let win_handicap = if handicap > 0.0 {
+                        WinHandicap::BehindUnder(handicap as u8 + 1)
+                    } else {
+                        WinHandicap::AheadOver(-handicap as u8)
+                    };
+                    // println!("handicap: {handicap}, prices: {prices:?}");
+                    // println!("home: {:?}, away: {:?}", win_handicap, win_handicap.flip_asian());
+                    offerings.insert(
+                        OfferType::AsianHandicap(Period::FullTime, win_handicap.clone()),
+                        HashMap::from([
+                            (Outcome::Win(Side::Home, win_handicap.clone()), prices.home),
+                            (Outcome::Win(Side::Away, win_handicap.flip_asian()), prices.away),
+                        ]),
+                    );
+                }
+                SoccerMarket::FirstHalfTwoWayHandicap(_, _) => {}
+                SoccerMarket::SecondHalfTwoWayHandicap(_, _) => {}
+                SoccerMarket::ThreeWayHandicap(h2h, handicap) => {
+                    let draw_handicap = if handicap > 0 {
+                        DrawHandicap::Behind(handicap as u8)
+                    } else {
+                        DrawHandicap::Ahead(-handicap as u8)
+                    };
+                    let win_handicap = draw_handicap.to_win_handicap();
+                    offerings.insert(
+                        OfferType::HeadToHead(Period::FullTime, draw_handicap.clone()),
+                        HashMap::from([
+                            (Outcome::Win(Side::Home, win_handicap.clone()), h2h.home),
+                            (Outcome::Win(Side::Away, win_handicap.flip_european()), h2h.away),
+                            (Outcome::Draw(draw_handicap), h2h.draw),
+                        ]),
+                    );
+                }
             }
         }
         Self {

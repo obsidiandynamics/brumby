@@ -5,6 +5,7 @@ use crate::interval::{Expansions, Prospect, Prospects};
 
 mod anytime_assist;
 mod anytime_goalscorer;
+mod asian_handicap;
 mod correct_score;
 mod first_goalscorer;
 mod head_to_head;
@@ -26,6 +27,7 @@ pub fn requirements(offer_type: &OfferType) -> Expansions {
         OfferType::HeadToHead(period, _) => head_to_head::requirements(period),
         OfferType::TotalGoals(period, _) => total_goals::requirements(period),
         OfferType::CorrectScore(period) => correct_score::requirements(period),
+        OfferType::AsianHandicap(period, _) => asian_handicap::requirements(period),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
@@ -44,6 +46,7 @@ pub fn prepare(
         OfferType::HeadToHead(_, _) => head_to_head::prepare(offer_type, outcome),
         OfferType::TotalGoals(_, _) => total_goals::prepare(offer_type, outcome),
         OfferType::CorrectScore(_) => correct_score::prepare(offer_type, outcome),
+        OfferType::AsianHandicap(_, _) => asian_handicap::prepare(offer_type, outcome),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
@@ -58,6 +61,7 @@ pub fn filter(offer_type: &OfferType, query: &QuerySpec, prospect: &Prospect) ->
         OfferType::HeadToHead(_, _) => head_to_head::filter(query, prospect),
         OfferType::TotalGoals(_, _) => total_goals::filter(query, prospect),
         OfferType::CorrectScore(_) => correct_score::filter(query, prospect),
+        OfferType::AsianHandicap(_, _) => asian_handicap::filter(query, prospect),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),

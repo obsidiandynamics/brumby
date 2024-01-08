@@ -81,7 +81,7 @@ fn to_win_handicap(draw_handicap: &DrawHandicap) -> WinHandicap {
 fn valid_outcomes(draw_handicap: &DrawHandicap) -> [Outcome; 3] {
     [
         Outcome::Win(Side::Home, to_win_handicap(draw_handicap)),
-        Outcome::Win(Side::Away, to_win_handicap(draw_handicap).flip()),
+        Outcome::Win(Side::Away, to_win_handicap(draw_handicap).flip_european()),
         Outcome::Draw(draw_handicap.clone()),
     ]
 }

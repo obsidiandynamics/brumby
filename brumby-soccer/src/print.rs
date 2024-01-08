@@ -25,7 +25,7 @@ pub fn tabulate_offer(offer: &Offer) -> Table {
                         Styles::default(),
                         vec![
                             format!("{outcome:?}").into(),
-                            format!("{:.2}", offer.market.prices[index]).into(),
+                            format!("{:.3}", offer.market.prices[index]).into(),
                         ],
                     )
                 }),

@@ -29,7 +29,7 @@ use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
-const SINGLE_PRICE_BOUNDS: PriceBounds = 1.01..=301.0;
+const SINGLE_PRICE_BOUNDS: PriceBounds = 1.001..=301.0;
 const INTERVALS: u8 = 18;
 const INCREMENTAL_OVERROUND: f64 = 0.01;
 const MAX_TOTAL_GOALS: u16 = 8;
@@ -110,6 +110,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 OfferType::HeadToHead(_, _)
                 | OfferType::TotalGoals(_, _)
                 | OfferType::CorrectScore(_)
+                | OfferType::AsianHandicap(_, _)
                 | OfferType::DrawNoBet(_) => 1.0,
                 OfferType::AnytimeGoalscorer
                 | OfferType::FirstGoalscorer
@@ -164,6 +165,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 offer_type,
                 OfferType::HeadToHead(_, _)
                     | OfferType::TotalGoals(_, _)
+                    | OfferType::AsianHandicap(_, _)
                     | OfferType::CorrectScore(_)
                     | OfferType::FirstGoalscorer
                     | OfferType::AnytimeGoalscorer
@@ -252,7 +254,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .collect::<Vec<_>>(),
         );
         info!(
-            "Fitting errors and overrounds:\n{}",
+            "Fitting errors and overrounds: ({} offers)\n{}",
+            model.offers().len(),
             Console::default().render(&tables::merge(&[fitting_errors, overrounds]))
         );
     }

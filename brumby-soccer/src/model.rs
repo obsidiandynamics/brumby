@@ -378,7 +378,7 @@ impl Model {
         if selections.is_empty() {
             return Err(MultiDerivationError::NoSelections(NoSelections));
         }
-        const PRUNE_MIN_PROB: f64 = 1e-5;
+        const PRUNE_MIN_PROB: f64 = 0.0;//1e-5;
 
         Timed::result(|| {
             let mut caching_context = CachingContext::default();
