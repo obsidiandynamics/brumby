@@ -34,15 +34,15 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(offer_type: &OfferType, outcome: &Outcome) -> QuerySpec {
-    QuerySpec::PassThrough(offer_type.clone(), outcome.clone())
+pub(crate) fn prepare() -> QuerySpec {
+    QuerySpec::Stateless
 }
 
 #[inline]
 #[must_use]
-pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
-    match query {
-        QuerySpec::PassThrough(OfferType::CorrectScore(period), Outcome::Score(score)) => {
+pub(crate) fn filter(period: &Period, outcome: &Outcome, prospect: &Prospect) -> bool {
+    match outcome {
+        Outcome::Score(score) => {
             let (home_goals, away_goals) = match period {
                 Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
                 Period::SecondHalf => { let h2_score = prospect.h2_score(); (h2_score.home, h2_score.away) },
@@ -50,6 +50,6 @@ pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
             };
             score.home == home_goals && score.away == away_goals
         }
-        _ => panic!("{query:?} unsupported"),
+        _ => panic!("{outcome:?} unsupported"),
     }
 }

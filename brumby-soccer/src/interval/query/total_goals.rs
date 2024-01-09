@@ -34,27 +34,22 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(offer_type: &OfferType, outcome: &Outcome) -> QuerySpec {
-    QuerySpec::PassThrough(offer_type.clone(), outcome.clone())
+pub(crate) fn prepare() -> QuerySpec {
+    QuerySpec::Stateless
 }
 
 #[inline]
 #[must_use]
-pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
-    match query {
-        QuerySpec::PassThrough(OfferType::TotalGoals(period, _), outcome) => {
-            let (home_goals, away_goals) = match period {
-                Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
-                Period::SecondHalf => { let h2_score = prospect.h2_score(); (h2_score.home, h2_score.away) },
-                Period::FullTime => (prospect.ft_score.home, prospect.ft_score.away),
-            };
+pub(crate) fn filter(period: &Period, outcome: &Outcome, prospect: &Prospect) -> bool {
+    let (home_goals, away_goals) = match period {
+        Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
+        Period::SecondHalf => { let h2_score = prospect.h2_score(); (h2_score.home, h2_score.away) },
+        Period::FullTime => (prospect.ft_score.home, prospect.ft_score.away),
+    };
 
-            match outcome {
-                Outcome::Over(limit) => home_goals + away_goals > *limit,
-                Outcome::Under(limit) => away_goals + home_goals < *limit,
-                _ => panic!("{outcome:?} unsupported"),
-            }
-        }
-        _ => panic!("{query:?} unsupported"),
+    match outcome {
+        Outcome::Over(limit) => home_goals + away_goals > *limit,
+        Outcome::Under(limit) => away_goals + home_goals < *limit,
+        _ => panic!("{outcome:?} unsupported"),
     }
 }

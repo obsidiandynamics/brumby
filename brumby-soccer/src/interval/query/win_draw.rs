@@ -1,5 +1,8 @@
+//! Handling of handicaps with win and draw outcomes, common to `HeadToHead` and `AsianHandicap`
+//! offer types.
+
 use super::*;
-use crate::domain::{Period, Side, WinHandicap};
+use crate::domain::{DrawHandicap, Period, Side, WinHandicap};
 
 #[inline]
 #[must_use]
@@ -34,41 +37,44 @@ pub(crate) fn requirements(period: &Period) -> Expansions {
 
 #[inline]
 #[must_use]
-pub(crate) fn prepare(offer_type: &OfferType, outcome: &Outcome) -> QuerySpec {
-    QuerySpec::PassThrough(offer_type.clone(), outcome.clone())
+pub(crate) fn prepare() -> QuerySpec {
+    QuerySpec::Stateless
 }
 
 #[inline]
 #[must_use]
-pub(crate) fn filter(query: &QuerySpec, prospect: &Prospect) -> bool {
-    match query {
-        QuerySpec::PassThrough(OfferType::AsianHandicap(period, _), outcome) => {
-            let (home_goals, away_goals) = match period {
-                Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
-                Period::SecondHalf => {
-                    let h2_score = prospect.h2_score();
-                    (h2_score.home, h2_score.away)
-                }
-                Period::FullTime => (prospect.ft_score.home, prospect.ft_score.away),
-            };
-
-            match outcome {
-                Outcome::Win(Side::Home, win_handicap) => match win_handicap {
-                    WinHandicap::AheadOver(by) => home_goals.saturating_sub(away_goals) > *by,
-                    WinHandicap::BehindUnder(by) => {
-                        home_goals > away_goals || away_goals - home_goals < *by
-                    }
-                },
-                Outcome::Win(Side::Away, win_handicap) => match win_handicap {
-                    WinHandicap::AheadOver(by) => away_goals.saturating_sub(home_goals) > *by,
-                    WinHandicap::BehindUnder(by) => {
-                        away_goals > home_goals || home_goals - away_goals < *by
-                    }
-                },
-                _ => panic!("{outcome:?} unsupported"),
-            }
+pub(crate) fn filter(period: &Period, outcome: &Outcome, prospect: &Prospect) -> bool {
+    let (home_goals, away_goals) = match period {
+        Period::FirstHalf => (prospect.ht_score.home, prospect.ht_score.away),
+        Period::SecondHalf => {
+            let h2_score = prospect.h2_score();
+            (h2_score.home, h2_score.away)
         }
-        _ => panic!("{query:?} unsupported"),
+        Period::FullTime => (prospect.ft_score.home, prospect.ft_score.away),
+    };
+
+    match outcome {
+        Outcome::Win(Side::Home, win_handicap) => match win_handicap {
+            WinHandicap::AheadOver(by) => home_goals.saturating_sub(away_goals) > *by,
+            WinHandicap::BehindUnder(by) => {
+                home_goals > away_goals || away_goals - home_goals < *by
+            }
+        },
+        Outcome::Win(Side::Away, win_handicap) => match win_handicap {
+            WinHandicap::AheadOver(by) => away_goals.saturating_sub(home_goals) > *by,
+            WinHandicap::BehindUnder(by) => {
+                away_goals > home_goals || home_goals - away_goals < *by
+            }
+        },
+        Outcome::Draw(draw_handicap) => match draw_handicap {
+            DrawHandicap::Ahead(by) => {
+                home_goals >= away_goals && home_goals - away_goals == *by
+            }
+            DrawHandicap::Behind(by) => {
+                away_goals >= home_goals && away_goals - home_goals == *by
+            }
+        },
+        _ => panic!("{outcome:?} unsupported"),
     }
 }
 
@@ -118,7 +124,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.65,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::AheadOver(0)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
                 &Outcome::Win(Side::Home, WinHandicap::AheadOver(0)),
                 &exploration.prospects,
                 &exploration.player_lookup
@@ -127,7 +133,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.15,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::AheadOver(0)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
                 &Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)),
                 &exploration.prospects,
                 &exploration.player_lookup
@@ -141,7 +147,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.4,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::AheadOver(1)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(1)),
                 &Outcome::Win(Side::Home, WinHandicap::AheadOver(1)),
                 &exploration.prospects,
                 &exploration.player_lookup
@@ -150,7 +156,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.35,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::AheadOver(1)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(1)),
                 &Outcome::Win(Side::Away, WinHandicap::BehindUnder(1)),
                 &exploration.prospects,
                 &exploration.player_lookup
@@ -164,7 +170,7 @@ mod tests {
         assert_float_absolute_eq!(
             0.85,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::BehindUnder(1)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
                 &Outcome::Win(Side::Home, WinHandicap::BehindUnder(1)),
                 &exploration.prospects,
                 &exploration.player_lookup
@@ -173,8 +179,45 @@ mod tests {
         assert_float_absolute_eq!(
             0.05,
             isolate(
-                &OfferType::AsianHandicap(Period::FullTime, WinHandicap::BehindUnder(1)),
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
                 &Outcome::Win(Side::Away, WinHandicap::AheadOver(1)),
+                &exploration.prospects,
+                &exploration.player_lookup
+            )
+        );
+    }
+
+    #[test]
+    pub fn draw_gather() {
+        let exploration = create_test_4x4_exploration();
+        assert_float_absolute_eq!(
+            0.2,
+            isolate(
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
+                &Outcome::Draw(DrawHandicap::Ahead(0)),
+                &exploration.prospects,
+                &exploration.player_lookup
+            )
+        );
+    }
+
+    #[test]
+    pub fn draw_handicap_1_gather() {
+        let exploration = create_test_4x4_exploration();
+        assert_float_absolute_eq!(
+            0.25,
+            isolate(
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(1)),
+                &Outcome::Draw(DrawHandicap::Ahead(1)),
+                &exploration.prospects,
+                &exploration.player_lookup
+            )
+        );
+        assert_float_absolute_eq!(
+            0.1,
+            isolate(
+                &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(1)),
+                &Outcome::Draw(DrawHandicap::Behind(1)),
                 &exploration.prospects,
                 &exploration.player_lookup
             )

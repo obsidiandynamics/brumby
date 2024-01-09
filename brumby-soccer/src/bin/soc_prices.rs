@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -14,6 +14,7 @@ use stanza::renderer::Renderer;
 use stanza::style::Styles;
 use stanza::table::{Cell, Content, Row, Table};
 use tracing::{debug, info, warn};
+use brumby::derived_price::DerivedPrice;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
@@ -30,6 +31,7 @@ use brumby_soccer::model::score_fitter::ScoreFitter;
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.001..=301.0;
+const MULTI_PRICE_BOUNDS: PriceBounds = 1.001..=1001.0;
 const INTERVALS: u8 = 18;
 const INCREMENTAL_OVERROUND: f64 = 0.01;
 const MAX_TOTAL_GOALS: u16 = 8;
@@ -277,24 +279,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // let relatedness =
         //     compute_relatedness_coefficient(&selections, model.offers(), derivation.probability);
         let scaling_exponent = compute_scaling_exponent(derivation.relatedness);
-        let scaled_price = derivation.quotation.price
-            / derivation
-                .quotation
-                .overround()
-                .powf(scaling_exponent - 1.0);
+        let scaled_price = scale_price(&derivation.quotation, scaling_exponent);
         info!("selections: {selections:?}, quotation: {:?}, overround: {:.3}, relatedness: {:.3}, redundancies: {:?}, scaling_exponent: {scaling_exponent:?}, scaled_price: {scaled_price:.3}, took: {elapsed:?}",
             derivation.quotation, derivation.quotation.overround(), derivation.relatedness, derivation.redundancies);
         let mut total_fringes = 0;
         let mut unattainable_fringes = 0;
-        for (offer, fringe_vec) in derivation.fringes {
-            info!("fringe offer: {offer:?}");
+        for (offer, fringe_vec) in derivation.fringes.into_iter().collect::<BTreeMap<_, _>>() {
+            info!("\nfringe offer: {offer:?}");
             for fringe in fringe_vec {
                 let scaling_exponent = compute_scaling_exponent(fringe.relatedness);
-                let scaled_price = fringe.quotation.price
-                    / fringe
-                    .quotation
-                    .overround()
-                    .powf(scaling_exponent - 1.0);
+                let scaled_price = scale_price(&fringe.quotation, scaling_exponent);
                 total_fringes += 1;
                 if fringe.quotation.probability == 0.0 {
                     unattainable_fringes += 1;
@@ -307,28 +301,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// fn compute_unrelated_probability(
-//     selections: &[(OfferType, Outcome)],
-//     offers: &FxHashMap<OfferType, Offer>,
-// ) -> f64 {
-//     selections
-//         .iter()
-//         .map(|(offer_type, outcome)| {
-//             let offer = offers.get(offer_type).unwrap();
-//             let outcome_index = offer.outcomes.index_of(outcome).unwrap();
-//             offer.market.probs[outcome_index]
-//         })
-//         .product()
-// }
-
-// fn compute_relatedness_coefficient(
-//     selections: &[(OfferType, Outcome)],
-//     offers: &FxHashMap<OfferType, Offer>,
-//     related_prob: f64,
-// ) -> f64 {
-//     let unrelated_prob = compute_unrelated_probability(selections, offers);
-//     unrelated_prob / related_prob
-// }
+fn scale_price(quotation: &DerivedPrice, scaling_exponent: f64) -> f64 {
+    if quotation.price.is_finite() {
+        let scaled_price = quotation.price
+            / quotation
+            .overround()
+            .powf(scaling_exponent - 1.0);
+        f64::max(*MULTI_PRICE_BOUNDS.start(), f64::min(scaled_price, *MULTI_PRICE_BOUNDS.end()))
+    } else {
+        quotation.price
+    }
+}
 
 fn compute_scaling_exponent(relatedness: f64) -> f64 {
     0.5 * f64::log10(100.0 * relatedness)

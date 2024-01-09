@@ -337,7 +337,7 @@ impl Model {
                 market,
             }
         } else {
-            // let LOG = stub.offer_type == TotalGoals(Period::FirstHalf, Over(4)); //TODO
+            // let LOG = stub.offer_type == OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)); //TODO
             // if LOG {
             //     trace!("reqs: {reqs:?}");
             // }
@@ -499,6 +499,7 @@ impl Model {
                 let mut fringes_vec = Vec::with_capacity(offer.outcomes.len());
                 for (outcome_index, outcome) in offer.outcomes.items().iter().enumerate() {
                     // let LOG = offer_type == &TotalGoals(Period::FirstHalf, Over(4)) && outcome == &Outcome::Over(4);
+                    // let LOG = offer_type == &OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)) && outcome == &Outcome::Win(Side::Home, WinHandicap::AheadOver(0));
 
                     let single_prob = offer.market.probs[outcome_index];
                     if single_prob == 0.0 {
@@ -589,7 +590,7 @@ impl Model {
                             .collect::<Vec<_>>();
                         let prob =
                             query::isolate_set(&prefix, &exploration.prospects, &exploration.player_lookup);
-                        // debug!("prefix: {prefix:?}, prob: {prob:.3}");
+                        // if LOG { trace!("fringe prefix: {prefix:?}, prob: {prob:.3}"); }
                         let tail = &fringe_sorted_selections[end_index - 1];
                         if prob < fringe_lowest_prob {
                             fringe_lowest_prob = prob;

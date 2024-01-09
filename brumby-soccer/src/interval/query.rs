@@ -5,16 +5,14 @@ use crate::interval::{Expansions, Prospect, Prospects};
 
 mod anytime_assist;
 mod anytime_goalscorer;
-mod asian_handicap;
 mod correct_score;
 mod first_goalscorer;
-mod head_to_head;
+mod win_draw;
 mod total_goals;
 
 #[derive(Debug)]
 pub enum QuerySpec {
-    None,
-    PassThrough(OfferType, Outcome),
+    Stateless,
     PlayerLookup(usize),
     NoFirstGoalscorer,
     NoAnytimeGoalscorer,
@@ -24,10 +22,10 @@ pub enum QuerySpec {
 #[must_use]
 pub fn requirements(offer_type: &OfferType) -> Expansions {
     match offer_type {
-        OfferType::HeadToHead(period, _) => head_to_head::requirements(period),
+        OfferType::HeadToHead(period, _) => win_draw::requirements(period),
         OfferType::TotalGoals(period, _) => total_goals::requirements(period),
         OfferType::CorrectScore(period) => correct_score::requirements(period),
-        OfferType::AsianHandicap(period, _) => asian_handicap::requirements(period),
+        OfferType::AsianHandicap(period, _) => win_draw::requirements(period),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
@@ -43,10 +41,10 @@ pub fn prepare(
     player_lookup: &HashLookup<Player>,
 ) -> QuerySpec {
     match offer_type {
-        OfferType::HeadToHead(_, _) => head_to_head::prepare(offer_type, outcome),
-        OfferType::TotalGoals(_, _) => total_goals::prepare(offer_type, outcome),
-        OfferType::CorrectScore(_) => correct_score::prepare(offer_type, outcome),
-        OfferType::AsianHandicap(_, _) => asian_handicap::prepare(offer_type, outcome),
+        OfferType::HeadToHead(_, _) => win_draw::prepare(),
+        OfferType::TotalGoals(_, _) => total_goals::prepare(),
+        OfferType::CorrectScore(_) => correct_score::prepare(),
+        OfferType::AsianHandicap(_, _) => win_draw::prepare(),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
@@ -56,12 +54,12 @@ pub fn prepare(
 }
 
 #[must_use]
-pub fn filter(offer_type: &OfferType, query: &QuerySpec, prospect: &Prospect) -> bool {
+pub fn filter(offer_type: &OfferType, outcome: &Outcome, query: &QuerySpec, prospect: &Prospect) -> bool {
     match offer_type {
-        OfferType::HeadToHead(_, _) => head_to_head::filter(query, prospect),
-        OfferType::TotalGoals(_, _) => total_goals::filter(query, prospect),
-        OfferType::CorrectScore(_) => correct_score::filter(query, prospect),
-        OfferType::AsianHandicap(_, _) => asian_handicap::filter(query, prospect),
+        OfferType::HeadToHead(period, _) => win_draw::filter(period, outcome, prospect),
+        OfferType::TotalGoals(period, _) => total_goals::filter(period, outcome, prospect),
+        OfferType::CorrectScore(period) => correct_score::filter(period, outcome, prospect),
+        OfferType::AsianHandicap(period, _) => win_draw::filter(period, outcome, prospect),
         OfferType::DrawNoBet(_) => unimplemented!(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),
@@ -80,7 +78,7 @@ pub fn isolate(
     let query = prepare(offer_type, outcome, player_lookup);
     prospects
         .iter()
-        .filter(|(prospect, _)| filter(offer_type, &query, prospect))
+        .filter(|(prospect, _)| filter(offer_type, outcome, &query, prospect))
         .map(|(_, prob)| prob)
         .sum()
 }
@@ -94,7 +92,7 @@ pub fn isolate_set(
     let queries = selections
         .iter()
         .map(|(offer_type, outcome)| {
-            (offer_type, prepare(offer_type, outcome, player_lookup))
+            (offer_type, outcome, prepare(offer_type, outcome, player_lookup))
         })
         .collect::<Vec<_>>();
     prospects
@@ -102,7 +100,7 @@ pub fn isolate_set(
         .filter(|(prospect, _)| {
             !queries
                 .iter()
-                .any(|(offer_type, query)| !filter(offer_type, query, prospect))
+                .any(|(offer_type, outcome, query)| !filter(offer_type, outcome, query, prospect))
         })
         .map(|(_, prospect_prob)| prospect_prob)
         .sum()
