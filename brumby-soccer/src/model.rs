@@ -490,6 +490,47 @@ impl Model {
             selections.sort_by(|s1, s2| s1.single_prob.total_cmp(&s2.single_prob))
         }
 
+        struct ScanPrefixResult {
+            keep: Vec<DetailedSelection>,
+            drop: Vec<DetailedSelection>,
+            lowest_prob: f64,
+        }
+
+        #[inline(always)]
+        fn scan_prefix(sorted_selections: &[DetailedSelection], exploration: &Exploration) -> ScanPrefixResult {
+            let mut keep = Vec::with_capacity(sorted_selections.len());
+            let mut drop = vec![];
+            let mut lowest_prob = f64::MAX;
+
+            for end_index in 1..=sorted_selections.len() {
+                let prefix = sorted_selections[0..end_index]
+                    .iter()
+                    .map(|selection| {
+                        (selection.offer_type.clone(), selection.outcome.clone())
+                    })
+                    .collect::<Vec<_>>();
+                let prob = query::isolate_set(
+                    &prefix,
+                    &exploration.prospects,
+                    &exploration.player_lookup,
+                );
+                // if LOG { trace!("fringe prefix: {prefix:?}, prob: {prob:.3}"); }
+                let tail = &sorted_selections[end_index - 1];
+                if prob < lowest_prob {
+                    lowest_prob = prob;
+                    keep.push(tail.clone());
+                } else {
+                    drop.push(tail.clone());
+                }
+            }
+
+            ScanPrefixResult {
+                keep,
+                drop,
+                lowest_prob,
+            }
+        }
+
         Timed::result(|| {
             let mut caching_context = CachingContext::default();
             let mut agg_player_probs = FxHashMap::<Player, PlayerProbs>::with_capacity_and_hasher(
@@ -553,51 +594,31 @@ impl Model {
                 expansions: agg_reqs.clone(),
             };
 
-            let pruned;
-            let mut keep = Vec::with_capacity(sorted_selections.len());
-            let mut redundancies = vec![];
-            let mut lowest_prob = f64::MAX;
-            {
-                let exploration_start = Instant::now();
-                let exploration = caching_context.explore(CacheableIntervalArgs {
-                    config,
-                    include_intervals: 0..self.config.intervals,
-                });
-                exploration_elapsed += exploration_start.elapsed();
-                trace!(
-                    "prospects: {}, took: {:?}",
-                    exploration.prospects.len(),
-                    exploration_start.elapsed()
-                );
-                pruned = exploration.pruned;
-                let query_start = Instant::now();
-                for end_index in 1..=sorted_selections.len() {
-                    let prefix = sorted_selections[0..end_index]
-                        .iter()
-                        .map(|selection| (selection.offer_type.clone(), selection.outcome.clone()))
-                        .collect::<Vec<_>>();
-                    let prob = query::isolate_set(
-                        &prefix,
-                        &exploration.prospects,
-                        &exploration.player_lookup,
-                    );
-                    trace!("prefix: {prefix:?}, prob: {prob:.3}");
-                    let tail = &sorted_selections[end_index - 1];
-                    if prob < lowest_prob {
-                        lowest_prob = prob;
-                        keep.push(tail.clone());
-                    } else {
-                        redundancies.push(tail.clone());
-                    }
-                }
-                query_elapsed += query_start.elapsed();
-            }
+            let exploration_start = Instant::now();
+            let exploration = caching_context.explore(CacheableIntervalArgs {
+                config,
+                include_intervals: 0..self.config.intervals,
+            });
+            exploration_elapsed += exploration_start.elapsed();
+            trace!(
+                "prospects: {}, took: {:?}",
+                exploration.prospects.len(),
+                exploration_start.elapsed()
+            );
+            let pruned = exploration.pruned;
+            let query_start = Instant::now();
+            let scan_result = scan_prefix(&sorted_selections, &exploration);
+            query_elapsed += query_start.elapsed();
 
             let mut fringes =
                 FxHashMap::with_capacity_and_hasher(self.offers.len(), Default::default());
 
             // fringes
             for (offer_type, offer) in &self.offers {
+                if offer_type.is_auxiliary() {
+                    continue;
+                }
+
                 if !is_fringe_supported(offer_type)
                     && selections_contain_offer_type(selections, offer_type)
                 {
@@ -606,7 +627,7 @@ impl Model {
                 let reqs = requirements(offer_type);
                 let reuse_exploration =
                     !reqs.requires_player_goal_probs() && !reqs.requires_player_assist_probs();
-                let mut exploration = None;
+                let mut fringe_exploration = None;
                 let mut fringes_vec = Vec::with_capacity(offer.outcomes.len());
                 for (outcome_index, outcome) in offer.outcomes.items().iter().enumerate() {
                     // let LOG = offer_type == &TotalGoals(Period::FirstHalf, Over(4)) && outcome == &Outcome::Over(4);
@@ -623,8 +644,8 @@ impl Model {
                     // if LOG {
                     //     trace!("price: {single_price:.3}, prob: {single_prob:.3}, overround: {single_overround:.3}");
                     // }
-                    let mut fringe_sorted_selections = Vec::with_capacity(keep.len() + 1);
-                    fringe_sorted_selections.clone_from(&keep);
+                    let mut fringe_sorted_selections = Vec::with_capacity(scan_result.keep.len() + 1);
+                    fringe_sorted_selections.clone_from(&scan_result.keep);
                     fringe_sorted_selections.push(selection);
                     sort_selections_by_increasing_prob(&mut fringe_sorted_selections);
 
@@ -659,55 +680,31 @@ impl Model {
                         expansions: fringe_agg_reqs.clone(),
                     };
 
-                    if exploration.is_none() || !reuse_exploration {
+                    if fringe_exploration.is_none() || !reuse_exploration {
                         let exploration_start = Instant::now();
-                        exploration = Some(caching_context.explore(CacheableIntervalArgs {
+                        fringe_exploration = Some(caching_context.explore(CacheableIntervalArgs {
                             config,
                             include_intervals: 0..self.config.intervals,
                         }));
                         exploration_elapsed += exploration_start.elapsed();
                         trace!(
                             "fringe {offer_type:?}/{outcome:?}, prospects: {}, took {:?}",
-                            exploration.unwrap().prospects.len(),
+                            fringe_exploration.unwrap().prospects.len(),
                             exploration_start.elapsed()
                         );
                     }
-                    let exploration = exploration.unwrap();
-
-                    let mut fringe_keep = Vec::with_capacity(fringe_sorted_selections.len());
-                    let mut fringe_redundancies = vec![];
-                    let mut fringe_lowest_prob = f64::MAX;
+                    let fringe_exploration = fringe_exploration.unwrap();
 
                     let query_start = Instant::now();
-                    for end_index in 1..=fringe_sorted_selections.len() {
-                        let prefix = fringe_sorted_selections[0..end_index]
-                            .iter()
-                            .map(|selection| {
-                                (selection.offer_type.clone(), selection.outcome.clone())
-                            })
-                            .collect::<Vec<_>>();
-                        let prob = query::isolate_set(
-                            &prefix,
-                            &exploration.prospects,
-                            &exploration.player_lookup,
-                        );
-                        // if LOG { trace!("fringe prefix: {prefix:?}, prob: {prob:.3}"); }
-                        let tail = &fringe_sorted_selections[end_index - 1];
-                        if prob < fringe_lowest_prob {
-                            fringe_lowest_prob = prob;
-                            fringe_keep.push(tail.clone());
-                        } else {
-                            fringe_redundancies.push(tail.clone());
-                        }
-                    }
+                    let fringe_scan_result = scan_prefix(&fringe_sorted_selections, &fringe_exploration);
                     query_elapsed += query_start.elapsed();
 
-                    let probability = fringe_lowest_prob;
-                    let overround = product_of_overrounds(&fringe_keep);
+                    let probability = fringe_scan_result.lowest_prob;
+                    let overround = product_of_overrounds(&fringe_scan_result.keep);
                     let price = 1.0 / probability / overround;
-                    let unrelated_prob = product_of_unrelated_probs(&fringe_keep);
+                    let unrelated_prob = product_of_unrelated_probs(&fringe_scan_result.keep);
                     let relatedness = unrelated_prob / probability;
-                    let redundancies = strip_details(fringe_redundancies);
+                    let redundancies = strip_details(fringe_scan_result.drop);
 
                     // if LOG {
                     //     trace!("probability: {probability:.3}, overround: {overround:.3}, price: {price:.3}, pruned: {:.3}", exploration.pruned);
@@ -730,12 +727,12 @@ impl Model {
             debug!("cache stats: {:?}", caching_context.stats);
             debug!("elapsed: exploration: {exploration_elapsed:?}, query: {query_elapsed:?}");
 
-            let probability = lowest_prob;
-            let overround = product_of_overrounds(&keep);
+            let probability = scan_result.lowest_prob;
+            let overround = product_of_overrounds(&scan_result.keep);
             let price = 1.0 / probability / overround;
-            let unrelated_prob = product_of_unrelated_probs(&keep);
+            let unrelated_prob = product_of_unrelated_probs(&scan_result.keep);
             let relatedness = unrelated_prob / probability;
-            let redundancies = strip_details(redundancies);
+            let redundancies = strip_details(scan_result.drop);
             Ok(MultiDerivation {
                 quotation: DerivedPrice { probability, price },
                 redundancies,

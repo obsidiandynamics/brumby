@@ -20,13 +20,14 @@ pub enum QuerySpec {
 }
 
 #[must_use]
+#[inline]
 pub fn requirements(offer_type: &OfferType) -> Expansions {
     match offer_type {
         OfferType::HeadToHead(period, _) => win_draw::requirements(period),
         OfferType::TotalGoals(period, _) => total_goals::requirements(period),
         OfferType::CorrectScore(period) => correct_score::requirements(period),
         OfferType::AsianHandicap(period, _) => win_draw::requirements(period),
-        OfferType::DrawNoBet(_) => unimplemented!(),
+        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -35,6 +36,7 @@ pub fn requirements(offer_type: &OfferType) -> Expansions {
 }
 
 #[must_use]
+#[inline]
 pub fn prepare(
     offer_type: &OfferType,
     outcome: &Outcome,
@@ -45,7 +47,7 @@ pub fn prepare(
         OfferType::TotalGoals(_, _) => total_goals::prepare(),
         OfferType::CorrectScore(_) => correct_score::prepare(),
         OfferType::AsianHandicap(_, _) => win_draw::prepare(),
-        OfferType::DrawNoBet(_) => unimplemented!(),
+        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -54,13 +56,14 @@ pub fn prepare(
 }
 
 #[must_use]
+#[inline]
 pub fn filter(offer_type: &OfferType, outcome: &Outcome, query: &QuerySpec, prospect: &Prospect) -> bool {
     match offer_type {
         OfferType::HeadToHead(period, _) => win_draw::filter(period, outcome, prospect),
         OfferType::TotalGoals(period, _) => total_goals::filter(period, outcome, prospect),
         OfferType::CorrectScore(period) => correct_score::filter(period, outcome, prospect),
         OfferType::AsianHandicap(period, _) => win_draw::filter(period, outcome, prospect),
-        OfferType::DrawNoBet(_) => unimplemented!(),
+        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
@@ -69,6 +72,7 @@ pub fn filter(offer_type: &OfferType, outcome: &Outcome, query: &QuerySpec, pros
 }
 
 #[must_use]
+#[inline]
 pub fn isolate(
     offer_type: &OfferType,
     outcome: &Outcome,
@@ -84,6 +88,7 @@ pub fn isolate(
 }
 
 #[must_use]
+#[inline]
 pub fn isolate_set(
     selections: &[(OfferType, Outcome)],
     prospects: &Prospects,
