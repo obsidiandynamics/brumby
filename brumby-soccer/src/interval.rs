@@ -248,6 +248,7 @@ enum Half {
     Second,
 }
 
+#[inline]
 pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
     config.expansions.validate();
 
@@ -285,7 +286,6 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
         }
     }
     player_lookup.push(Player::Other);
-    // let other_player_index = config.player_probs.len();
     home_scorers.push((
         config.player_probs.len(),
         1.0 - combined_home_player_goal_prob,
@@ -299,7 +299,7 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
 
     let mut current_prospects = init_prospects(1);
     current_prospects.insert(Prospect::init(player_lookup.len()), 1.0);
-    let mut pruned = 0.0;
+    let mut pruned = vec![];
 
     for interval in include_intervals {
         let half = if interval < config.intervals / 2 {
@@ -317,7 +317,7 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
 
         for (current_prospect, current_prob) in current_prospects {
             if current_prob < config.prune_thresholds.min_prob {
-                pruned += current_prob;
+                pruned.push((current_prospect, current_prob));
                 continue;
             }
 
@@ -391,7 +391,9 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
                     }
                 }
             } else {
-                pruned += current_prob * (params.home + params.away);
+                pruned.push((current_prospect, current_prob * (params.home + params.away + params.common)));
+                // no point continuing to the at-least-two case if at-least-one isn't satisfied
+                continue;
             }
 
             // at least two more goals allowed before pruning
@@ -436,21 +438,34 @@ pub fn explore(config: &Config, include_intervals: Range<u8>) -> Exploration {
                     }
                 }
             } else {
-                pruned += current_prob * params.common;
+                pruned.push((current_prospect, current_prob * params.common));
             }
         }
 
         current_prospects = next_prospects;
     }
 
+    let mut pruned_prob = 0.0;
+    pruned.into_iter().for_each(|(prospect, prob)| {
+        pruned_prob += prob;
+        upsert_prospect(&mut current_prospects, prospect, prob);
+    });
+
+    #[cfg(debug_assertions)]
+    {
+        let prob_sum = current_prospects.values().sum::<f64>();
+        const EPSILON: f64 = 1e-6;
+        assert!((1.0 - EPSILON..1.0 + EPSILON).contains(&prob_sum), "unexpected prob_sum: {prob_sum}");
+    }
+
     Exploration {
         player_lookup,
         prospects: current_prospects,
-        pruned,
+        pruned: pruned_prob,
     }
 }
 
-#[inline]
+#[inline(always)]
 fn merge(
     expansions: &Expansions,
     half: &Half,
@@ -527,10 +542,15 @@ fn merge(
         }
     }
 
-    next_prospects
-        .entry(merged)
-        .and_modify(|prob| *prob += merged_prob)
-        .or_insert(merged_prob);
+    upsert_prospect(next_prospects, merged, merged_prob);
+}
+
+#[inline(always)]
+fn upsert_prospect(prospects: &mut Prospects, prospect: Prospect, probability: f64) {
+    prospects
+        .entry(prospect)
+        .and_modify(|prob| *prob += probability)
+        .or_insert(probability);
 }
 
 #[cfg(test)]

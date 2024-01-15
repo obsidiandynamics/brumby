@@ -32,9 +32,9 @@ use brumby_soccer::model::score_fitter::ScoreFitter;
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.001..=301.0;
 const MULTI_PRICE_BOUNDS: PriceBounds = 1.001..=1001.0;
-const INTERVALS: u8 = 18;
+const INTERVALS: u8 = 8;
 const INCREMENTAL_OVERROUND: f64 = 0.01;
-const MAX_TOTAL_GOALS: u16 = 8;
+const MAX_TOTAL_GOALS: u16 = 18;
 
 #[derive(Debug, clap::Parser, Clone)]
 struct Args {
@@ -168,6 +168,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 OfferType::HeadToHead(_, _)
                     | OfferType::TotalGoals(_, _)
                     | OfferType::AsianHandicap(_, _)
+                    | OfferType::DrawNoBet(_)
                     | OfferType::CorrectScore(_)
                     | OfferType::FirstGoalscorer
                     | OfferType::AnytimeGoalscorer

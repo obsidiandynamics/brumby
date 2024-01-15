@@ -64,38 +64,6 @@ pub fn away_booksum(offer: &Offer) -> f64 {
         .sum()
 }
 
-// pub fn fit_scoregrid_half(offers: &[&Offer]) -> HypergridSearchOutcome {
-//     let init_estimates = {
-//         let start = Instant::now();
-//         let search_outcome = fit_bivariate_poisson_scoregrid(offers, MAX_TOTAL_GOALS_HALF);
-//         let elapsed = start.elapsed();
-//         println!("biv-poisson: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}", expectation_from_lambdas(&search_outcome.optimal_values));
-//         search_outcome
-//             .optimal_values
-//             .iter()
-//             .map(|optimal_value| {
-//                 1.0 - poisson::univariate(
-//                     0,
-//                     optimal_value / INTERVALS as f64 * 2.0,
-//                     &factorial::Calculator,
-//                 )
-//             })
-//             .collect::<Vec<_>>()
-//     };
-//     println!("initial estimates: {init_estimates:?}");
-//
-//     let start = Instant::now();
-//     let search_outcome = fit_bivariate_binomial_scoregrid(
-//         offers,
-//         &init_estimates,
-//         (INTERVALS / 2) as u8,
-//         MAX_TOTAL_GOALS_HALF,
-//     );
-//     let elapsed = start.elapsed();
-//     println!("biv-binomial: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-//     search_outcome
-// }
-
 pub fn fit_scoregrid_half(
     home_goals_estimate: f64,
     away_goals_estimate: f64,
@@ -134,62 +102,7 @@ pub fn fit_scoregrid_half(
         optimal_values: init_estimates,
         optimal_residual: 0.0,
     }
-
-    // let start = Instant::now();
-    // let search_outcome = fit_univariate_binomial_scoregrid(
-    //     offers,
-    //     &init_estimates,
-    //     (INTERVALS / 2) as u8,
-    //     MAX_TOTAL_GOALS_HALF,
-    // );
-    // let elapsed = start.elapsed();
-    // println!("biv-binomial: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-    // search_outcome
 }
-//
-// pub fn fit_scoregrid_full(offers: &[&Offer]) -> HypergridSearchOutcome {
-//     let init_estimates = {
-//         println!("*** f/t: fitting bivariate poisson scoregrid ***");
-//         let start = Instant::now();
-//         let search_outcome = fit_bivariate_poisson_scoregrid(offers, MAX_TOTAL_GOALS_FULL);
-//         let elapsed = start.elapsed();
-//         println!(
-//             "f/t: {elapsed:?} elapsed: search outcome: {search_outcome:?}, expectation: {:.3}",
-//             expectation_from_bivariate_poisson(&search_outcome.optimal_values)
-//         );
-//         search_outcome
-//             .optimal_values
-//             .iter()
-//             .map(|optimal_value| {
-//                 poisson::univariate(
-//                     1,
-//                     optimal_value / INTERVALS as f64,
-//                     &factorial::Calculator,
-//                 )
-//             })
-//             .collect::<Vec<_>>()
-//     };
-//     println!("f/t: initial estimates: {init_estimates:?}");
-//
-//     // HypergridSearchOutcome {
-//     //     steps: 0,
-//     //     optimal_values: init_estimates,
-//     //     optimal_residual: 0.0,
-//     // }
-//
-//     println!("*** f/t: fitting bivariate binomial scoregrid ***");
-//     let start = Instant::now();
-//     let search_outcome = fit_bivariate_binomial_scoregrid(
-//         offers,
-//         &init_estimates,
-//         INTERVALS as u8,
-//         MAX_TOTAL_GOALS_FULL,
-//     );
-//     // let search_outcome = fit_scoregrid(&[&correct_score]);
-//     let elapsed = start.elapsed();
-//     println!("f/t: {elapsed:?} elapsed: search outcome: {search_outcome:?}");
-//     search_outcome
-// }
 
 pub fn fit_scoregrid_full(
     h2h: &Offer,

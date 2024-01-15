@@ -37,23 +37,23 @@ impl From<ContestModel> for ContestSummary {
                         })),
                     );
                 }
-                SoccerMarket::TotalGoalsOverUnder(market, line) => {
+                SoccerMarket::TotalGoalsOverUnder(prices, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
                         OfferType::TotalGoals(Period::FullTime, Over(over)),
                         HashMap::from([
-                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), prices.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), prices.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
-                SoccerMarket::H2H(h2h) => {
+                SoccerMarket::H2H(prices) => {
                     offerings.insert(
                         OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
-                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
-                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), prices.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), prices.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), prices.draw),
                         ]),
                     );
                 }
@@ -103,55 +103,46 @@ impl From<ContestModel> for ContestSummary {
                         })),
                     );
                 }
-                // SoccerMarket::TotalGoalsOddEven(_) => {
-                //     //TODO
-                // }
-                // SoccerMarket::FirstHalfGoalsOddEven(_) => {
-                //     //TODO
-                // }
-                // SoccerMarket::SecondHalfGoalOddEven(_) => {
-                //     //TODO
-                // }
                 SoccerMarket::Score2GoalsOrMore(_) => {
                     //TODO
                 }
-                SoccerMarket::FirstHalfGoalsOverUnder(market, line) => {
+                SoccerMarket::FirstHalfGoalsOverUnder(prices, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
                         OfferType::TotalGoals(Period::FirstHalf, Over(over)),
                         HashMap::from([
-                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), prices.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), prices.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
-                SoccerMarket::FirstHalfH2H(h2h) => {
+                SoccerMarket::FirstHalfH2H(prices) => {
                     offerings.insert(
                         OfferType::HeadToHead(Period::FirstHalf, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
-                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
-                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), prices.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), prices.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), prices.draw),
                         ]),
                     );
                 }
-                SoccerMarket::SecondHalfGoalsOverUnder(market, line) => {
+                SoccerMarket::SecondHalfGoalsOverUnder(prices, line) => {
                     let (over, under) = (line.floor() as u8, line.ceil() as u8);
                     offerings.insert(
                         OfferType::TotalGoals(Period::SecondHalf, Over(over)),
                         HashMap::from([
-                            (Outcome::Over(over), market.over.unwrap_or(f64::INFINITY)),
-                            (Outcome::Under(under), market.under.unwrap_or(f64::INFINITY)),
+                            (Outcome::Over(over), prices.over.unwrap_or(f64::INFINITY)),
+                            (Outcome::Under(under), prices.under.unwrap_or(f64::INFINITY)),
                         ]),
                     );
                 }
-                SoccerMarket::SecondHalfH2H(h2h) => {
+                SoccerMarket::SecondHalfH2H(prices) => {
                     offerings.insert(
                         OfferType::HeadToHead(Period::SecondHalf, DrawHandicap::Ahead(0)),
                         HashMap::from([
-                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), h2h.home),
-                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), h2h.away),
-                            (Outcome::Draw(DrawHandicap::Ahead(0)), h2h.draw),
+                            (Outcome::Win(Side::Home, WinHandicap::AheadOver(0)), prices.home),
+                            (Outcome::Win(Side::Away, WinHandicap::BehindUnder(0)), prices.away),
+                            (Outcome::Draw(DrawHandicap::Ahead(0)), prices.draw),
                         ]),
                     );
                 }
@@ -179,7 +170,7 @@ impl From<ContestModel> for ContestSummary {
                 SoccerMarket::SecondHalfCornersOverUnder(_, _) => {}
                 SoccerMarket::TwoWayHandicap(prices, handicap) => {
                     let win_handicap = to_win_handicap(handicap);
-                    // println!("handicap: {handicap}, prices: {prices:?}");
+                    // println!("two-way handicap: {handicap}, prices: {prices:?}");
                     // println!("home: {:?}, away: {:?}", win_handicap, win_handicap.flip_asian());
                     offerings.insert(
                         OfferType::AsianHandicap(Period::FullTime, win_handicap.clone()),
@@ -209,16 +200,27 @@ impl From<ContestModel> for ContestSummary {
                         ]),
                     );
                 }
-                SoccerMarket::ThreeWayHandicap(h2h, handicap) => {
+                SoccerMarket::ThreeWayHandicap(prices, handicap) => {
+                    // println!("three-way handicap: {handicap}, prices: {h2h:?}");
                     let draw_handicap = to_draw_handicap(handicap);
                     let win_handicap = draw_handicap.to_win_handicap();
                     offerings.insert(
                         OfferType::HeadToHead(Period::FullTime, draw_handicap.clone()),
                         HashMap::from([
-                            (Outcome::Win(Side::Home, win_handicap.clone()), h2h.home),
-                            (Outcome::Win(Side::Away, win_handicap.flip_european()), h2h.away),
-                            (Outcome::Draw(draw_handicap), h2h.draw),
+                            (Outcome::Win(Side::Home, win_handicap.clone()), prices.home),
+                            (Outcome::Win(Side::Away, win_handicap.flip_european()), prices.away),
+                            (Outcome::Draw(draw_handicap), prices.draw),
                         ]),
+                    );
+                }
+                SoccerMarket::DrawNoBet(prices) => {
+                    let draw_handicap = DrawHandicap::Ahead(0);
+                    offerings.insert(
+                        OfferType::DrawNoBet(draw_handicap.clone()),
+                        HashMap::from([
+                            (Outcome::Win(Side::Home, draw_handicap.to_win_handicap()), prices.home),
+                            (Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european()), prices.away),
+                        ])
                     );
                 }
             }

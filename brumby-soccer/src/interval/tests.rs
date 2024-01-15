@@ -305,7 +305,7 @@ fn explore_2x2_pruned_2_goals() {
                 stats:sv![PlayerStats { h1: PeriodStats { goals: 2 }, h2: PeriodStats { goals: 0 }, assists: 2 }],
                 first_scorer: Some(0),
             },
-            0.0625,
+            0.25,
         ),
         (
             Prospect {
@@ -332,7 +332,7 @@ fn explore_2x2_pruned_2_goals() {
                 stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
-            0.0625,
+            0.125,
         ),
         (
             Prospect {
@@ -350,7 +350,7 @@ fn explore_2x2_pruned_2_goals() {
                 stats:sv![PlayerStats { h1: PeriodStats { goals: 1 }, h2: PeriodStats { goals: 0 }, assists: 1 }],
                 first_scorer: Some(0),
             },
-            0.0625,
+            0.125,
         ),
         (
             Prospect {
@@ -362,7 +362,7 @@ fn explore_2x2_pruned_2_goals() {
             0.0625,
         ),
     ];
-    assert_eq!(1.0 - 0.3125, exploration.prospects.values().sum::<f64>());
+    assert_eq!(1.0, exploration.prospects.values().sum::<f64>());
     assert_eq!(0.3125, exploration.pruned);
     assert_expected_prospects(&expected, &exploration.prospects);
 
@@ -380,7 +380,7 @@ fn explore_2x2_pruned_2_goals() {
         &exploration.prospects,
         &exploration.player_lookup,
     );
-    assert_eq!(1.0 - 0.0625 - 0.3125, fist_goalscorer_other);
+    assert_eq!(1.0 - 0.0625, fist_goalscorer_other);
 }
 
 #[test]

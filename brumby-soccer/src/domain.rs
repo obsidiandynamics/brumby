@@ -102,6 +102,10 @@ impl OfferType {
             OfferType::AnytimeAssist => OfferCategory::AnytimeAssist
         }
     }
+
+    pub fn is_auxiliary(&self) -> bool {
+        matches!(self, OfferType::DrawNoBet(_))
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]

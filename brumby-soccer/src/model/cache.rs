@@ -71,6 +71,7 @@ pub struct CachingContext {
     pub stats: CacheStats
 }
 impl CachingContext {
+    #[inline(always)]
     pub fn explore(
         &mut self,
         args: CacheableIntervalArgs,

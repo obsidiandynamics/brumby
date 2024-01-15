@@ -10,6 +10,7 @@ use brumby::probs::SliceExt;
 use crate::domain::{Offer, OfferType, Outcome};
 
 mod asian_handicap;
+mod draw_no_bet;
 mod head_to_head;
 mod total_goals;
 
@@ -41,6 +42,7 @@ impl Offer {
             OfferType::TotalGoals(_, _) => total_goals::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::HeadToHead(_, _) => head_to_head::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::AsianHandicap(_, _) => asian_handicap::validate_probs(&self.offer_type, &self.market.probs),
+            OfferType::DrawNoBet(_) => draw_no_bet::validate_probs(&self.offer_type, &self.market.probs),
             _ => Ok(()),
         }
     }
@@ -87,6 +89,7 @@ impl OfferType {
             OfferType::TotalGoals(_, over) => total_goals::validate_outcomes(self, outcomes, over),
             OfferType::HeadToHead(_, draw_handicap) => head_to_head::validate_outcomes(self, outcomes, draw_handicap),
             OfferType::AsianHandicap(_, win_handicap) => asian_handicap::validate_outcomes(self, outcomes, win_handicap),
+            OfferType::DrawNoBet(draw_handicap) => draw_no_bet::validate_outcomes(self, outcomes, draw_handicap),
             _ => Ok(()),
         }
     }
@@ -96,6 +99,7 @@ impl OfferType {
             OfferType::TotalGoals(_, over) => total_goals::validate_outcome(self, outcome, over),
             OfferType::HeadToHead(_, draw_handicap) => head_to_head::validate_outcome(self, outcome, draw_handicap),
             OfferType::AsianHandicap(_, win_handicap) => asian_handicap::validate_outcome(self, outcome, win_handicap),
+            OfferType::DrawNoBet(draw_handicap) => draw_no_bet::validate_outcome(self, outcome, draw_handicap),
             _ => Ok(()),
         }
     }
