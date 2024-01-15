@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use brumby::hash_lookup::HashLookup;
 use brumby::market::Market;
 
-pub mod error;
+pub mod validation;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Score {

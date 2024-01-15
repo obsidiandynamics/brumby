@@ -1,14 +1,14 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{DrawHandicap, error, OfferType, Outcome, Side};
-use crate::domain::error::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
+use crate::domain::{DrawHandicap, validation, OfferType, Outcome, Side};
+use crate::domain::validation::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
     outcomes: &HashLookup<Outcome>,
     draw_handicap: &DrawHandicap
 ) -> Result<(), InvalidOutcome> {
-    error::OutcomesCompleteAssertion {
+    validation::OutcomesCompleteAssertion {
         outcomes: &valid_outcomes(draw_handicap),
     }
         .check(outcomes, offer_type)?;
@@ -32,7 +32,7 @@ pub(crate) fn validate_outcome(
 }
 
 pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), InvalidOffer> {
-    error::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
+    validation::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
     Ok(())
 }
 

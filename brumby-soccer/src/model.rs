@@ -16,7 +16,7 @@ use brumby::stack_vec::FromIteratorResult;
 use brumby::sv;
 use brumby::timed::Timed;
 
-use crate::domain::error::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
+use crate::domain::validation::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{Offer, OfferCategory, OfferType, Outcome, Over, Period, Player, Side};
 use crate::interval;
 use crate::interval::query::{isolate, requirements};

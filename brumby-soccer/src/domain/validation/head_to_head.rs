@@ -1,15 +1,15 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{error, OfferType, Outcome, Side, WinHandicap};
-use crate::domain::error::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
+use crate::domain::{DrawHandicap, validation, OfferType, Outcome, Side};
+use crate::domain::validation::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
     outcomes: &HashLookup<Outcome>,
-    win_handicap: &WinHandicap
+    draw_handicap: &DrawHandicap
 ) -> Result<(), InvalidOutcome> {
-    error::OutcomesCompleteAssertion {
-        outcomes: &valid_outcomes(win_handicap),
+    validation::OutcomesCompleteAssertion {
+        outcomes: &valid_outcomes(draw_handicap),
     }
     .check(outcomes, offer_type)?;
     Ok(())
@@ -18,9 +18,9 @@ pub(crate) fn validate_outcomes(
 pub(crate) fn validate_outcome(
     offer_type: &OfferType,
     outcome: &Outcome,
-    win_handicap: &WinHandicap
+    draw_handicap: &DrawHandicap
 ) -> Result<(), InvalidOutcome> {
-    let valid_outcomes = valid_outcomes(win_handicap);
+    let valid_outcomes = valid_outcomes(draw_handicap);
     if valid_outcomes.contains(outcome) {
         Ok(())
     } else {
@@ -32,14 +32,15 @@ pub(crate) fn validate_outcome(
 }
 
 pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), InvalidOffer> {
-    error::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
+    validation::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
     Ok(())
 }
 
-fn valid_outcomes(win_handicap: &WinHandicap) -> [Outcome; 2] {
+fn valid_outcomes(draw_handicap: &DrawHandicap) -> [Outcome; 3] {
     [
-        Outcome::Win(Side::Home, win_handicap.clone()),
-        Outcome::Win(Side::Away, win_handicap.flip_asian()),
+        Outcome::Win(Side::Home, draw_handicap.to_win_handicap()),
+        Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european()),
+        Outcome::Draw(draw_handicap.clone()),
     ]
 }
 
@@ -54,7 +55,7 @@ mod tests {
 
     use super::*;
 
-    const OFFER_TYPE: OfferType = OfferType::AsianHandicap(Period::FullTime, WinHandicap::AheadOver(2));
+    const OFFER_TYPE: OfferType = OfferType::HeadToHead(Period::FullTime, DrawHandicap::Ahead(2));
     const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
 
     #[test]
@@ -63,9 +64,10 @@ mod tests {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
                 Outcome::Win(Side::Home, WinHandicap::AheadOver(2)),
-                Outcome::Win(Side::Away, WinHandicap::BehindUnder(3)),
+                Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)),
+                Outcome::Draw(DrawHandicap::Ahead(2)),
             ]),
-            market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
+            market: Market::frame(&Overround::fair(), vec![0.4, 0.4, 0.2], &PRICE_BOUNDS),
         };
         offer.validate().unwrap();
     }
@@ -76,12 +78,13 @@ mod tests {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
                 Outcome::Win(Side::Home, WinHandicap::AheadOver(2)),
-                Outcome::Win(Side::Away, WinHandicap::BehindUnder(3)),
+                Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)),
+                Outcome::Draw(DrawHandicap::Ahead(2)),
             ]),
-            market: Market::frame(&Overround::fair(), vec![0.4, 0.5], &PRICE_BOUNDS),
+            market: Market::frame(&Overround::fair(), vec![0.4, 0.4, 0.1], &PRICE_BOUNDS),
         };
         assert_eq!(
-            "expected booksum in 1.0..=1.0 ± 0.001, got 0.9 for AsianHandicap(FullTime, AheadOver(2))",
+            "expected booksum in 1.0..=1.0 ± 0.001, got 0.9 for HeadToHead(FullTime, Ahead(2))",
             offer.validate().unwrap_err().to_string()
         );
     }
@@ -92,11 +95,12 @@ mod tests {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
                 Outcome::Win(Side::Home, WinHandicap::AheadOver(2)),
+                Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)),
             ]),
-            market: Market::frame(&Overround::fair(), vec![1.0], &PRICE_BOUNDS),
+            market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
         };
         assert_eq!(
-            "Win(Away, BehindUnder(3)) missing from AsianHandicap(FullTime, AheadOver(2))",
+            "Draw(Ahead(2)) missing from HeadToHead(FullTime, Ahead(2))",
             offer.validate().unwrap_err().to_string()
         );
     }
@@ -107,17 +111,18 @@ mod tests {
             offer_type: OFFER_TYPE,
             outcomes: HashLookup::from(vec![
                 Outcome::Win(Side::Home, WinHandicap::AheadOver(2)),
-                Outcome::Win(Side::Away, WinHandicap::BehindUnder(3)),
+                Outcome::Win(Side::Away, WinHandicap::BehindUnder(2)),
+                Outcome::Draw(DrawHandicap::Ahead(2)),
                 Outcome::None,
             ]),
             market: Market::frame(
                 &Overround::fair(),
-                vec![0.4, 0.5, 0.1],
+                vec![0.4, 0.5, 0.05, 0.05],
                 &PRICE_BOUNDS,
             ),
         };
         assert_eq!(
-            "None does not belong in AsianHandicap(FullTime, AheadOver(2))",
+            "None does not belong in HeadToHead(FullTime, Ahead(2))",
             offer.validate().unwrap_err().to_string()
         );
     }

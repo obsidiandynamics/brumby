@@ -7,7 +7,7 @@ use tracing::debug;
 use brumby::probs::Fraction;
 
 use crate::domain::{DrawHandicap, Offer, OfferCategory, OfferType, Period};
-use crate::domain::error::OfferCapture;
+use crate::domain::validation::OfferCapture;
 use crate::fit;
 use crate::interval::BivariateProbs;
 use crate::model::{

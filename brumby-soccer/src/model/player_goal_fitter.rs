@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use tracing::debug;
 
 use crate::domain::{Offer, OfferType, Outcome};
-use crate::domain::error::{MissingOutcome, OfferCapture};
+use crate::domain::validation::{MissingOutcome, OfferCapture};
 use crate::fit;
 use crate::model::{FitError, get_offer, get_or_create_player, Model};
 

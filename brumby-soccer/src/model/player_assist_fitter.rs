@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 use tracing::debug;
 
-use crate::domain::error::{MissingOutcome, OfferCapture};
+use crate::domain::validation::{MissingOutcome, OfferCapture};
 use crate::domain::{Offer, OfferType, Outcome};
 use crate::fit;
 use crate::interval::UnivariateProbs;
