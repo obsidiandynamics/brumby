@@ -123,6 +123,9 @@ pub enum MultiDerivationError {
 
     #[error("{0}")]
     MissingDerivative(#[from] MissingDerivative),
+
+    #[error("{0}")]
+    AuxiliaryOffer(#[from] AuxiliaryOffer),
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -140,6 +143,12 @@ pub struct TooManyPlayers {
 pub struct MissingDerivative {
     pub offer_type: OfferType,
     pub outcome: Outcome,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("auxiliary {offer_type:?}")]
+pub struct AuxiliaryOffer {
+    pub offer_type: OfferType,
 }
 
 #[derive(Debug, Error)]
@@ -543,6 +552,10 @@ impl Model {
             let mut exploration_elapsed = Duration::default();
             let mut query_elapsed = Duration::default();
             for (offer_type, outcome) in selections {
+                if offer_type.is_auxiliary() {
+                    return Err(MultiDerivationError::AuxiliaryOffer(AuxiliaryOffer { offer_type: offer_type.clone() }));
+                }
+
                 self.collect_requirements(
                     offer_type,
                     outcome,
