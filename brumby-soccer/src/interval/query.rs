@@ -7,8 +7,8 @@ mod anytime_assist;
 mod anytime_goalscorer;
 mod correct_score;
 mod first_goalscorer;
-mod win_draw;
 mod total_goals;
+mod win_draw;
 
 #[derive(Debug)]
 pub enum QuerySpec {
@@ -27,11 +27,13 @@ pub fn requirements(offer_type: &OfferType) -> Expansions {
         OfferType::TotalGoals(period, _) => total_goals::requirements(period),
         OfferType::CorrectScore(period) => correct_score::requirements(period),
         OfferType::AsianHandicap(period, _) => win_draw::requirements(period),
-        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::FirstGoalscorer => first_goalscorer::requirements(),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::requirements(),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
         OfferType::AnytimeAssist => anytime_assist::requirements(),
+        OfferType::DrawNoBet(_) | OfferType::SplitHandicap(_, _, _) => {
+            panic!("unsupported auxiliary {offer_type:?}")
+        }
     }
 }
 
@@ -47,27 +49,36 @@ pub fn prepare(
         OfferType::TotalGoals(_, _) => total_goals::prepare(),
         OfferType::CorrectScore(_) => correct_score::prepare(),
         OfferType::AsianHandicap(_, _) => win_draw::prepare(),
-        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::FirstGoalscorer => first_goalscorer::prepare(outcome, player_lookup),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::prepare(outcome, player_lookup),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
         OfferType::AnytimeAssist => anytime_assist::prepare(outcome, player_lookup),
+        OfferType::DrawNoBet(_) | OfferType::SplitHandicap(_, _, _) => {
+            panic!("unsupported auxiliary {offer_type:?}")
+        }
     }
 }
 
 #[must_use]
 #[inline]
-pub fn filter(offer_type: &OfferType, outcome: &Outcome, query: &QuerySpec, prospect: &Prospect) -> bool {
+pub fn filter(
+    offer_type: &OfferType,
+    outcome: &Outcome,
+    query: &QuerySpec,
+    prospect: &Prospect,
+) -> bool {
     match offer_type {
         OfferType::HeadToHead(period, _) => win_draw::filter(period, outcome, prospect),
         OfferType::TotalGoals(period, _) => total_goals::filter(period, outcome, prospect),
         OfferType::CorrectScore(period) => correct_score::filter(period, outcome, prospect),
         OfferType::AsianHandicap(period, _) => win_draw::filter(period, outcome, prospect),
-        OfferType::DrawNoBet(_) => panic!("unsupported auxiliary {offer_type:?}"),
         OfferType::AnytimeGoalscorer => anytime_goalscorer::filter(query, prospect),
         OfferType::FirstGoalscorer => first_goalscorer::filter(query, prospect),
         OfferType::PlayerShotsOnTarget(_) => unimplemented!(),
         OfferType::AnytimeAssist => anytime_assist::filter(query, prospect),
+        OfferType::DrawNoBet(_) | OfferType::SplitHandicap(_, _, _) => {
+            panic!("unsupported auxiliary {offer_type:?}")
+        }
     }
 }
 
@@ -97,7 +108,11 @@ pub fn isolate_set(
     let queries = selections
         .iter()
         .map(|(offer_type, outcome)| {
-            (offer_type, outcome, prepare(offer_type, outcome, player_lookup))
+            (
+                offer_type,
+                outcome,
+                prepare(offer_type, outcome, player_lookup),
+            )
         })
         .collect::<Vec<_>>();
     prospects
@@ -113,9 +128,9 @@ pub fn isolate_set(
 
 #[cfg(test)]
 mod tests {
-    use brumby::sv;
     use crate::domain::{DrawHandicap, Period, Score, Side, WinHandicap};
-    use crate::interval::{explore, Config, BivariateProbs, TeamProbs, UnivariateProbs};
+    use crate::interval::{explore, BivariateProbs, Config, TeamProbs, UnivariateProbs};
+    use brumby::sv;
 
     use super::*;
 
@@ -125,9 +140,20 @@ mod tests {
             &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
+                    h1_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    h2_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    assists: UnivariateProbs {
+                        home: 1.0,
+                        away: 1.0,
+                    },
                 },
                 player_probs: sv![],
                 prune_thresholds: Default::default(),
@@ -167,9 +193,20 @@ mod tests {
             &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
+                    h1_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    h2_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    assists: UnivariateProbs {
+                        home: 1.0,
+                        away: 1.0,
+                    },
                 },
                 player_probs: sv![],
                 prune_thresholds: Default::default(),
@@ -229,9 +266,20 @@ mod tests {
             &Config {
                 intervals: 4,
                 team_probs: TeamProbs {
-                    h1_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    h2_goals: BivariateProbs { home: 0.25, away: 0.25, common: 0.25 },
-                    assists: UnivariateProbs { home: 1.0, away: 1.0 },
+                    h1_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    h2_goals: BivariateProbs {
+                        home: 0.25,
+                        away: 0.25,
+                        common: 0.25,
+                    },
+                    assists: UnivariateProbs {
+                        home: 1.0,
+                        away: 1.0,
+                    },
                 },
                 player_probs: sv![],
                 prune_thresholds: Default::default(),

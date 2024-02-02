@@ -53,6 +53,19 @@ impl DrawHandicap {
             DrawHandicap::Behind(by) => WinHandicap::BehindUnder(*by)
         }
     }
+
+    pub fn flip(&self) -> DrawHandicap {
+        match self {
+            DrawHandicap::Ahead(by) => {
+                if *by > 0 {
+                    DrawHandicap::Behind(*by)
+                } else {
+                    DrawHandicap::Ahead(0)
+                }
+            },
+            DrawHandicap::Behind(by) => DrawHandicap::Ahead(*by)
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -83,6 +96,7 @@ pub enum OfferType {
     CorrectScore(Period),
     AsianHandicap(Period, WinHandicap),
     DrawNoBet(DrawHandicap),
+    SplitHandicap(Period, DrawHandicap, WinHandicap),
     AnytimeGoalscorer,
     FirstGoalscorer,
     PlayerShotsOnTarget(Over),
@@ -94,8 +108,9 @@ impl OfferType {
             OfferType::HeadToHead(_, _) => OfferCategory::HeadToHead,
             OfferType::TotalGoals(_, _) => OfferCategory::TotalGoals,
             OfferType::CorrectScore(_) => OfferCategory::CorrectScore,
-            OfferType::DrawNoBet(_) => OfferCategory::DrawNoBet,
             OfferType::AsianHandicap(_, _) => OfferCategory::AsianHandicap,
+            OfferType::DrawNoBet(_) => OfferCategory::DrawNoBet,
+            OfferType::SplitHandicap(_, _, _) => OfferCategory::SplitHandicap,
             OfferType::AnytimeGoalscorer => OfferCategory::AnytimeGoalscorer,
             OfferType::FirstGoalscorer => OfferCategory::FirstGoalscorer,
             OfferType::PlayerShotsOnTarget(_) => OfferCategory::PlayerShotsOnTarget,
@@ -104,7 +119,7 @@ impl OfferType {
     }
 
     pub fn is_auxiliary(&self) -> bool {
-        matches!(self, OfferType::DrawNoBet(_))
+        matches!(self, OfferType::DrawNoBet(_) | OfferType::SplitHandicap(_, _, _))
     }
 }
 
@@ -115,6 +130,7 @@ pub enum OfferCategory {
     CorrectScore,
     AsianHandicap,
     DrawNoBet,
+    SplitHandicap,
     AnytimeGoalscorer,
     FirstGoalscorer,
     PlayerShotsOnTarget,
@@ -137,6 +153,7 @@ pub enum Player {
 pub enum Outcome {
     Win(Side, WinHandicap),
     Draw(DrawHandicap),
+    SplitWin(Side, DrawHandicap, WinHandicap),
     Under(u8),
     Over(u8),
     Score(Score),

@@ -17,7 +17,9 @@ use brumby::sv;
 use brumby::timed::Timed;
 
 use crate::domain::validation::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
-use crate::domain::{Offer, OfferCategory, OfferType, Outcome, Over, Period, Player, Side};
+use crate::domain::{
+    DrawHandicap, Offer, OfferCategory, OfferType, Outcome, Over, Period, Player, Side, WinHandicap,
+};
 use crate::interval;
 use crate::interval::query::{isolate, requirements};
 use crate::interval::{
@@ -249,6 +251,16 @@ impl Model {
         &self.offers
     }
 
+    pub fn insert_offer(&mut self, offer: Offer) {
+        self.offers.insert(offer.offer_type.clone(), offer);
+    }
+
+    fn get_offer(&self, offer_type: &OfferType) -> Result<&Offer, MissingOffer> {
+        self.offers
+            .get(&offer_type)
+            .ok_or(MissingOffer::Type(offer_type.clone()))
+    }
+
     pub fn derive(
         &mut self,
         stubs: &[Stub],
@@ -274,7 +286,7 @@ impl Model {
                         start.elapsed(),
                         caching_context.stats
                     );
-                    self.offers.insert(offer.offer_type.clone(), offer);
+                    self.insert_offer(offer);
                 }
             }
             for stub in auxiliary_stubs {
@@ -284,12 +296,13 @@ impl Model {
                     stub.outcomes.len()
                 );
                 let offer = match stub.offer_type {
-                    OfferType::DrawNoBet(_) => {
-                        self.derive_dnb(stub, price_bounds)?
+                    OfferType::DrawNoBet(_) => self.derive_draw_no_bet(stub, price_bounds)?,
+                    OfferType::SplitHandicap(_, _, _) => {
+                        self.derive_split_handicap(stub, price_bounds)?
                     }
                     _ => unreachable!(),
                 };
-                self.offers.insert(offer.offer_type.clone(), offer);
+                self.insert_offer(offer);
             }
             Ok(caching_context.stats)
         })
@@ -409,7 +422,7 @@ impl Model {
     }
 
     #[inline(always)]
-    fn derive_dnb(
+    fn derive_draw_no_bet(
         &mut self,
         stub: &Stub,
         price_bounds: &PriceBounds,
@@ -420,18 +433,94 @@ impl Model {
         };
 
         let source_offer_type = OfferType::HeadToHead(Period::FullTime, draw_handicap.clone());
-        let source_offer =
-            self.offers
-                .get(&source_offer_type)
-                .ok_or(SingleDerivationError::MissingOffer(MissingOffer::Type(
-                    source_offer_type,
-                )))?;
+        let source_offer = self.get_offer(&source_offer_type)?;
 
         let home_outcome = Outcome::Win(Side::Home, draw_handicap.to_win_handicap());
         let home_prob = source_offer.get_probability(&home_outcome).unwrap();
-        let away_outcome = Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european());
+        let away_outcome =
+            Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european());
         let away_prob = source_offer.get_probability(&away_outcome).unwrap();
 
+        let mut probs = [home_prob, away_prob];
+        probs.normalise(stub.normal);
+        // trace!("DNB probs: {probs:?}, sum: {:.6}", probs.sum());
+        let market = Market::frame(&stub.overround, probs.to_vec(), price_bounds);
+        let outcomes = [home_outcome, away_outcome];
+        Ok(Offer {
+            offer_type: stub.offer_type.clone(),
+            outcomes: HashLookup::from(outcomes.to_vec()),
+            market,
+        })
+    }
+
+    #[inline(always)]
+    fn derive_split_handicap(
+        &mut self,
+        stub: &Stub,
+        price_bounds: &PriceBounds,
+    ) -> Result<Offer, SingleDerivationError> {
+        let (period, draw_handicap, win_handicap) = match stub.offer_type {
+            OfferType::SplitHandicap(ref period, ref draw_handicap, ref win_handicap) => {
+                (period, draw_handicap, win_handicap)
+            }
+            _ => unreachable!(),
+        };
+
+        let euro_offer_type = OfferType::HeadToHead(period.clone(), draw_handicap.clone());
+        let euro_offer = self.get_offer(&euro_offer_type)?;
+        let asian_offer_type = OfferType::AsianHandicap(period.clone(), win_handicap.clone());
+        let asian_offer = self.get_offer(&asian_offer_type)?;
+
+        let draw_prob = euro_offer
+            .get_probability(&Outcome::Draw(draw_handicap.clone()))
+            .unwrap();
+        let (home_prob, away_prob) = match (draw_handicap, win_handicap) {
+            (DrawHandicap::Ahead(ahead), WinHandicap::AheadOver(ahead_over)) => {
+                if ahead == ahead_over {
+                    // -x.25 case
+                    let asian_win_prob = asian_offer
+                        .get_probability(&Outcome::Win(Side::Home, win_handicap.clone()))
+                        .unwrap();
+                    let home_prob = asian_win_prob / (1.0 - 0.5 * draw_prob);
+                    (home_prob, 1.0 - home_prob)
+                } else {
+                    // -x.75 case
+                    assert_eq!(*ahead, ahead_over + 1);
+                    let euro_win_prob = euro_offer
+                        .get_probability(&Outcome::Win(Side::Home, draw_handicap.to_win_handicap()))
+                        .unwrap();
+                    let home_prob = (euro_win_prob + 0.5 * draw_prob) / (1.0 - 0.5 * draw_prob);
+                    (home_prob, 1.0 - home_prob)
+                }
+            }
+            (_, WinHandicap::BehindUnder(behind_under)) => {
+                let behind = match draw_handicap {
+                    DrawHandicap::Ahead(0) => 0,    // Behind(0) is always written as Ahead(0) by convention
+                    DrawHandicap::Behind(by) => *by,
+                    _ => unreachable!()
+                };
+                if behind == *behind_under {
+                    // +x.75 case
+                    let euro_win_prob = euro_offer
+                        .get_probability(&Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european()))
+                        .unwrap();
+                    let away_prob = (euro_win_prob + 0.5 * draw_prob) / (1.0 - 0.5 * draw_prob);
+                    (1.0 - away_prob, away_prob)
+                } else {
+                    // +x.25 case
+                    assert_eq!(behind + 1, *behind_under);
+                    let asian_win_prob = asian_offer
+                        .get_probability(&Outcome::Win(Side::Away, win_handicap.flip_asian()))
+                        .unwrap();
+                    let away_prob = asian_win_prob / (1.0 - 0.5 * draw_prob);
+                    (1.0 - away_prob, away_prob)
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        let home_outcome = Outcome::SplitWin(Side::Home, draw_handicap.clone(), win_handicap.clone());
+        let away_outcome = Outcome::SplitWin(Side::Away, draw_handicap.flip(), win_handicap.flip_asian());
         let mut probs = [home_prob, away_prob];
         probs.normalise(stub.normal);
         // trace!("DNB probs: {probs:?}, sum: {:.6}", probs.sum());
@@ -506,7 +595,10 @@ impl Model {
         }
 
         #[inline(always)]
-        fn scan_prefix(sorted_selections: &[DetailedSelection], exploration: &Exploration) -> ScanPrefixResult {
+        fn scan_prefix(
+            sorted_selections: &[DetailedSelection],
+            exploration: &Exploration,
+        ) -> ScanPrefixResult {
             let mut keep = Vec::with_capacity(sorted_selections.len());
             let mut drop = vec![];
             let mut lowest_prob = f64::MAX;
@@ -514,15 +606,10 @@ impl Model {
             for end_index in 1..=sorted_selections.len() {
                 let prefix = sorted_selections[0..end_index]
                     .iter()
-                    .map(|selection| {
-                        (selection.offer_type.clone(), selection.outcome.clone())
-                    })
+                    .map(|selection| (selection.offer_type.clone(), selection.outcome.clone()))
                     .collect::<Vec<_>>();
-                let prob = query::isolate_set(
-                    &prefix,
-                    &exploration.prospects,
-                    &exploration.player_lookup,
-                );
+                let prob =
+                    query::isolate_set(&prefix, &exploration.prospects, &exploration.player_lookup);
                 // if LOG { trace!("fringe prefix: {prefix:?}, prob: {prob:.3}"); }
                 let tail = &sorted_selections[end_index - 1];
                 if prob < lowest_prob {
@@ -553,7 +640,9 @@ impl Model {
             let mut query_elapsed = Duration::default();
             for (offer_type, outcome) in selections {
                 if offer_type.is_auxiliary() {
-                    return Err(MultiDerivationError::AuxiliaryOffer(AuxiliaryOffer { offer_type: offer_type.clone() }));
+                    return Err(MultiDerivationError::AuxiliaryOffer(AuxiliaryOffer {
+                        offer_type: offer_type.clone(),
+                    }));
                 }
 
                 self.collect_requirements(
@@ -657,7 +746,8 @@ impl Model {
                     // if LOG {
                     //     trace!("price: {single_price:.3}, prob: {single_prob:.3}, overround: {single_overround:.3}");
                     // }
-                    let mut fringe_sorted_selections = Vec::with_capacity(scan_result.keep.len() + 1);
+                    let mut fringe_sorted_selections =
+                        Vec::with_capacity(scan_result.keep.len() + 1);
                     fringe_sorted_selections.clone_from(&scan_result.keep);
                     fringe_sorted_selections.push(selection);
                     sort_selections_by_increasing_prob(&mut fringe_sorted_selections);
@@ -709,7 +799,8 @@ impl Model {
                     let fringe_exploration = fringe_exploration.unwrap();
 
                     let query_start = Instant::now();
-                    let fringe_scan_result = scan_prefix(&fringe_sorted_selections, &fringe_exploration);
+                    let fringe_scan_result =
+                        scan_prefix(&fringe_sorted_selections, &fringe_exploration);
                     query_elapsed += query_start.elapsed();
 
                     let probability = fringe_scan_result.lowest_prob;
@@ -893,3 +984,6 @@ fn frame_prices_from_exploration(
         market,
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -1,9 +1,11 @@
+use std::ops::RangeInclusive;
+
+use anyhow::bail;
+use serde::{Deserialize, Serialize};
+
 use crate::opt;
 use crate::opt::UnivariateDescentConfig;
 use crate::probs::SliceExt;
-use anyhow::bail;
-use serde::{Deserialize, Serialize};
-use std::ops::RangeInclusive;
 
 pub type PriceBounds = RangeInclusive<f64>;
 

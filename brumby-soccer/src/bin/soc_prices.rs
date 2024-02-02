@@ -113,7 +113,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 | OfferType::TotalGoals(_, _)
                 | OfferType::CorrectScore(_)
                 | OfferType::AsianHandicap(_, _)
-                | OfferType::DrawNoBet(_) => 1.0,
+                | OfferType::DrawNoBet(_)
+                | OfferType::SplitHandicap(_, _, _) => 1.0,
                 OfferType::AnytimeGoalscorer
                 | OfferType::FirstGoalscorer
                 | OfferType::PlayerShotsOnTarget(_)
@@ -169,6 +170,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     | OfferType::TotalGoals(_, _)
                     | OfferType::AsianHandicap(_, _)
                     | OfferType::DrawNoBet(_)
+                    | OfferType::SplitHandicap(_, _, _)
                     | OfferType::CorrectScore(_)
                     | OfferType::FirstGoalscorer
                     | OfferType::AnytimeGoalscorer
@@ -338,11 +340,7 @@ fn fit_offer(offer_type: OfferType, map: &HashMap<Outcome, f64>, normal: f64) ->
     }
 }
 
-fn sort_tuples<K, V, I>(tuples: I) -> Vec<(K, V)>
-where
-    I: IntoIterator<Item = (K, V)>,
-    K: Ord,
-{
+fn sort_tuples<K: Ord, V>(tuples: impl IntoIterator<Item = (K, V)>) -> Vec<(K, V)> {
     let tuples = tuples.into_iter();
     let mut tuples = tuples.collect::<Vec<_>>();
     tuples.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
