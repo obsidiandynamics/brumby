@@ -29,9 +29,6 @@ pub mod timed;
 pub mod selection;
 pub mod stack_vec;
 
-#[cfg(test)]
-pub(crate) mod testing;
-
 #[doc = include_str!("../../README.md")]
 #[cfg(doc)]
 fn readme() {}

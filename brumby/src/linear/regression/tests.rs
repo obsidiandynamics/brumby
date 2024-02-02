@@ -1,14 +1,14 @@
 use assert_float_eq::*;
 use ordinalizer::Ordinal;
+use brumby_testing::assert_slice_f64_relative;
 
 use Regressor::{Exp, Variable, Product};
 
 use crate::linear::regression::Regressor::{Intercept, Origin};
-use crate::testing::assert_slice_f64_relative;
 
 use super::*;
 
-#[derive(Debug, PartialEq, ordinalizer::Ordinal, Display, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Ordinal, Display, Serialize, Deserialize)]
 enum TestFactor {
     A,
     B,

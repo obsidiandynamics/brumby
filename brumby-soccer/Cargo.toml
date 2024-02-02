@@ -32,6 +32,7 @@ tracing-subscriber = { workspace = true }
 [dev-dependencies]
 assert_float_eq = { workspace = true }
 criterion = { workspace = true }
+brumby-testing = { version = "0.7.3", path = "../brumby-testing" }
 
 [[bench]]
 name = "cri_interval"

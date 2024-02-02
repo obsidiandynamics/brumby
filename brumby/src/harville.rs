@@ -76,12 +76,12 @@ pub fn harville_summary_no_alloc(
 mod tests {
     use assert_float_eq::assert_float_relative_eq;
     use assert_float_eq::*;
+    use brumby_testing::assert_slice_f64_relative;
 
     use crate::capture::Capture;
     use crate::comb::{is_unique_quadratic, Permuter};
     use crate::mc::DilatedProbs;
     use crate::probs::SliceExt;
-    use crate::testing::assert_slice_f64_relative;
 
     use super::*;
 

@@ -31,6 +31,7 @@ thiserror = { workspace = true }
 rustc-hash = { workspace = true }
 
 [dev-dependencies]
+brumby-testing = { version = "0.7.3", path = "../brumby-testing" }
 assert_float_eq = { workspace = true }
 criterion = { workspace = true }
 tinyrand-alloc = { workspace = true }

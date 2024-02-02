@@ -169,9 +169,9 @@ impl Display for Fraction {
 #[cfg(test)]
 mod tests {
     use assert_float_eq::*;
+    use brumby_testing::{assert_slice_f64_near, assert_slice_f64_relative};
     use super::*;
     use crate::linear::matrix::matrix_fixtures::populate_with_test_data;
-    use crate::testing::{assert_slice_f64_near, assert_slice_f64_relative};
 
     #[test]
     fn sum() {
