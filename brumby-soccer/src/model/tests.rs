@@ -64,20 +64,19 @@ fn stub_split_handicap(draw_handicap: DrawHandicap, win_handicap: WinHandicap) -
 #[test]
 pub fn split_handicap_evenly_matched() {
     let mut model = create_test_model();
-    insert_head_to_head(&mut model, DrawHandicap::Ahead(2), vec![12.26, 8.2, 1.25]);
-    insert_head_to_head(&mut model, DrawHandicap::Ahead(1), vec![4.91, 4.88, 1.68]);
-    insert_head_to_head(&mut model, DrawHandicap::Ahead(0), vec![2.44, 4.13, 2.85]);
-    insert_head_to_head(&mut model, DrawHandicap::Behind(1), vec![1.53, 5.33, 6.15]);
-    insert_asian_handicap(&mut model, WinHandicap::AheadOver(0), vec![2.44, 1.68]);
-    insert_asian_handicap(&mut model, WinHandicap::BehindUnder(1), vec![1.53, 2.85]);
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(1), vec![4.91, 4.88, 1.68]);    // 0:1
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(0), vec![2.44, 4.13, 2.85]);    // 0:0
+    insert_head_to_head(&mut model, DrawHandicap::Behind(1), vec![1.53, 5.33, 6.15]);   // 1:0
+    insert_asian_handicap(&mut model, WinHandicap::AheadOver(0), vec![2.44, 1.68]);     // -0.5/+0.5
+    insert_asian_handicap(&mut model, WinHandicap::BehindUnder(1), vec![1.53, 2.85]);   // +0.5/-0.5
 
     model
         .derive(
             &[
-                stub_split_handicap(DrawHandicap::Ahead(1), WinHandicap::AheadOver(0)),
-                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::AheadOver(0)),
-                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::BehindUnder(1)),
-                stub_split_handicap(DrawHandicap::Behind(1), WinHandicap::BehindUnder(1)),
+                stub_split_handicap(DrawHandicap::Ahead(1), WinHandicap::AheadOver(0)),     // -0.75/+0.75
+                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::AheadOver(0)),     // -0.25/+0.25
+                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::BehindUnder(1)),   // +0.25/-0.25
+                stub_split_handicap(DrawHandicap::Behind(1), WinHandicap::BehindUnder(1)),  // +0.75/-0.75
             ],
             &SINGLE_PRICE_BOUNDS,
         )
@@ -119,6 +118,126 @@ pub fn split_handicap_evenly_matched() {
             WinHandicap::BehindUnder(1),
         ),
         &[1.392, 3.549],
+    );
+}
+
+#[test]
+pub fn split_handicap_home_advantage() {
+    let mut model = create_test_model();
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(2), vec![7.02, 6.34, 1.42]);    // 0:2
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(1), vec![3.33, 4.54, 2.08]);    // 0:1
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(0), vec![1.92, 4.54, 3.84]);    // 0:0
+    insert_asian_handicap(&mut model, WinHandicap::AheadOver(1), vec![3.33, 1.42]);     // -1.5/+1.5
+    insert_asian_handicap(&mut model, WinHandicap::AheadOver(0), vec![1.92, 2.08]);     // -0.5/+0.5
+
+    model
+        .derive(
+            &[
+                stub_split_handicap(DrawHandicap::Ahead(2), WinHandicap::AheadOver(1)),     // -1.75/+1.75
+                stub_split_handicap(DrawHandicap::Ahead(1), WinHandicap::AheadOver(1)),     // -1.25/+1.25
+                stub_split_handicap(DrawHandicap::Ahead(1), WinHandicap::AheadOver(0)),     // -0.75/+0.75
+                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::AheadOver(0)),     // -0.25/+0.25
+            ],
+            &SINGLE_PRICE_BOUNDS,
+        )
+        .unwrap();
+    print_offers(model.offers());
+
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Ahead(2),
+            WinHandicap::AheadOver(1),
+        ),
+        &[4.182, 1.314],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Ahead(1),
+            WinHandicap::AheadOver(1),
+        ),
+        &[2.977, 1.506],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Ahead(1),
+            WinHandicap::AheadOver(0),
+        ),
+        &[2.171, 1.854],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Ahead(0),
+            WinHandicap::AheadOver(0),
+        ),
+        &[1.712, 2.405],
+    );
+}
+
+#[test]
+pub fn split_handicap_away_advantage() {
+    let mut model = create_test_model();
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(0), vec![3.84, 4.54, 1.92]);    // 0:0
+    insert_head_to_head(&mut model, DrawHandicap::Behind(1), vec![2.08, 4.54, 3.33]);   // 1:0
+    insert_head_to_head(&mut model, DrawHandicap::Behind(2), vec![1.42, 6.34, 7.02]);   // 2:0
+    insert_asian_handicap(&mut model, WinHandicap::BehindUnder(1), vec![2.08, 1.92]);   // +0.5/-0.5
+    insert_asian_handicap(&mut model, WinHandicap::BehindUnder(2), vec![1.42, 3.33]);   // +1.5/-1.5
+
+    model
+        .derive(
+            &[
+                stub_split_handicap(DrawHandicap::Ahead(0), WinHandicap::BehindUnder(1)),   // +0.25/-0.25
+                stub_split_handicap(DrawHandicap::Behind(1), WinHandicap::BehindUnder(1)),  // +0.75/-0.75
+                stub_split_handicap(DrawHandicap::Behind(1), WinHandicap::BehindUnder(2)),  // +1.25/-1.25
+                stub_split_handicap(DrawHandicap::Behind(2), WinHandicap::BehindUnder(2)),  // +1.75/-1.75
+            ],
+            &SINGLE_PRICE_BOUNDS,
+        )
+        .unwrap();
+    print_offers(model.offers());
+
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Ahead(0),
+            WinHandicap::BehindUnder(1),
+        ),
+        &[2.405, 1.712],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Behind(1),
+            WinHandicap::BehindUnder(1),
+        ),
+        &[1.854, 2.171],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Behind(1),
+            WinHandicap::BehindUnder(2),
+        ),
+        &[1.506, 2.977],
+    );
+    assert_prices(
+        model.offers(),
+        &OfferType::SplitHandicap(
+            Period::FullTime,
+            DrawHandicap::Behind(2),
+            WinHandicap::BehindUnder(2),
+        ),
+        &[1.314, 4.182],
     );
 }
 

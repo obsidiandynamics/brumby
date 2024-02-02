@@ -478,6 +478,7 @@ impl Model {
             (DrawHandicap::Ahead(ahead), WinHandicap::AheadOver(ahead_over)) => {
                 if ahead == ahead_over {
                     // -x.25 case
+                    assert_eq!(*ahead, *ahead_over);
                     let asian_win_prob = asian_offer
                         .get_probability(&Outcome::Win(Side::Home, win_handicap.clone()))
                         .unwrap();
@@ -501,6 +502,7 @@ impl Model {
                 };
                 if behind == *behind_under {
                     // +x.75 case
+                    assert_eq!(behind, *behind_under);
                     let euro_win_prob = euro_offer
                         .get_probability(&Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european()))
                         .unwrap();

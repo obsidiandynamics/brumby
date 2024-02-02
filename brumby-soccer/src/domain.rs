@@ -56,13 +56,9 @@ impl DrawHandicap {
 
     pub fn flip(&self) -> DrawHandicap {
         match self {
-            DrawHandicap::Ahead(by) => {
-                if *by > 0 {
-                    DrawHandicap::Behind(*by)
-                } else {
-                    DrawHandicap::Ahead(0)
-                }
-            },
+            DrawHandicap::Ahead(0) => DrawHandicap::Ahead(0),
+            DrawHandicap::Ahead(by) => DrawHandicap::Behind(*by),
+            DrawHandicap::Behind(0) => panic!("unsupported {:?}", self),
             DrawHandicap::Behind(by) => DrawHandicap::Ahead(*by)
         }
     }
