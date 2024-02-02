@@ -263,7 +263,7 @@ impl Model {
 
     fn get_offer(&self, offer_type: &OfferType) -> Result<&Offer, MissingOffer> {
         self.offers
-            .get(&offer_type)
+            .get(offer_type)
             .ok_or(MissingOffer::Type(offer_type.clone()))
     }
 
@@ -591,7 +591,7 @@ impl Model {
         }
 
         #[inline(always)]
-        fn sort_selections_by_increasing_prob(selections: &mut Vec<DetailedSelection>) {
+        fn sort_selections_by_increasing_prob(selections: &mut [DetailedSelection]) {
             selections.sort_by(|s1, s2| s1.single_prob.total_cmp(&s2.single_prob))
         }
 
@@ -716,7 +716,7 @@ impl Model {
             );
             let pruned = exploration.pruned;
             let query_start = Instant::now();
-            let scan_result = scan_prefix(&sorted_selections, &exploration);
+            let scan_result = scan_prefix(&sorted_selections, exploration);
             query_elapsed += query_start.elapsed();
 
             let mut fringes =
@@ -807,7 +807,7 @@ impl Model {
 
                     let query_start = Instant::now();
                     let fringe_scan_result =
-                        scan_prefix(&fringe_sorted_selections, &fringe_exploration);
+                        scan_prefix(&fringe_sorted_selections, fringe_exploration);
                     query_elapsed += query_start.elapsed();
 
                     let probability = fringe_scan_result.lowest_prob;

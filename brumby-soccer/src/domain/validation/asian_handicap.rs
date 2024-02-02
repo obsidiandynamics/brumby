@@ -1,7 +1,7 @@
 use brumby::hash_lookup::HashLookup;
 
 use crate::domain::{validation, OfferType, Outcome, Side, WinHandicap};
-use crate::domain::validation::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
+use crate::domain::validation::{ExtraneousOutcome, InvalidOffer, InvalidOfferType, InvalidOutcome};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
@@ -34,6 +34,18 @@ pub(crate) fn validate_outcome(
 pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), InvalidOffer> {
     validation::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
     Ok(())
+}
+
+pub(crate) fn validate_type(
+    offer_type: &OfferType,
+    win_handicap: &WinHandicap,
+) -> Result<(), InvalidOfferType> {
+    match win_handicap {
+        WinHandicap::BehindUnder(0) => Err(InvalidOfferType {
+            offer_type: offer_type.clone(),
+        }),
+        _ => Ok(()),
+    }
 }
 
 fn valid_outcomes(win_handicap: &WinHandicap) -> [Outcome; 2] {
@@ -118,6 +130,22 @@ mod tests {
         };
         assert_eq!(
             "None does not belong in AsianHandicap(FullTime, AheadOver(2))",
+            offer.validate().unwrap_err().to_string()
+        );
+    }
+
+    #[test]
+    fn invalid_type() {
+        let offer = Offer {
+            offer_type: OfferType::AsianHandicap(Period::FullTime, WinHandicap::BehindUnder(0)),
+            outcomes: HashLookup::from(vec![
+                Outcome::Win(Side::Home, WinHandicap::BehindUnder(0)),
+                Outcome::Win(Side::Away, WinHandicap::AheadOver(0)),
+            ]),
+            market: Market::frame(&Overround::fair(), vec![0.4, 0.6], &PRICE_BOUNDS),
+        };
+        assert_eq!(
+            "AsianHandicap(FullTime, BehindUnder(0)) is not a valid offer type",
             offer.validate().unwrap_err().to_string()
         );
     }

@@ -98,6 +98,9 @@ pub struct InvalidOfferType {
 impl OfferType {
     pub fn validate(&self) -> Result<(), InvalidOfferType> {
         match self {
+            OfferType::HeadToHead(_, draw_handicap) => head_to_head::validate_type(self, draw_handicap),
+            OfferType::DrawNoBet(draw_handicap) => draw_no_bet::validate_type(self, draw_handicap),
+            OfferType::AsianHandicap(_, win_handicap) => asian_handicap::validate_type(self, win_handicap),
             OfferType::SplitHandicap(_, draw_handicap, win_handicap) => split_handicap::validate_type(self, draw_handicap, win_handicap),
             _ => Ok(()),
         }

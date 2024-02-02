@@ -1,12 +1,14 @@
 use brumby::hash_lookup::HashLookup;
 
-use crate::domain::{DrawHandicap, validation, OfferType, Outcome, Side};
-use crate::domain::validation::{ExtraneousOutcome, InvalidOffer, InvalidOutcome};
+use crate::domain::validation::{
+    ExtraneousOutcome, InvalidOffer, InvalidOfferType, InvalidOutcome,
+};
+use crate::domain::{validation, DrawHandicap, OfferType, Outcome, Side};
 
 pub(crate) fn validate_outcomes(
     offer_type: &OfferType,
     outcomes: &HashLookup<Outcome>,
-    draw_handicap: &DrawHandicap
+    draw_handicap: &DrawHandicap,
 ) -> Result<(), InvalidOutcome> {
     validation::OutcomesCompleteAssertion {
         outcomes: &valid_outcomes(draw_handicap),
@@ -18,7 +20,7 @@ pub(crate) fn validate_outcomes(
 pub(crate) fn validate_outcome(
     offer_type: &OfferType,
     outcome: &Outcome,
-    draw_handicap: &DrawHandicap
+    draw_handicap: &DrawHandicap,
 ) -> Result<(), InvalidOutcome> {
     let valid_outcomes = valid_outcomes(draw_handicap);
     if valid_outcomes.contains(outcome) {
@@ -34,6 +36,18 @@ pub(crate) fn validate_outcome(
 pub(crate) fn validate_probs(offer_type: &OfferType, probs: &[f64]) -> Result<(), InvalidOffer> {
     validation::BooksumAssertion::with_default_tolerance(1.0..=1.0).check(probs, offer_type)?;
     Ok(())
+}
+
+pub(crate) fn validate_type(
+    offer_type: &OfferType,
+    draw_handicap: &DrawHandicap,
+) -> Result<(), InvalidOfferType> {
+    match draw_handicap {
+        DrawHandicap::Behind(0) => Err(InvalidOfferType {
+            offer_type: offer_type.clone(),
+        }),
+        _ => Ok(()),
+    }
 }
 
 fn valid_outcomes(draw_handicap: &DrawHandicap) -> [Outcome; 3] {
@@ -123,6 +137,23 @@ mod tests {
         };
         assert_eq!(
             "None does not belong in HeadToHead(FullTime, Ahead(2))",
+            offer.validate().unwrap_err().to_string()
+        );
+    }
+
+    #[test]
+    fn invalid_type() {
+        let offer = Offer {
+            offer_type: OfferType::HeadToHead(Period::FullTime, DrawHandicap::Behind(0)),
+            outcomes: HashLookup::from(vec![
+                Outcome::Win(Side::Home, WinHandicap::BehindUnder(0)),
+                Outcome::Win(Side::Away, WinHandicap::AheadOver(0)),
+                Outcome::Draw(DrawHandicap::Behind(0)),
+            ]),
+            market: Market::frame(&Overround::fair(), vec![0.4, 0.4, 0.2], &PRICE_BOUNDS),
+        };
+        assert_eq!(
+            "HeadToHead(FullTime, Behind(0)) is not a valid offer type",
             offer.validate().unwrap_err().to_string()
         );
     }

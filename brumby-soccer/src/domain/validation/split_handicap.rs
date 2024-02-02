@@ -49,7 +49,7 @@ pub(crate) fn validate_type(
         } else {
             Err(InvalidOfferType {
                 offer_type: offer_type.clone(),
-            }.into())
+            })
         }
     };
 
@@ -99,7 +99,6 @@ mod tests {
 
     use super::*;
 
-    const OFFER_TYPE: OfferType = OfferType::SplitHandicap(Period::FullTime, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2));
     const PRICE_BOUNDS: RangeInclusive<f64> = 1.0..=1001.0;
 
     #[test]
@@ -157,7 +156,7 @@ mod tests {
     #[test]
     fn wrong_booksum() {
         let offer = Offer {
-            offer_type: OFFER_TYPE,
+            offer_type: OfferType::SplitHandicap(Period::FullTime, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2)),
             outcomes: HashLookup::from(vec![
                 Outcome::SplitWin(Side::Home, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2)),       // -2.25
                 Outcome::SplitWin(Side::Away, DrawHandicap::Behind(2), WinHandicap::BehindUnder(3)),    // +2.25
@@ -173,7 +172,7 @@ mod tests {
     #[test]
     fn missing_outcome() {
         let offer = Offer {
-            offer_type: OFFER_TYPE,
+            offer_type: OfferType::SplitHandicap(Period::FullTime, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2)),
             outcomes: HashLookup::from(vec![Outcome::SplitWin(Side::Home, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2))]),
             market: Market::frame(&Overround::fair(), vec![1.0], &PRICE_BOUNDS),
         };
@@ -186,7 +185,7 @@ mod tests {
     #[test]
     fn extraneous_outcome() {
         let offer = Offer {
-            offer_type: OFFER_TYPE,
+            offer_type: OfferType::SplitHandicap(Period::FullTime, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2)),
             outcomes: HashLookup::from(vec![
                 Outcome::SplitWin(Side::Home, DrawHandicap::Ahead(2), WinHandicap::AheadOver(2)),       // -2.25
                 Outcome::SplitWin(Side::Away, DrawHandicap::Behind(2), WinHandicap::BehindUnder(3)),    // +2.25
