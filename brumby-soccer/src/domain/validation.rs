@@ -12,6 +12,7 @@ use crate::domain::{Offer, OfferType, Outcome};
 mod asian_handicap;
 mod draw_no_bet;
 mod head_to_head;
+mod split_handicap;
 mod total_goals;
 
 #[derive(Debug, Error)]
@@ -27,6 +28,9 @@ pub enum InvalidOffer {
 
     #[error("{0}")]
     InvalidMarket(#[from] anyhow::Error),
+
+    #[error("{0}")]
+    InvalidOfferType(#[from] InvalidOfferType),
 }
 
 impl Offer {
@@ -37,12 +41,14 @@ impl Offer {
             &self.market.probs,
             &self.offer_type,
         )?;
+        self.offer_type.validate()?;
         self.offer_type.validate_outcomes(&self.outcomes)?;
         match self.offer_type {
             OfferType::TotalGoals(_, _) => total_goals::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::HeadToHead(_, _) => head_to_head::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::AsianHandicap(_, _) => asian_handicap::validate_probs(&self.offer_type, &self.market.probs),
             OfferType::DrawNoBet(_) => draw_no_bet::validate_probs(&self.offer_type, &self.market.probs),
+            OfferType::SplitHandicap(_, _, _) => split_handicap::validate_probs(&self.offer_type, &self.market.probs),
             _ => Ok(()),
         }
     }
@@ -83,13 +89,27 @@ pub enum InvalidOutcome {
     ExtraneousOutcome(#[from] ExtraneousOutcome),
 }
 
+#[derive(Debug, Error)]
+#[error("{offer_type:?} is not a valid offer type")]
+pub struct InvalidOfferType {
+    pub offer_type: OfferType,
+}
+
 impl OfferType {
+    pub fn validate(&self) -> Result<(), InvalidOfferType> {
+        match self {
+            OfferType::SplitHandicap(_, draw_handicap, win_handicap) => split_handicap::validate_type(self, draw_handicap, win_handicap),
+            _ => Ok(()),
+        }
+    }
+
     pub fn validate_outcomes(&self, outcomes: &HashLookup<Outcome>) -> Result<(), InvalidOutcome> {
         match self {
             OfferType::TotalGoals(_, over) => total_goals::validate_outcomes(self, outcomes, over),
             OfferType::HeadToHead(_, draw_handicap) => head_to_head::validate_outcomes(self, outcomes, draw_handicap),
             OfferType::AsianHandicap(_, win_handicap) => asian_handicap::validate_outcomes(self, outcomes, win_handicap),
             OfferType::DrawNoBet(draw_handicap) => draw_no_bet::validate_outcomes(self, outcomes, draw_handicap),
+            OfferType::SplitHandicap(_, draw_handicap, win_handicap) => split_handicap::validate_outcomes(self, outcomes, draw_handicap, win_handicap),
             _ => Ok(()),
         }
     }
@@ -100,6 +120,7 @@ impl OfferType {
             OfferType::HeadToHead(_, draw_handicap) => head_to_head::validate_outcome(self, outcome, draw_handicap),
             OfferType::AsianHandicap(_, win_handicap) => asian_handicap::validate_outcome(self, outcome, win_handicap),
             OfferType::DrawNoBet(draw_handicap) => draw_no_bet::validate_outcome(self, outcome, draw_handicap),
+            OfferType::SplitHandicap(_, draw_handicap, win_handicap) => split_handicap::validate_outcome(self, outcome, draw_handicap, win_handicap),
             _ => Ok(()),
         }
     }

@@ -11,7 +11,7 @@ pub(crate) fn validate_outcomes(
     validation::OutcomesCompleteAssertion {
         outcomes: &valid_outcomes(draw_handicap),
     }
-        .check(outcomes, offer_type)?;
+    .check(outcomes, offer_type)?;
     Ok(())
 }
 

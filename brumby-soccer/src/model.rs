@@ -16,7 +16,7 @@ use brumby::stack_vec::FromIteratorResult;
 use brumby::sv;
 use brumby::timed::Timed;
 
-use crate::domain::validation::{InvalidOffer, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
+use crate::domain::validation::{InvalidOffer, InvalidOfferType, InvalidOutcome, MissingOutcome, UnvalidatedOffer};
 use crate::domain::{
     DrawHandicap, Offer, OfferCategory, OfferType, Outcome, Over, Period, Player, Side, WinHandicap,
 };
@@ -107,6 +107,9 @@ pub enum SingleDerivationError {
 
     #[error("{0}")]
     MissingOffer(#[from] MissingOffer),
+
+    #[error("{0}")]
+    InvalidOfferType(#[from] InvalidOfferType),
 }
 
 #[derive(Debug, Error)]
@@ -128,6 +131,9 @@ pub enum MultiDerivationError {
 
     #[error("{0}")]
     AuxiliaryOffer(#[from] AuxiliaryOffer),
+
+    #[error("{0}")]
+    InvalidOfferType(#[from] InvalidOfferType),
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -270,6 +276,7 @@ impl Model {
             let mut caching_context = CachingContext::default();
             let mut auxiliary_stubs = vec![];
             for stub in stubs {
+                stub.offer_type.validate()?;
                 stub.offer_type.validate_outcomes(&stub.outcomes)?;
                 if stub.offer_type.is_auxiliary() {
                     auxiliary_stubs.push(stub);
@@ -478,7 +485,6 @@ impl Model {
             (DrawHandicap::Ahead(ahead), WinHandicap::AheadOver(ahead_over)) => {
                 if ahead == ahead_over {
                     // -x.25 case
-                    assert_eq!(*ahead, *ahead_over);
                     let asian_win_prob = asian_offer
                         .get_probability(&Outcome::Win(Side::Home, win_handicap.clone()))
                         .unwrap();
@@ -502,7 +508,6 @@ impl Model {
                 };
                 if behind == *behind_under {
                     // +x.75 case
-                    assert_eq!(behind, *behind_under);
                     let euro_win_prob = euro_offer
                         .get_probability(&Outcome::Win(Side::Away, draw_handicap.to_win_handicap().flip_european()))
                         .unwrap();
@@ -855,6 +860,7 @@ impl Model {
         agg_reqs: &mut Expansions,
         agg_player_probs: &mut FxHashMap<Player, PlayerProbs>,
     ) -> Result<(), MultiDerivationError> {
+        offer_type.validate()?;
         offer_type.validate_outcome(outcome)?;
         let reqs = requirements(offer_type);
         let requires_player_goal_probs = reqs.requires_player_goal_probs();
