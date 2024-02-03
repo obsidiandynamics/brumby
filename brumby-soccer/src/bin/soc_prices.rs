@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 use anyhow::{bail, Context};
+use brumby::derived_price::DerivedPrice;
 use clap::Parser;
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -14,20 +15,19 @@ use stanza::renderer::Renderer;
 use stanza::style::Styles;
 use stanza::table::{Cell, Content, Row, Table};
 use tracing::{debug, info, warn};
-use brumby::derived_price::DerivedPrice;
 
 use brumby::hash_lookup::HashLookup;
 use brumby::market::{Market, OverroundMethod, PriceBounds};
 use brumby::tables;
 use brumby::timed::Timed;
-use brumby_soccer::{fit, model, print};
-use brumby_soccer::data::{ContestSummary, download_by_id, SoccerFeedId};
+use brumby_soccer::data::{download_by_id, ContestSummary, SoccerFeedId};
 use brumby_soccer::domain::{Offer, OfferType, Outcome};
 use brumby_soccer::fit::{ErrorType, FittingErrors};
-use brumby_soccer::model::{FitError, Model, score_fitter, Stub};
 use brumby_soccer::model::player_assist_fitter::PlayerAssistFitter;
 use brumby_soccer::model::player_goal_fitter::PlayerGoalFitter;
 use brumby_soccer::model::score_fitter::ScoreFitter;
+use brumby_soccer::model::{score_fitter, FitError, Model, Stub};
+use brumby_soccer::{fit, model, print};
 
 const OVERROUND_METHOD: OverroundMethod = OverroundMethod::OddsRatio;
 const SINGLE_PRICE_BOUNDS: PriceBounds = 1.001..=301.0;
@@ -177,6 +177,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     | OfferType::AnytimeAssist
             )
         })
+        .filter(|(_, offer)| {
+            let has_nil_price = offer.market.prices.contains(&0.0);
+            if has_nil_price { warn!("discarding {offer:?}"); }
+            !has_nil_price
+        })
         .map(|(_, offer)| Stub {
             offer_type: offer.offer_type.clone(),
             outcomes: offer.outcomes.clone(),
@@ -296,7 +301,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 if fringe.quotation.probability == 0.0 {
                     unattainable_fringes += 1;
                 }
-                info!("  {fringe:?}, overround: {:.3}, scaled_price: {scaled_price:.3}", fringe.quotation.overround());
+                info!(
+                    "  {fringe:?}, overround: {:.3}, scaled_price: {scaled_price:.3}",
+                    fringe.quotation.overround()
+                );
             }
         }
         info!("{total_fringes} fringes derived, {unattainable_fringes} are unattainable");
@@ -306,11 +314,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 fn scale_price(quotation: &DerivedPrice, scaling_exponent: f64) -> f64 {
     if quotation.price.is_finite() {
-        let scaled_price = quotation.price
-            / quotation
-            .overround()
-            .powf(scaling_exponent - 1.0);
-        f64::max(*MULTI_PRICE_BOUNDS.start(), f64::min(scaled_price, *MULTI_PRICE_BOUNDS.end()))
+        let scaled_price = quotation.price / quotation.overround().powf(scaling_exponent - 1.0);
+        f64::max(
+            *MULTI_PRICE_BOUNDS.start(),
+            f64::min(scaled_price, *MULTI_PRICE_BOUNDS.end()),
+        )
     } else {
         quotation.price
     }

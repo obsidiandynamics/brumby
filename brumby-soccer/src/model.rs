@@ -986,6 +986,7 @@ fn frame_prices_from_exploration(
     probs.normalise(normal);
     // trace!("probs: {probs:?}, sum: {:.6}", probs.sum());
     let market = Market::frame(overround, probs, price_bounds);
+    // trace!("market: {market:?}");
     Offer {
         offer_type: offer_type.clone(),
         outcomes: HashLookup::from(outcomes.to_vec()),
