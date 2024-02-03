@@ -61,6 +61,20 @@ fn stub_split_handicap(draw_handicap: DrawHandicap, win_handicap: WinHandicap) -
     }
 }
 
+fn stub_draw_no_bet(draw_handicap: DrawHandicap) -> Stub {
+    let win_handicap = draw_handicap.to_win_handicap();
+    let outcomes = HashLookup::from([
+        Outcome::Win(Side::Home, win_handicap.clone()),
+        Outcome::Win(Side::Away, win_handicap.flip_european()),
+    ]);
+    Stub {
+        offer_type: OfferType::DrawNoBet(draw_handicap),
+        outcomes,
+        normal: 1.0,
+        overround: OVERROUND.clone(),
+    }
+}
+
 #[test]
 pub fn split_handicap_evenly_matched() {
     let mut model = create_test_model();
@@ -238,6 +252,30 @@ pub fn split_handicap_away_advantage() {
             WinHandicap::BehindUnder(2),
         ),
         &[1.314, 4.182],
+    );
+}
+
+#[test]
+pub fn draw_no_bet() {
+    let mut model = create_test_model();
+    insert_head_to_head(&mut model, DrawHandicap::Ahead(0), vec![1.0/0.25, 1.0/0.35, 1.0/0.4]);
+
+    model
+        .derive(
+            &[
+                stub_draw_no_bet(DrawHandicap::Ahead(0)),
+            ],
+            &SINGLE_PRICE_BOUNDS,
+        )
+        .unwrap();
+    print_offers(model.offers());
+
+    assert_prices(
+        model.offers(),
+        &OfferType::DrawNoBet(
+            DrawHandicap::Ahead(0),
+        ),
+        &[2.6, 1.625],
     );
 }
 
