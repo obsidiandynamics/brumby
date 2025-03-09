@@ -46,7 +46,7 @@ pub struct Iter<'a> {
     permuter: Permuter<'a>,
     permutation: u64,
 }
-impl<'a> Iterator for Iter<'a> {
+impl Iterator for Iter<'_> {
     type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
