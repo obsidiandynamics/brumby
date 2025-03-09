@@ -135,7 +135,7 @@ mod tests {
 
     use crate::capture::Capture;
     use crate::comb::{is_unique_quadratic, Permuter};
-    use crate::mc::DilatedProbs;
+    use crate::dilative::DilatedProbs;
     use crate::probs::SliceExt;
 
     use super::*;

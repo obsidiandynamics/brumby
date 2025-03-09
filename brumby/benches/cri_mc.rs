@@ -1,10 +1,10 @@
 use brumby::capture::Capture;
 use brumby::mc;
-use brumby::mc::DilatedProbs;
 use brumby::probs::SliceExt;
 use criterion::{criterion_group, criterion_main, Criterion};
 use tinyrand::{StdRand, Wyrand};
 use tinyrand_alloc::Mock;
+use brumby::dilative::DilatedProbs;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut probs = [

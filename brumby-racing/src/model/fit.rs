@@ -12,11 +12,11 @@ use mc::MonteCarloEngine;
 use brumby::capture::Capture;
 use brumby::linear::matrix::Matrix;
 use brumby::market::{Market, MarketPrice, Overround, PriceBounds};
-use brumby::mc::DilatedProbs;
 use crate::model::cf::{Coefficients, Factor};
 use brumby::probs::SliceExt;
 use brumby::selection::{Rank, Selections};
 use brumby::{mc, selection};
+use brumby::dilative::DilatedProbs;
 use crate::model;
 
 pub const FITTED_PRICE_RANGES: [Range<f64>; 4] =

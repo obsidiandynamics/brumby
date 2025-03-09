@@ -1,5 +1,6 @@
 use brumby::capture::{Capture, CaptureMut};
-use brumby::mc::{DilatedProbs, MonteCarloEngine};
+use brumby::dilative::DilatedProbs;
+use brumby::mc::MonteCarloEngine;
 use brumby::probs::SliceExt;
 use brumby::selection::{Rank, Runner, Selection};
 use criterion::{criterion_group, criterion_main, Criterion};
