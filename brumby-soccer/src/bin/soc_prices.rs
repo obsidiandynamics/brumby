@@ -270,15 +270,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    // let selections = [
-    //     // (OfferType::TotalGoals(Period::FullTime, Over(2)), Outcome::Over(2)),
-    //     // (OfferType::HeadToHead(Period::FullTime), Outcome::Win(Side::Home)),
-    //     // (OfferType::FirstGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("João Pedro")))),
-    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Away, String::from("Welbeck")))),
-    //     // (OfferType::AnytimeGoalscorer, Outcome::Player(Player::Named(Side::Home, String::from("Bowen")))),
-    // ];
-    // let encoded = serde_json::to_string(&selections)?;
-    // info!("selections: {encoded}");
     if let Some(ref selections) = args.selections {
         let selections = load_selections(selections)?;
         let derivation = model.derive_multi(&selections)?;

@@ -72,6 +72,61 @@ pub fn harville_summary_no_alloc(
     }
 }
 
+pub fn harville_summary_condensed(probs: &Matrix<f64>, ranks: usize) -> Vec<f64> {
+    let runners = probs.cols();
+    let mut summary = Vec::with_capacity(runners);
+    summary.resize(runners, 0.0);
+    let cardinalities = vec![runners; ranks];
+    let mut podium = vec![0; ranks];
+    let mut bitmap = vec![false; runners];
+    harville_summary_condensed_no_alloc(
+        probs,
+        ranks,
+        &cardinalities,
+        &mut podium,
+        &mut bitmap,
+        summary.as_mut_slice(),
+    );
+    summary
+}
+
+pub fn harville_summary_condensed_no_alloc(
+    probs: &Matrix<f64>,
+    ranks: usize,
+    cardinalities: &[usize],
+    podium: &mut [usize],
+    bitmap: &mut [bool],
+    summary: &mut [f64],
+) {
+    debug_assert_eq!(
+        probs.rows(),
+        ranks,
+        "number of rows in the probabilities matrix must equal to the number of ranks"
+    );
+    debug_assert_eq!(summary.len(), probs.cols(), "number of columns in the probabilities matrix must equal to the length of the summary slice");
+    debug_assert_eq!(
+        probs.rows(),
+        podium.len(),
+        "number of rows in the probabilities matrix must equal to the podium length"
+    );
+    debug_assert_eq!(
+        probs.cols(),
+        bitmap.len(),
+        "number of columns in the probabilities matrix must equal to the bitmap length"
+    );
+    let permutations = count_permutations(cardinalities);
+    for permutation in 0..permutations {
+        pick(cardinalities, permutation, podium);
+        if !is_unique_linear(podium, bitmap) {
+            continue;
+        }
+        let prob = harville(probs, podium);
+        for &runner in podium.iter() {
+            summary[runner] += prob;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use assert_float_eq::assert_float_relative_eq;
@@ -300,6 +355,50 @@ mod tests {
             let col_cells = summary.col(col);
             assert_float_relative_eq!(1.0, col_cells.sum::<f64>());
         }
+    }
+
+    #[test]
+    fn harville_summary_3x2_condensed_without_scratchings() {
+        const WIN_PROBS: [f64; 3] = [0.6, 0.3, 0.1];
+        const RANKS: usize = 2;
+        let probs = Matrix::from(
+            DilatedProbs::default()
+                .with_win_probs(Capture::Borrowed(&WIN_PROBS))
+                .with_podium_places(RANKS),
+        );
+        let summary = harville_summary_condensed(&probs, RANKS);
+        println!("summary: {summary:?}");
+        assert_slice_f64_relative(
+            &[
+                0.6 + 0.32380952380952444,
+                0.3 + 0.48333333333333445,
+                0.1 + 0.19285714285714314,
+            ],
+            &summary,
+            1e-9,
+        );
+    }
+
+    #[test]
+    fn harville_summary_condensed_3x3_without_scratchings() {
+        const WIN_PROBS: [f64; 3] = [0.6, 0.3, 0.1];
+        const RANKS: usize = 3;
+        let probs = Matrix::from(
+            DilatedProbs::default()
+                .with_win_probs(Capture::Borrowed(&WIN_PROBS))
+                .with_podium_places(RANKS),
+        );
+        let summary = harville_summary_condensed(&probs, RANKS);
+        println!("summary: {summary:?}");
+        assert_slice_f64_relative(
+            &[
+                1.0,
+                1.0,
+                1.0,
+            ],
+            &summary,
+            1e-9,
+        );
     }
 
     #[test]

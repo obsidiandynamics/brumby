@@ -286,9 +286,7 @@ pub fn run_once(
                         break;
                     }
                 }
-            } /*else {
-                  println!("skipping runner {runner}");
-              }*/
+            }
         }
         if !chosen {
             *ranked_runner = last_eligible_runner;
@@ -299,8 +297,6 @@ pub fn run_once(
             //panic!("no runner chosen in rank {rank}! cumulative: {cumulative}, random: {random}, bitmap: {bitmap:?}, totals: {totals:?}");
         }
     }
-
-    // println!("podium: {podium:?}");
 }
 
 fn validate_args(
